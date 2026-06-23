@@ -1,0 +1,19 @@
+{
+  "buildCommand": "prisma generate && next build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "env": {
+    "DATABASE_URL": "@fintrack-database-url",
+    "NEXTAUTH_SECRET": "@fintrack-nextauth-secret",
+    "NEXTAUTH_URL": "@fintrack-nextauth-url",
+    "TELLER_APPLICATION_ID": "@fintrack-teller-app-id",
+    "TELLER_SIGNING_SECRET": "@fintrack-teller-signing-secret",
+    "TELLER_CERTIFICATE": "@fintrack-teller-cert",
+    "TELLER_PRIVATE_KEY": "@fintrack-teller-key",
+    "ENCRYPTION_KEY": "@fintrack-encryption-key",
+    "ANTHROPIC_API_KEY": "@fintrack-anthropic-key",
+    "NEXT_PUBLIC_TELLER_APP_ID": "@fintrack-teller-app-id-public",
+    "GOOGLE_CLIENT_ID": "@fintrack-google-client-id",
+    "GOOGLE_CLIENT_SECRET": "@fintrack-google-client-secret"
+  }
+}
