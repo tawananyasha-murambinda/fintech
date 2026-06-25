@@ -1,25 +1,28 @@
 import { getServerSession } from 'next-auth'
+import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { DashboardClient } from './DashboardClient'
 
-async function getDashboardData(userId: string) {
+async function getDashboardData(userId: string, accountId?: string | null) {
   const now = new Date()
   const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const prevMonthStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
 
+  const accountFilter = accountId ? { linkedBankId: accountId } : {}
+
   const [banks, txThisMonth, txLastMonth, recentTx] = await Promise.all([
     prisma.linkedBank.findMany({ where: { userId } }),
     prisma.transaction.findMany({
-      where: { userId, date: { gte: monthAgo } },
+      where: { userId, date: { gte: monthAgo }, ...accountFilter },
       select: { amount: true, direction: true, date: true, merchantCategory: true },
     }),
     prisma.transaction.findMany({
-      where: { userId, date: { gte: prevMonthStart, lt: monthAgo } },
+      where: { userId, date: { gte: prevMonthStart, lt: monthAgo }, ...accountFilter },
       select: { amount: true, direction: true },
     }),
     prisma.transaction.findMany({
-      where: { userId },
+      where: { userId, ...accountFilter },
       orderBy: { date: 'desc' },
       take: 10,
       select: {
@@ -34,7 +37,6 @@ async function getDashboardData(userId: string) {
   const expenses = txThisMonth.filter((t) => t.direction === 'debit').reduce((s: number, t) => s + Math.abs(t.amount), 0)
   const prevExpenses = txLastMonth.filter((t) => t.direction === 'debit').reduce((s: number, t) => s + Math.abs(t.amount), 0)
 
-  // Build 30-day cashflow
   const cashflowMap: Record<string, { income: number; expenses: number }> = {}
   for (const tx of txThisMonth) {
     const day = tx.date.toISOString().split('T')[0]
@@ -47,7 +49,6 @@ async function getDashboardData(userId: string) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, vals]) => ({ date, ...vals, net: vals.income - vals.expenses }))
 
-  // Category breakdown
   const catMap: Record<string, number> = {}
   for (const tx of txThisMonth.filter((t) => t.direction === 'debit')) {
     const cat = tx.merchantCategory || 'Uncategorized'
@@ -78,9 +79,25 @@ async function getDashboardData(userId: string) {
   }
 }
 
-export default async function DashboardPage() {
-  const session = await getServerSession(authOptions)
-  const data = await getDashboardData(session!.user.id)
+interface DashboardPageProps {
+  searchParams?: Promise<{ account?: string }>
+}
 
-  return <DashboardClient data={data} userName={session!.user.name || 'there'} />
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) redirect('/auth/login')
+
+  const sp = await searchParams
+  const accountId = sp?.account || null
+
+  const data = await getDashboardData(session.user.id, accountId)
+
+  return (
+    <DashboardClient
+      data={data}
+      userName={session.user.name || 'there'}
+      userId={session.user.id}
+      selectedAccountId={accountId}
+    />
+  )
 }

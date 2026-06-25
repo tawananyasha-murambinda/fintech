@@ -17,11 +17,27 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
-  linkedBanks   LinkedBank[]
-  transactions  Transaction[]
-  aiInsights    AiInsight[]
+  accounts              Account[]
+  sessions              Session[]
+  linkedBanks           LinkedBank[]
+  transactions          Transaction[]
+  manualTransactions    ManualTransaction[]
+  aiInsights            AiInsight[]
+  budgets               Budget[]
+  goals                 Goal[]
+  bills                 Bill[]
+  chatMessages          ChatMessage[]
+  alerts                Alert[]
+  categorizationRules   CategorizationRule[]
+  assets                Asset[]
+  liabilities           Liability[]
+  debtPlans             DebtPlan[]
+  taxEntries            TaxEntry[]
+  investments           Investment[]
+  householdMember       HouseholdMember[]
+  creditScore           CreditScore[]
+  notifications         Notification[]
+  receipts              Receipt[]
 }
 
 model Account {
@@ -115,4 +131,268 @@ model AiInsight {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, type, period])
+}
+
+model Budget {
+  id        String   @id @default(cuid())
+  userId    String
+  category  String
+  amount    Float
+  period    String   @default("monthly") // "weekly" | "monthly" | "quarterly"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category, period])
+  @@index([userId])
+}
+
+model Goal {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  targetAmount  Float
+  currentAmount Float     @default(0)
+  deadline      DateTime?
+  color         String    @default("teal")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Bill {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  amount        Float
+  dueDate       Int       // day of month (1-31)
+  frequency     String    @default("monthly") // "weekly" | "monthly" | "quarterly" | "yearly"
+  category      String?
+  reminderDays  Int       @default(3)
+  isActive      Boolean   @default(true)
+  lastReminded  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  role      String   // "user" | "assistant"
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model ManualTransaction {
+  id               String   @id @default(cuid())
+  userId           String
+  date             DateTime
+  amount           Float
+  direction        String   // "credit" | "debit"
+  description      String
+  merchantName     String?
+  merchantCategory String?
+  receiptId        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  receipt Receipt? @relation(fields: [receiptId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+}
+
+model Receipt {
+  id         String   @id @default(cuid())
+  userId     String
+  filename   String
+  data       Bytes
+  mimeType   String
+  createdAt  DateTime @default(now())
+
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  manualTransactions ManualTransaction[]
+
+  @@index([userId])
+}
+
+model Alert {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "overspend" | "price_change" | "duplicate" | "bill_reminder" | "goal_progress"
+  title     String
+  message   String
+  severity  String   @default("info") // "info" | "warning" | "critical"
+  read      Boolean  @default(false)
+  data      Json?    // extra context
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model CategorizationRule {
+  id         String   @id @default(cuid())
+  userId     String
+  matchType  String   // "merchant" | "description" | "amount_lt" | "amount_gt"
+  matchValue String
+  category   String
+  priority   Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Asset {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  type      String   // "checking" | "savings" | "investment" | "crypto" | "property" | "vehicle" | "other"
+  value     Float
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Liability {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  type      String   // "credit_card" | "student_loan" | "mortgage" | "auto_loan" | "personal_loan" | "other"
+  balance   Float
+  interestRate Float?
+  minPayment   Float?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  debtPlans DebtPlan[]
+
+  @@index([userId])
+}
+
+model DebtPlan {
+  id            String   @id @default(cuid())
+  userId        String
+  liabilityId   String
+  strategy      String   // "snowball" | "avalanche" | "custom"
+  extraPayment  Float    @default(0)
+  targetDate    DateTime?
+  totalInterestSaved Float?
+  payoffDate    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  liability Liability @relation(fields: [liabilityId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model TaxEntry {
+  id          String   @id @default(cuid())
+  userId      String
+  year        Int
+  type        String   // "deduction" | "income" | "donation" | "business_expense" | "medical" | "education" | "other"
+  description String
+  amount      Float
+  category    String?
+  date        DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, year])
+  @@index([userId, type])
+}
+
+model Investment {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  type      String   // "stock" | "etf" | "mutual_fund" | "crypto" | "bond" | "real_estate" | "other"
+  shares    Float?
+  costBasis Float?
+  currentPrice Float?
+  ticker    String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CreditScore {
+  id        String   @id @default(cuid())
+  userId    String
+  score     Int
+  provider  String?  // "equifax" | "experian" | "transunion" | "credit_karma" | "other"
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Household {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members HouseholdMember[]
+}
+
+model HouseholdMember {
+  id          String   @id @default(cuid())
+  householdId String
+  userId      String
+  role        String   @default("member") // "owner" | "member"
+  joinedAt    DateTime @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  type      String   // "bill_reminder" | "alert" | "goal" | "report" | "system"
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
 }

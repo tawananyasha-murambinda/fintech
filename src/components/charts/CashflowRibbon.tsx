@@ -10,6 +10,7 @@ import {
   CartesianGrid,
 } from 'recharts'
 import { format, parseISO } from 'date-fns'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { CashflowPoint } from '@/types'
 
 const DEMO_DATA: CashflowPoint[] = Array.from({ length: 30 }, (_, i) => {
@@ -27,24 +28,17 @@ interface CashflowRibbonProps {
   demo?: boolean
 }
 
-function fmt(v: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(v)
-}
-
 function CustomTooltip({ active, payload, label }: any) {
+  const { format: fmt } = useCurrency()
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-white border border-slate-100 rounded-lg p-3 shadow-sm text-xs">
-      <p className="text-slate-500 mb-2">{format(parseISO(label), 'MMM d')}</p>
+    <div className="bg-white border border-slate-100 rounded-lg p-3 shadow-sm text-xs dark:bg-slate-900 dark:border-slate-800">
+      <p className="text-slate-500 mb-2 dark:text-slate-400">{format(parseISO(label), 'MMM d')}</p>
       {payload.map((p: any) => (
         <div key={p.dataKey} className="flex items-center gap-2 mb-1">
           <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-          <span className="text-slate-600 capitalize">{p.name}:</span>
-          <span className="font-medium text-slate-900 tabular-nums">{fmt(p.value)}</span>
+          <span className="text-slate-600 capitalize dark:text-slate-400">{p.name}:</span>
+          <span className="font-medium text-slate-900 tabular-nums dark:text-slate-100">{fmt(p.value)}</span>
         </div>
       ))}
     </div>
@@ -52,11 +46,12 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export function CashflowRibbon({ data, demo }: CashflowRibbonProps) {
+  const { formatShort } = useCurrency()
   const chartData = data && data.length > 0 ? data : demo ? DEMO_DATA : []
 
   if (!chartData.length) {
     return (
-      <div className="h-48 flex items-center justify-center text-sm text-slate-400">
+      <div className="h-48 flex items-center justify-center text-sm text-slate-400 dark:text-slate-500">
         No data for this period
       </div>
     )
@@ -89,7 +84,7 @@ export function CashflowRibbon({ data, demo }: CashflowRibbonProps) {
             tickLine={false}
             axisLine={false}
             tick={{ fontSize: 11, fill: '#94a3b8' }}
-            tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
+            tickFormatter={(v) => formatShort(v)}
           />
           <Tooltip content={<CustomTooltip />} />
           <Area

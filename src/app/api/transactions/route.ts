@@ -48,38 +48,43 @@ export async function GET(req: NextRequest) {
     ]
   }
 
-  const [transactions, total] = await Promise.all([
-    prisma.transaction.findMany({
-      where,
-      orderBy: { date: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
-      select: {
-        id: true,
-        date: true,
-        amount: true,
-        direction: true,
-        description: true,
-        merchantName: true,
-        merchantCategory: true,
-        merchantCity: true,
-        merchantState: true,
-        merchantCountry: true,
-        status: true,
-        type: true,
-        runningBalance: true,
-      },
-    }),
-    prisma.transaction.count({ where }),
-  ])
+  try {
+    const [transactions, total] = await Promise.all([
+      prisma.transaction.findMany({
+        where,
+        orderBy: { date: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          date: true,
+          amount: true,
+          direction: true,
+          description: true,
+          merchantName: true,
+          merchantCategory: true,
+          merchantCity: true,
+          merchantState: true,
+          merchantCountry: true,
+          status: true,
+          type: true,
+          runningBalance: true,
+        },
+      }),
+      prisma.transaction.count({ where }),
+    ])
 
-  return NextResponse.json({
-    transactions: transactions.map((t) => ({
-      ...t,
-      date: t.date.toISOString(),
-    })),
-    total,
-    page,
-    pages: Math.ceil(total / limit),
-  })
+    return NextResponse.json({
+      transactions: transactions.map((t) => ({
+        ...t,
+        date: t.date.toISOString(),
+      })),
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+    })
+  } catch (err) {
+    console.error('Transactions API error:', err)
+    return NextResponse.json({ error: 'Failed to load transactions' }, { status: 500 })
+  }
 }

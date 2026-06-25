@@ -31,19 +31,22 @@ export async function POST(req: NextRequest) {
 
   // Fetch transactions for the period
   const now = new Date()
-  const fromDate = new Date(
-    now.getTime() -
-      (period === 'week' ? 7 : period === 'quarter' ? 90 : 30) * 24 * 60 * 60 * 1000
-  )
+  const days = period === 'week' ? 7 : period === 'quarter' ? 90 : 30
+  const fromDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+  const prevFromDate = new Date(fromDate.getTime() - days * 24 * 60 * 60 * 1000)
 
-  const rawTxns = await prisma.transaction.findMany({
-    where: {
-      userId: session.user.id,
-      date: { gte: fromDate },
-    },
-    orderBy: { date: 'desc' },
-    take: 500,
-  })
+  const [rawTxns, prevRawTxns] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { userId: session.user.id, date: { gte: fromDate } },
+      orderBy: { date: 'desc' },
+      take: 500,
+    }),
+    prisma.transaction.findMany({
+      where: { userId: session.user.id, date: { gte: prevFromDate, lt: fromDate } },
+      orderBy: { date: 'desc' },
+      take: 500,
+    }),
+  ])
 
   if (rawTxns.length === 0) {
     return NextResponse.json({ error: 'No transaction data available for this period.' }, { status: 404 })
@@ -63,7 +66,14 @@ export async function POST(req: NextRequest) {
     status: t.status as 'posted' | 'pending',
   }))
 
-  const analysis = await analyzeSpending({ transactions, period, userLocation })
+  const prevCategories: Record<string, number> = {}
+  for (const t of prevRawTxns) {
+    if (t.direction !== 'debit') continue
+    const cat = (t.merchantCategory || 'Uncategorized').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    prevCategories[cat] = (prevCategories[cat] || 0) + Math.abs(t.amount)
+  }
+
+  const analysis = await analyzeSpending({ transactions, period, userLocation, prevPeriodCategories: prevCategories })
 
   // Cache the result
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000)

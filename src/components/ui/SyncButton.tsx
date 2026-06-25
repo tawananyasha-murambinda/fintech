@@ -12,12 +12,16 @@ export function SyncButton() {
     setSyncing(true)
     setResult(null)
     try {
-      const res = await fetch('/api/teller/sync', { method: 'POST' })
+      const res = await fetch('/api/plaid/sync', { method: 'POST' })
       const data = await res.json()
       if (res.ok) {
         setResult(`${data.transactions} new`)
         router.refresh()
+      } else {
+        setResult(data.error || 'Sync failed')
       }
+    } catch {
+      setResult('Sync failed')
     } finally {
       setSyncing(false)
       setTimeout(() => setResult(null), 3000)

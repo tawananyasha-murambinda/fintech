@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { CashflowRibbon } from '@/components/charts/CashflowRibbon'
 import { CategoryChart } from '@/components/charts/CategoryChart'
 import { TransactionRow } from '@/components/ui/TransactionRow'
 import { StatCard } from '@/components/ui/StatCard'
 import { SyncButton } from '@/components/ui/SyncButton'
 import { LinkBankButton } from '@/components/bank/LinkBankButton'
+import { AccountSwitcher } from '@/components/dashboard/AccountSwitcher'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { CashflowPoint, SpendingCategory } from '@/types'
 
 interface DashboardClientProps {
@@ -25,24 +28,36 @@ interface DashboardClientProps {
     hasData: boolean
   }
   userName: string
+  userId: string
+  selectedAccountId: string | null
 }
 
-export function DashboardClient({ data, userName }: DashboardClientProps) {
+export function DashboardClient({ data, userName, userId, selectedAccountId }: DashboardClientProps) {
   const { stats, cashflow, categories, recentTransactions, hasData } = data
   const [period, setPeriod] = useState<'week' | 'month' | 'quarter'>('month')
+  const { format: fmt } = useCurrency()
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
-  const fmt = (n: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
+  const handleAccountChange = useCallback((accountId: string | null) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (accountId) {
+      params.set('account', accountId)
+    } else {
+      params.delete('account')
+    }
+    router.push(`/dashboard${params.toString() ? '?' + params.toString() : ''}`)
+  }, [router, searchParams])
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-fade-up">
+    <div className="max-w-7xl mx-auto space-y-4 lg:space-y-6 animate-fade-up">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">
+          <h1 className="text-lg lg:text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">
             Good {getGreeting()}, {firstName(userName)}
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
             {hasData ? "Here's your financial picture this month." : 'Connect a bank account to get started.'}
           </p>
         </div>
@@ -52,12 +67,15 @@ export function DashboardClient({ data, userName }: DashboardClientProps) {
         </div>
       </div>
 
+      {/* Account Switcher */}
+      <AccountSwitcher selectedAccountId={selectedAccountId} onSelect={handleAccountChange} />
+
       {!hasData ? (
         <EmptyState />
       ) : (
         <>
           {/* Stats row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
             <StatCard
               label="Monthly income"
               value={fmt(stats.monthlyIncome)}
@@ -81,38 +99,57 @@ export function DashboardClient({ data, userName }: DashboardClientProps) {
             />
           </div>
 
+          {/* Quick access */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <QuickCard href="/dashboard/budgets" label="Budgets" color="teal" desc="Set category limits" />
+            <QuickCard href="/dashboard/goals" label="Savings Goals" color="purple" desc="Track your targets" />
+            <QuickCard href="/dashboard/bills" label="Bills" color="amber" desc="Upcoming due dates" />
+            <QuickCard href="/dashboard/subscriptions" label="Subscriptions" color="pink" desc="Manage recurring" />
+            <QuickCard href="/dashboard/net-worth" label="Net Worth" color="green" desc="Assets & liabilities" />
+            <QuickCard href="/dashboard/debt" label="Debt Planner" color="red" desc="Payoff strategies" />
+            <QuickCard href="/dashboard/investments" label="Investments" color="blue" desc="Stocks & crypto" />
+            <QuickCard href="/dashboard/reports" label="Reports" color="indigo" desc="Monthly summaries" />
+          </div>
+
+          {/* Financial health score */}
+          <HealthScoreWidget userId="" />
+
           {/* Cashflow ribbon */}
-          <div className="card p-5">
+          <div className="card p-4 lg:p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">Cashflow</h2>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Cashflow</h2>
                 <p className="text-xs text-slate-400 mt-0.5">Income and expenses over time</p>
               </div>
-              <div className="flex items-center gap-4 text-xs text-slate-500">
+              <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-teal-600 inline-block" />
                   Income
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-slate-200 inline-block" />
+                  <span className="w-2 h-2 rounded-full bg-slate-200 inline-block dark:bg-slate-700" />
                   Expenses
                 </span>
               </div>
             </div>
-            <CashflowRibbon data={cashflow} />
+            <div className="overflow-x-auto">
+              <div className="min-w-[600px]">
+                <CashflowRibbon data={cashflow} />
+              </div>
+            </div>
           </div>
 
           {/* Categories + Transactions */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            <div className="card p-5 lg:col-span-2">
-              <h2 className="text-sm font-semibold text-slate-900 mb-4">Spending by category</h2>
+            <div className="card p-4 lg:p-5 lg:col-span-2">
+              <h2 className="text-sm font-semibold text-slate-900 mb-4 dark:text-slate-100">Spending by category</h2>
               <CategoryChart data={categories} />
             </div>
 
-            <div className="card p-5 lg:col-span-3">
+            <div className="card p-4 lg:p-5 lg:col-span-3">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-slate-900">Recent transactions</h2>
-                <a href="/dashboard/transactions" className="text-xs text-teal-700 hover:underline">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Recent transactions</h2>
+                <a href="/dashboard/transactions" className="text-xs text-teal-700 hover:underline dark:text-teal-400">
                   View all
                 </a>
               </div>
@@ -129,9 +166,64 @@ export function DashboardClient({ data, userName }: DashboardClientProps) {
   )
 }
 
+function QuickCard({ href, label, desc, color }: { href: string; label: string; desc: string; color: string }) {
+  const colors: Record<string, string> = {
+    teal: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300',
+    purple: 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300',
+    amber: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+    pink: 'bg-pink-50 text-pink-700 dark:bg-pink-950 dark:text-pink-300',
+    green: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300',
+    red: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300',
+    blue: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
+    indigo: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300',
+  }
+  const colorClass = colors[color] || colors.teal
+  return (
+    <a href={href} className="card p-3 lg:p-4 card-hover block group">
+      <p className="text-xs font-semibold text-slate-900 group-hover:text-teal-700 transition-colors dark:text-slate-100 dark:group-hover:text-teal-400">
+        {label}
+      </p>
+      <p className="text-2xs text-slate-400 mt-0.5">{desc}</p>
+    </a>
+  )
+}
+
+function HealthScoreWidget({ userId: _ }: { userId: string }) {
+  const [score, setScore] = useState<any>(null)
+  const { format: fmt } = useCurrency()
+
+  useEffect(() => {
+    fetch('/api/health-score').then(r => r.json()).then(setScore).catch(() => {})
+  }, [])
+
+  if (!score) return null
+
+  const scoreColor = score.score >= 80 ? 'text-teal-700 dark:text-teal-400' : score.score >= 60 ? 'text-amber-600 dark:text-amber-400' : 'text-red-500'
+
+  return (
+    <a href="/dashboard/reports" className="card p-4 card-hover block">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide dark:text-slate-500">Financial health score</p>
+          <p className={`text-xl lg:text-2xl font-bold stat-number ${scoreColor}`}>{score.score}/100</p>
+          <p className="text-xs text-slate-500 mt-1 dark:text-slate-400">{score.rating}</p>
+        </div>
+        <div className="w-14 h-14 lg:w-16 lg:h-16 relative">
+          <svg viewBox="0 0 36 36" className="w-14 h-14 lg:w-16 lg:h-16">
+            <path className="text-slate-100 dark:text-slate-800" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            <path stroke={score.score >= 80 ? '#0d7c66' : score.score >= 60 ? '#d97706' : '#ef4444'} strokeWidth="3" fill="none" strokeLinecap="round"
+              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+              strokeDasharray={`${score.score}, 100`} />
+          </svg>
+        </div>
+      </div>
+    </a>
+  )
+}
+
 function EmptyState() {
   return (
-    <div className="card p-12 text-center">
+    <div className="card p-8 lg:p-12 text-center">
       <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-slate-400">
           <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/>

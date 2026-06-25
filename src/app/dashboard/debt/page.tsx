@@ -1,0 +1,239 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useCurrency } from '@/hooks/useCurrency'
+import type { Liability, DebtPlan } from '@/types'
+
+export default function DebtPage() {
+  const { format: fmt } = useCurrency()
+  const [liabilities, setLiabilities] = useState<(Liability & { debtPlans?: DebtPlan[] })[]>([])
+  const [plans, setPlans] = useState<DebtPlan[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedLiability, setSelectedLiability] = useState('')
+  const [strategy, setStrategy] = useState<'snowball' | 'avalanche'>('avalanche')
+  const [extraPayment, setExtraPayment] = useState('')
+
+  const fetchData = useCallback(async () => {
+    const [lRes, pRes] = await Promise.all([
+      fetch('/api/liabilities').then(r => r.json()),
+      fetch('/api/debt-plans').then(r => r.json()),
+    ])
+    setLiabilities(lRes)
+    setPlans(pRes)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  const createPlan = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedLiability) return
+    await fetch('/api/debt-plans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ liabilityId: selectedLiability, strategy, extraPayment: extraPayment || '0' }),
+    })
+    setSelectedLiability('')
+    setExtraPayment('')
+    fetchData()
+  }
+
+  const deletePlan = async (id: string) => {
+    if (!confirm('Delete this plan?')) return
+    await fetch(`/api/debt-plans?id=${id}`, { method: 'DELETE' })
+    fetchData()
+  }
+
+  function calculatePayoff(balance: number, rate: number, minPayment: number, extra: number, strategy: string): { months: number; interestPaid: number; totalPaid: number } {
+    const monthlyRate = rate / 100 / 12
+    const payment = minPayment + extra
+    let remaining = balance
+    let interestPaid = 0
+    let months = 0
+
+    while (remaining > 0 && months < 600) {
+      const interest = remaining * monthlyRate
+      interestPaid += interest
+      const principal = Math.min(payment - interest, remaining)
+      remaining -= principal
+      months++
+    }
+
+    return { months, interestPaid, totalPaid: balance + interestPaid }
+  }
+
+  const totalDebt = liabilities.reduce((s, l) => s + l.balance, 0)
+  const sortedByBalance = [...liabilities].sort((a, b) => a.balance - b.balance)
+  const sortedByRate = [...liabilities].sort((a, b) => (b.interestRate || 0) - (a.interestRate || 0))
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6 animate-fade-up">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">Debt Payoff Planner</h1>
+          <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
+            Snowball and avalanche calculators showing payoff dates and interest saved.
+          </p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="card p-16 text-center">
+          <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      ) : liabilities.length === 0 ? (
+        <div className="card p-16 text-center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="mx-auto mb-4 text-slate-300">
+            <path d="M12 2v20M2 12h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <h2 className="text-sm font-semibold text-slate-900 mb-2 dark:text-slate-100">No debts tracked</h2>
+          <p className="text-sm text-slate-500 max-w-xs mx-auto mb-5 dark:text-slate-400">
+            Add liabilities in Net Worth first, then create payoff plans here.
+          </p>
+          <a href="/dashboard/net-worth" className="btn-primary text-sm inline-block">Go to Net Worth</a>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="card px-4 py-3">
+              <p className="text-2xs text-slate-400 font-medium uppercase mb-1">Total debt</p>
+              <p className="text-lg font-semibold stat-number text-red-500">{fmt(totalDebt)}</p>
+            </div>
+            <div className="card px-4 py-3">
+              <p className="text-2xs text-slate-400 font-medium uppercase mb-1">Accounts</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{liabilities.length}</p>
+            </div>
+            <div className="card px-4 py-3">
+              <p className="text-2xs text-slate-400 font-medium uppercase mb-1">Avg interest rate</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {liabilities.filter(l => l.interestRate).length > 0
+                  ? (liabilities.filter(l => l.interestRate).reduce((s, l) => s + (l.interestRate || 0), 0) / liabilities.filter(l => l.interestRate).length).toFixed(1) + '%'
+                  : 'N/A'}
+              </p>
+            </div>
+            <div className="card px-4 py-3">
+              <p className="text-2xs text-slate-400 font-medium uppercase mb-1">Active plans</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{plans.length}</p>
+            </div>
+          </div>
+
+          <form onSubmit={createPlan} className="card p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Create payoff plan</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div>
+                <label className="label">Liability</label>
+                <select value={selectedLiability} onChange={e => setSelectedLiability(e.target.value)} className="input text-sm" required>
+                  <option value="">Choose...</option>
+                  {liabilities.map(l => (
+                    <option key={l.id} value={l.id}>{l.name} ({fmt(l.balance)})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Strategy</label>
+                <select value={strategy} onChange={e => setStrategy(e.target.value as any)} className="input text-sm">
+                  <option value="avalanche">Avalanche (highest rate)</option>
+                  <option value="snowball">Snowball (smallest balance)</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Extra payment/mo</label>
+                <input type="number" step="0.01" min="0" placeholder="50" className="input text-sm"
+                  value={extraPayment} onChange={e => setExtraPayment(e.target.value)} />
+              </div>
+              <div className="flex items-end">
+                <button type="submit" className="btn-primary text-sm py-2.5 w-full">Create plan</button>
+              </div>
+            </div>
+          </form>
+
+          {plans.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Active payoff plans</h2>
+              {plans.map(plan => {
+                const liability = liabilities.find(l => l.id === plan.liabilityId)
+                if (!liability || !liability.interestRate || !liability.minPayment) return null
+
+                const result = calculatePayoff(liability.balance, liability.interestRate, liability.minPayment, plan.extraPayment, plan.strategy)
+                const noExtra = calculatePayoff(liability.balance, liability.interestRate, liability.minPayment, 0, plan.strategy)
+                const interestSaved = noExtra.interestPaid - result.interestPaid
+
+                return (
+                  <div key={plan.id} className="card p-5">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{liability.name}</h3>
+                        <p className="text-xs text-slate-400">{plan.strategy === 'avalanche' ? 'Avalanche' : 'Snowball'} strategy · {fmt(plan.extraPayment)}/mo extra</p>
+                      </div>
+                      <button onClick={() => deletePlan(plan.id)} className="text-slate-300 hover:text-red-400">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-2xs text-slate-400 mb-0.5">Payoff time</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{result.months} mo ({Math.floor(result.months / 12)}y {result.months % 12}m)</p>
+                      </div>
+                      <div>
+                        <p className="text-2xs text-slate-400 mb-0.5">Interest paid</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{fmt(Math.round(result.interestPaid))}</p>
+                      </div>
+                      <div>
+                        <p className="text-2xs text-slate-400 mb-0.5">Interest saved</p>
+                        <p className="text-sm font-semibold text-teal-700 dark:text-teal-400">{fmt(Math.round(interestSaved))}</p>
+                      </div>
+                      <div>
+                        <p className="text-2xs text-slate-400 mb-0.5">Total paid</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{fmt(Math.round(result.totalPaid))}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 h-2 bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
+                      <div className="h-full bg-teal-600 rounded-full transition-all" style={{ width: `${Math.min(100, (result.months > 0 ? (1 - result.interestPaid / noExtra.interestPaid) * 100 : 0))}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="card p-5">
+              <h2 className="text-sm font-semibold text-slate-900 mb-3 dark:text-slate-100">Snowball order (by balance)</h2>
+              <div className="space-y-2">
+                {sortedByBalance.map((l, i) => (
+                  <div key={l.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg dark:bg-slate-800">
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-700 text-xs font-semibold flex items-center justify-center dark:bg-teal-950 dark:text-teal-300">{i + 1}</span>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{l.name}</p>
+                        <p className="text-2xs text-slate-400">{l.interestRate ? `${l.interestRate}% APR` : 'No rate'}</p>
+                      </div>
+                    </div>
+                    <p className="text-sm font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(l.balance)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="card p-5">
+              <h2 className="text-sm font-semibold text-slate-900 mb-3 dark:text-slate-100">Avalanche order (by rate)</h2>
+              <div className="space-y-2">
+                {sortedByRate.map((l, i) => (
+                  <div key={l.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg dark:bg-slate-800">
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-red-100 text-red-700 text-xs font-semibold flex items-center justify-center dark:bg-red-950 dark:text-red-300">{i + 1}</span>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{l.name}</p>
+                        <p className="text-2xs text-slate-400">{l.interestRate ? `${l.interestRate}% APR` : 'No rate'}</p>
+                      </div>
+                    </div>
+                    <p className="text-sm font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(l.balance)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}

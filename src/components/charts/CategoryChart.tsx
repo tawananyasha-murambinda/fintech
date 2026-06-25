@@ -1,19 +1,12 @@
 'use client'
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { useCurrency } from '@/hooks/useCurrency'
 
 const COLORS = ['#0d7c66', '#0f5145', '#14b891', '#2dd4aa', '#5de9c8', '#94a3b8']
 
 interface CategoryChartProps {
   data: { category: string; total: number; percentage: number }[]
-}
-
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(n)
 }
 
 function cleanCategory(cat: string) {
@@ -23,8 +16,10 @@ function cleanCategory(cat: string) {
 }
 
 export function CategoryChart({ data }: CategoryChartProps) {
+  const { format: fmt } = useCurrency()
+
   if (!data.length) {
-    return <div className="text-sm text-slate-400 py-8 text-center">No spending data</div>
+    return <div className="text-sm text-slate-400 dark:text-slate-500 py-8 text-center">No spending data</div>
   }
 
   return (
@@ -66,13 +61,13 @@ export function CategoryChart({ data }: CategoryChartProps) {
               className="w-2 h-2 rounded-sm shrink-0"
               style={{ background: COLORS[i % COLORS.length] }}
             />
-            <span className="text-xs text-slate-600 flex-1 truncate">
+            <span className="text-xs text-slate-600 flex-1 truncate dark:text-slate-300">
               {cleanCategory(item.category)}
             </span>
-            <span className="text-xs tabular-nums text-slate-900 font-medium">
+            <span className="text-xs tabular-nums text-slate-900 font-medium dark:text-slate-100">
               {fmt(item.total)}
             </span>
-            <span className="text-2xs text-slate-400 tabular-nums w-10 text-right">
+            <span className="text-2xs text-slate-400 tabular-nums w-10 text-right dark:text-slate-500">
               {item.percentage.toFixed(0)}%
             </span>
           </div>

@@ -71,35 +71,38 @@
   }
 
   .card {
-    @apply bg-white border border-slate-100 rounded-xl;
+    @apply bg-white border border-slate-100 rounded-xl dark:bg-slate-900 dark:border-slate-800;
   }
 
   .card-hover {
-    @apply transition-all duration-150 hover:border-slate-200 hover:shadow-sm;
+    @apply transition-all duration-150 hover:border-slate-200 hover:shadow-sm dark:hover:border-slate-700;
   }
 
   .btn-primary {
     @apply bg-teal-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium
            hover:bg-teal-800 active:scale-[0.98] transition-all duration-100
-           focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2;
+           focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2
+           dark:focus:ring-offset-slate-900;
   }
 
   .btn-secondary {
     @apply bg-white text-slate-700 px-4 py-2.5 rounded-lg text-sm font-medium
            border border-slate-200 hover:border-slate-300 hover:bg-slate-50
            active:scale-[0.98] transition-all duration-100
-           focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2;
+           focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2
+           dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:border-slate-600 dark:focus:ring-offset-slate-900;
   }
 
   .input {
     @apply w-full px-3.5 py-2.5 text-sm text-slate-900 bg-white border border-slate-200
            rounded-lg placeholder:text-slate-400
            focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600
-           transition-colors duration-100;
+           transition-colors duration-100
+           dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500;
   }
 
   .label {
-    @apply block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5;
+    @apply block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400;
   }
 
   .badge {
@@ -107,15 +110,15 @@
   }
 
   .badge-credit {
-    @apply badge bg-teal-50 text-teal-700;
+    @apply badge bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300;
   }
 
   .badge-debit {
-    @apply badge bg-slate-100 text-slate-600;
+    @apply badge bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300;
   }
 
   .badge-pending {
-    @apply badge bg-amber-50 text-amber-700;
+    @apply badge bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300;
   }
 }
 
@@ -125,10 +128,49 @@
   stroke: #f1f5f9;
 }
 
+html.dark .recharts-cartesian-grid-horizontal line,
+html.dark .recharts-cartesian-grid-vertical line {
+  stroke: #1e293b;
+}
+
 .recharts-tooltip-wrapper .recharts-default-tooltip {
   border: 1px solid #e2e8f0 !important;
   border-radius: 8px !important;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05) !important;
+}
+
+html.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+  border-color: #334155 !important;
+  background: #0f172a !important;
+}
+
+/* Accessibility: keyboard navigation */
+*:focus-visible {
+  outline: 2px solid #0d7c66;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+html.dark *:focus-visible {
+  outline-color: #2dd4aa;
+}
+
+/* Skip to main content */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  z-index: 100;
+  padding: 8px 16px;
+  background: #0d7c66;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  transition: top 0.1s;
+}
+
+.skip-link:focus {
+  top: 0;
 }
 
 /* Scrollbar */
@@ -136,3 +178,5 @@
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+html.dark ::-webkit-scrollbar-thumb { background: #475569; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }

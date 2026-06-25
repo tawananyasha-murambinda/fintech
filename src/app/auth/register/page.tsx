@@ -38,17 +38,22 @@ export default function RegisterPage() {
     }
 
     // Auto sign in after register
-    await signIn('credentials', { email, password, redirect: false })
+    const signInRes = await signIn('credentials', { email, password, redirect: false })
+    if (signInRes?.error) {
+      setError('Account created but sign-in failed. Please sign in manually.')
+      setLoading(false)
+      return
+    }
     router.push('/onboarding')
   }
 
   return (
     <div className="w-full max-w-sm">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Create account</h1>
-        <p className="text-sm text-slate-500 mt-1.5">
+        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">Create account</h1>
+        <p className="text-sm text-slate-500 mt-1.5 dark:text-slate-400">
           Already have an account?{' '}
-          <Link href="/auth/login" className="text-teal-700 hover:underline font-medium">
+          <Link href="/auth/login" className="text-teal-700 hover:underline font-medium dark:text-teal-400">
             Sign in
           </Link>
         </p>
@@ -72,9 +77,9 @@ export default function RegisterPage() {
       </div>
 
       <div className="flex items-center gap-3 mb-6">
-        <div className="h-px flex-1 bg-slate-100" />
-        <span className="text-xs text-slate-400">or</span>
-        <div className="h-px flex-1 bg-slate-100" />
+        <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
+        <span className="text-xs text-slate-400 dark:text-slate-500">or</span>
+        <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -116,7 +121,7 @@ export default function RegisterPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-100 rounded-lg px-4 py-3 text-sm text-red-600">
+          <div className="bg-red-50 border border-red-100 rounded-lg px-4 py-3 text-sm text-red-600 dark:bg-red-950 dark:text-red-300 dark:border-red-900/40">
             {error}
           </div>
         )}
@@ -129,9 +134,9 @@ export default function RegisterPage() {
           {loading ? 'Creating account…' : 'Create account'}
         </button>
 
-        <p className="text-2xs text-slate-400 text-center leading-relaxed">
+        <p className="text-2xs text-slate-400 text-center leading-relaxed dark:text-slate-500">
           By creating an account you agree to our Terms of Service and Privacy Policy.
-          Bank connections are read-only via Teller.io.
+          Bank connections are read-only via Plaid.
         </p>
       </form>
     </div>

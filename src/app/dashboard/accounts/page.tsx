@@ -23,8 +23,8 @@ function formatDate(d?: string) {
 
 function AccountTypeIcon({ type }: { type: string }) {
   return (
-    <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-slate-500">
+    <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 dark:bg-slate-800">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-slate-500 dark:text-slate-400">
         <rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/>
         <path d="M1 6h14" stroke="currentColor" strokeWidth="1.3"/>
         <path d="M4 10h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
@@ -38,14 +38,14 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/teller/link')
+    fetch('/api/plaid/accounts')
       .then(r => r.json())
       .then(d => { setBanks(d.banks || []); setLoading(false) })
   }, [])
 
   async function handleUnlink(id: string) {
     if (!confirm('Unlink this account? Transaction history will be retained.')) return
-    const res = await fetch(`/api/teller/link/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/plaid/accounts/${id}`, { method: 'DELETE' })
     if (res.ok) setBanks(prev => prev.filter(b => b.id !== id))
   }
 
@@ -53,8 +53,8 @@ export default function AccountsPage() {
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-up">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Accounts</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">Accounts</h1>
+          <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
             Manage your linked bank accounts.
           </p>
         </div>
@@ -76,20 +76,20 @@ export default function AccountsPage() {
               <path d="M2 8h16" stroke="currentColor" strokeWidth="1.5"/>
             </svg>
           </div>
-          <h2 className="text-sm font-semibold text-slate-900 mb-2">No linked accounts</h2>
-          <p className="text-sm text-slate-500 mb-5">
+          <h2 className="text-sm font-semibold text-slate-900 mb-2 dark:text-slate-100">No linked accounts</h2>
+          <p className="text-sm text-slate-500 mb-5 dark:text-slate-400">
             Connect a bank account to start tracking your finances.
           </p>
           <LinkBankButton />
         </div>
       ) : (
         <div className="card overflow-hidden">
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50 dark:divide-slate-800">
             {banks.map(bank => (
-              <div key={bank.id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors">
+              <div key={bank.id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors dark:hover:bg-slate-800">
                 <AccountTypeIcon type={bank.accountType} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-900 truncate">
+                  <p className="text-sm font-semibold text-slate-900 truncate dark:text-slate-100">
                     {bank.institutionName}
                   </p>
                   <p className="text-xs text-slate-400 truncate">
@@ -97,12 +97,12 @@ export default function AccountsPage() {
                   </p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-2xs text-slate-400">Last synced</p>
-                  <p className="text-xs text-slate-600">{formatDate(bank.lastSynced)}</p>
+                  <p className="text-2xs text-slate-400 dark:text-slate-500">Last synced</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-300">{formatDate(bank.lastSynced)}</p>
                 </div>
                 <button
                   onClick={() => handleUnlink(bank.id)}
-                  className="text-xs text-slate-400 hover:text-red-500 transition-colors px-2 py-1 rounded"
+                  className="text-xs text-slate-400 hover:text-red-500 transition-colors px-2 py-1 rounded dark:text-slate-500 dark:hover:text-red-400"
                 >
                   Unlink
                 </button>
@@ -113,15 +113,15 @@ export default function AccountsPage() {
       )}
 
       {/* Security notice */}
-      <div className="flex gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100">
+      <div className="flex gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-teal-600 shrink-0 mt-0.5">
           <path d="M8 1.5L2 4v4c0 3.31 2.69 6 6 6s6-2.69 6-6V4L8 1.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
           <path d="M5.5 8l1.5 1.5L10.5 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
         <div>
-          <p className="text-xs font-semibold text-slate-700 mb-0.5">Read-only access</p>
-          <p className="text-xs text-slate-500 leading-relaxed">
-            Bank connections are read-only via Teller.io open banking. We never see your credentials,
+          <p className="text-xs font-semibold text-slate-700 mb-0.5 dark:text-slate-300">Read-only access</p>
+          <p className="text-xs text-slate-500 leading-relaxed dark:text-slate-400">
+            Bank connections are read-only via Plaid open banking. We never see your credentials,
             store your account numbers, or initiate transactions. Access tokens are encrypted at rest using AES-256-GCM.
           </p>
         </div>
