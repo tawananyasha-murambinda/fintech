@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import Link from 'next/link'
+import { NotificationDropdown } from '@/components/notifications/NotificationDropdown'
 
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Overview',
@@ -31,20 +30,13 @@ const PAGE_TITLES: Record<string, string> = {
 }
 
 interface TopBarProps {
-  user: { name?: string | null; email?: string | null }
+  user: { name?: string | null; email?: string | null; emailVerified?: string | null }
   onMenuToggle: () => void
 }
 
 export function TopBar({ user, onMenuToggle }: TopBarProps) {
   const pathname = usePathname()
   const title = PAGE_TITLES[pathname] || 'FinTrack'
-  const [unread, setUnread] = useState(0)
-
-  useEffect(() => {
-    fetch('/api/notifications').then(r => r.json()).then(data => {
-      setUnread(data.filter((n: any) => !n.read).length)
-    }).catch(() => {})
-  }, [])
 
   return (
     <header className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-4 lg:px-6 shrink-0 dark:bg-slate-900 dark:border-slate-800">
@@ -61,17 +53,7 @@ export function TopBar({ user, onMenuToggle }: TopBarProps) {
         <h1 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h1>
       </div>
       <div className="flex items-center gap-3">
-        <Link href="/dashboard/alerts" className="relative text-slate-400 hover:text-slate-600 transition-colors dark:hover:text-slate-300">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M8 1v1M13 3l-1 1M15 8h-1M13 13l-1-1M8 14v1M3 13l1-1M1 8h1M3 3l1 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-            <circle cx="8" cy="8" r="2.5" fill="currentColor"/>
-          </svg>
-          {unread > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-2xs rounded-full flex items-center justify-center font-bold">
-              {unread > 9 ? '9+' : unread}
-            </span>
-          )}
-        </Link>
+        <NotificationDropdown />
         <button
           onClick={() => signOut({ callbackUrl: '/auth/login' })}
           className="text-xs text-slate-400 hover:text-slate-600 transition-colors dark:hover:text-slate-300"

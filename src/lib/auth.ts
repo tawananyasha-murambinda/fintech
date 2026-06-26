@@ -39,7 +39,7 @@ export const authOptions: NextAuthOptions = {
         const valid = await bcrypt.compare(parsed.data.password, user.password)
         if (!valid) return null
 
-        return { id: user.id, email: user.email, name: user.name, image: user.image }
+        return { id: user.id, email: user.email, name: user.name, image: user.image, emailVerified: user.emailVerified?.toISOString() || null }
       },
     }),
     ...(process.env.GOOGLE_CLIENT_ID
@@ -61,12 +61,16 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user) token.id = user.id
+      if (user) {
+        token.id = user.id
+        token.emailVerified = typeof user.emailVerified === 'string' ? user.emailVerified : (user.emailVerified as Date | null)?.toISOString() || null
+      }
       return token
     },
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string
+        session.user.emailVerified = token.emailVerified as string | null | undefined
       }
       return session
     },

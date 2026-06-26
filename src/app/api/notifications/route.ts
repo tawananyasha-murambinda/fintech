@@ -16,6 +16,29 @@ export async function GET() {
   return NextResponse.json(notifications)
 }
 
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json()
+  const { title, body: notifBody, type } = body
+
+  if (!title || !type) {
+    return NextResponse.json({ error: 'title and type are required' }, { status: 400 })
+  }
+
+  const notification = await prisma.notification.create({
+    data: {
+      userId: session.user.id,
+      title,
+      body: notifBody || '',
+      type,
+    },
+  })
+
+  return NextResponse.json(notification, { status: 201 })
+}
+
 export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

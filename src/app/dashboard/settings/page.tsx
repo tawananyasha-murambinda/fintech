@@ -4,6 +4,7 @@ import { ProfileSection } from "@/components/settings/ProfileSection";
 import { SecuritySection } from "@/components/settings/SecuritySection";
 import { PreferencesSection } from "@/components/settings/PreferencesSection";
 import { PrivacySection } from "@/components/settings/PrivacySection";
+import { NotificationPreferencesSection } from "@/components/settings/NotificationPreferences";
 
 export default function SettingsPage() {
   return (
@@ -17,6 +18,7 @@ export default function SettingsPage() {
 
       <ProfileSection />
       <SecuritySection />
+      <NotificationPreferencesSection />
       <PrivacySection />
       <PreferencesSection />
     </div>

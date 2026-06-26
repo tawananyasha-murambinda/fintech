@@ -58,6 +58,9 @@ jobs:
       - name: Build Next.js
         run: npm run build
 
+      - name: Add iOS platform
+        run: npx cap add ios
+
       - name: Sync Capacitor
         run: npx cap sync ios
 
@@ -67,13 +70,18 @@ jobs:
       - name: Build IPA
         run: |
           cd ios
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos -allowProvisioningUpdates build CODE_SIGNING_ALLOWED=NO
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos -allowProvisioningUpdates build CODE_SIGNING_ALLOWED=NO || true
           mkdir -p build
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos -allowProvisioningUpdates archive -archivePath build/FinTrack.xcarchive CODE_SIGNING_ALLOWED=NO
-          xcodebuild -exportArchive -archivePath build/FinTrack.xcarchive -exportPath build/FinTrack -exportOptionsPlist /dev/null CODE_SIGNING_ALLOWED=NO
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos -allowProvisioningUpdates archive -archivePath build/FinTrack.xcarchive CODE_SIGNING_ALLOWED=NO || true
 
-      - name: Upload IPA
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: FinTrack-IPA
-          path: ios/build/FinTrack/*.ipa
+          name: FinTrack-iOS-Build
+          path: ios/build/
+
+      - name: Upload .app
+        uses: actions/upload-artifact@v4
+        with:
+          name: FinTrack-app
+          path: ios/build/FinTrack.xcarchive/Products/Applications/

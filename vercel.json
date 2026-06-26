@@ -1,20 +1,5 @@
 {
   "buildCommand": "prisma generate && next build",
   "installCommand": "npm install",
-  "framework": "nextjs",
-  "env": {
-    "DATABASE_URL": "@fintrack-database-url",
-    "NEXTAUTH_SECRET": "@fintrack-nextauth-secret",
-    "NEXTAUTH_URL": "@fintrack-nextauth-url",
-    "ENCRYPTION_KEY": "@fintrack-encryption-key",
-    "ANTHROPIC_API_KEY": "@fintrack-anthropic-key",
-    "GOOGLE_CLIENT_ID": "@fintrack-google-client-id",
-    "GOOGLE_CLIENT_SECRET": "@fintrack-google-client-secret",
-    "GITHUB_CLIENT_ID": "@fintrack-github-client-id",
-    "GITHUB_CLIENT_SECRET": "@fintrack-github-client-secret",
-    "PLAID_CLIENT_ID": "@fintrack-plaid-client-id",
-    "PLAID_SECRET": "@fintrack-plaid-secret",
-    "PLAID_ENV": "@fintrack-plaid-env",
-    "NEXT_PUBLIC_APP_URL": "@fintrack-next-public-app-url"
-  }
+  "framework": "nextjs"
 }

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -56,6 +57,19 @@ export async function POST(req: NextRequest) {
       where: { id: session.user.id },
       data: { email: newEmail, emailVerified: null },
     })
+
+    // Send verification email for new address
+    try {
+      const token = crypto.randomBytes(32).toString('hex')
+      const expires = new Date(Date.now() + 24 * 60 * 60 * 1000)
+      await prisma.verificationToken.create({
+        data: { identifier: newEmail, token, expires },
+      })
+      const { sendEmailChangeVerification } = await import('@/lib/email')
+      await sendEmailChangeVerification(newEmail, token)
+    } catch (emailErr) {
+      console.error('Failed to send change email verification:', emailErr)
+    }
 
     return NextResponse.json({ success: true, email: newEmail })
   } catch (err) {

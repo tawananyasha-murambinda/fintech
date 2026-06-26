@@ -10,6 +10,7 @@ export function ProfileSection() {
   const { profile, loading } = useProfile()
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [verifying, setVerifying] = useState(false)
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -108,6 +109,46 @@ export function ProfileSection() {
           <p className="text-2xs text-slate-400 mt-0.5 dark:text-slate-500">
             Member since {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '—'}
           </p>
+          <div className="mt-1">
+            {session?.user?.emailVerified ? (
+              <span className="inline-flex items-center gap-1 text-2xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full dark:bg-emerald-950 dark:text-emerald-400">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                Verified
+              </span>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-2xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full dark:bg-amber-950 dark:text-amber-400">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 9v4M12 17h.01" />
+                  </svg>
+                  Unverified
+                </span>
+                <button
+                  onClick={async () => {
+                    setVerifying(true)
+                    try {
+                      const res = await fetch('/api/auth/verify-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: session?.user?.email }),
+                      })
+                      const data = await res.json()
+                      setMessage(data.success ? 'Verification email sent!' : data.error || 'Failed to send')
+                    } catch {
+                      setMessage('Failed to send verification email')
+                    }
+                    setVerifying(false)
+                  }}
+                  disabled={verifying}
+                  className="text-2xs text-teal-700 hover:underline disabled:opacity-50 dark:text-teal-400"
+                >
+                  {verifying ? 'Sending…' : 'Resend verification'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
