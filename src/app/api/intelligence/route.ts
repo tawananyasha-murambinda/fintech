@@ -12,7 +12,18 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const period = (body.period as 'week' | 'month' | 'quarter') || 'month'
-  const userLocation = body.location
+  let userLocation = body.location
+
+  // Load location from DB if not provided in request
+  if (!userLocation) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { city: true, country: true },
+    })
+    if (user?.city) {
+      userLocation = { city: user.city, country: user.country }
+    }
+  }
 
   // Check cache (1-hour TTL)
   const cached = await prisma.aiInsight.findFirst({

@@ -24,6 +24,13 @@ export async function POST(req: NextRequest) {
   const { message } = await req.json()
   if (!message) return NextResponse.json({ error: 'Message is required' }, { status: 400 })
 
+  // Load user location for AI context
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { city: true, country: true },
+  })
+  const userLocation = user?.city ? { city: user.city, country: user.country ?? undefined } : null
+
   await prisma.chatMessage.create({
     data: { userId: session.user.id, role: 'user', content: message },
   })
@@ -95,7 +102,7 @@ export async function POST(req: NextRequest) {
     message,
     txData,
     convHistory.slice(0, -1),
-    { budgets: budgetData, goals: goalData, debts: debtData }
+    { budgets: budgetData, goals: goalData, debts: debtData, userLocation: userLocation || undefined }
   )
 
   await prisma.chatMessage.create({

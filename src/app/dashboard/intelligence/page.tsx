@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useCurrency } from '@/hooks/useCurrency'
+import { detectUserLocation, saveUserLocation, getUserLocation } from '@/lib/location'
 import type { AiAnalysis } from '@/types'
 
 const PERIODS = [
@@ -34,16 +35,43 @@ export default function IntelligencePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [cached, setCached] = useState(false)
+  const [userLocation, setUserLocation] = useState<{ city?: string; country?: string; latitude?: number; longitude?: number } | null>(null)
+  const [locationPrompt, setLocationPrompt] = useState<'off' | 'detecting' | 'done'>('off')
+
+  useEffect(() => {
+    const tracking = localStorage.getItem('location_tracking') === 'true'
+    if (!tracking) return
+    getUserLocation().then(async (loc) => {
+      if (loc?.city) {
+        setUserLocation(loc)
+      } else {
+        setLocationPrompt('detecting')
+        const detected = await detectUserLocation()
+        if (detected) {
+          await saveUserLocation(detected)
+          setUserLocation(detected)
+          setLocationPrompt('done')
+        } else {
+          setLocationPrompt('off')
+        }
+      }
+    })
+  }, [])
 
   async function runAnalysis() {
     setLoading(true)
     setError('')
     setAnalysis(null)
 
+    const body: any = { period }
+    if (userLocation?.city) {
+      body.location = { city: userLocation.city, country: userLocation.country }
+    }
+
     const res = await fetch('/api/intelligence', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ period }),
+      body: JSON.stringify(body),
     })
 
     const data = await res.json()
@@ -106,6 +134,48 @@ export default function IntelligencePage() {
         </div>
       )}
 
+      {/* Location prompt */}
+      {!loading && !analysis && !error && !userLocation && (
+        <div className="card p-5 border-amber-100 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/20">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0 dark:bg-amber-900/40">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-amber-700 dark:text-amber-400">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="1.5"/>
+                <circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Enable location for better insights</p>
+              <p className="text-xs text-slate-500 mt-0.5 dark:text-slate-400">
+                Set your location to get local merchant alternatives and area-specific savings tips in your analysis.
+              </p>
+              <button
+                onClick={async () => {
+                  setLocationPrompt('detecting')
+                  const loc = await detectUserLocation()
+                  if (loc) {
+                    await saveUserLocation(loc)
+                    setUserLocation(loc)
+                    localStorage.setItem('location_tracking', 'true')
+                    setLocationPrompt('done')
+                  } else {
+                    setLocationPrompt('off')
+                  }
+                }}
+                disabled={locationPrompt === 'detecting'}
+                className="mt-3 text-xs font-medium text-teal-700 hover:text-teal-800 disabled:opacity-50 transition-colors dark:text-teal-400"
+              >
+                {locationPrompt === 'detecting' ? 'Detecting…' : 'Detect my location'}
+              </button>
+              <span className="text-xs text-slate-400 mx-2">or</span>
+              <a href="/dashboard/settings" className="text-xs font-medium text-teal-700 hover:underline dark:text-teal-400">
+                Open Settings
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Empty state */}
       {!loading && !analysis && !error && (
         <div className="card p-16 text-center">
@@ -120,6 +190,7 @@ export default function IntelligencePage() {
           <h2 className="text-sm font-semibold text-slate-900 mb-2 dark:text-slate-100">Ready to analyse</h2>
           <p className="text-sm text-slate-500 max-w-xs mx-auto mb-5 dark:text-slate-400">
             Click "Run analysis" to get a full breakdown of your spending, merchant alternatives, and savings recommendations.
+            {userLocation?.city && ` Using location: ${userLocation.city}${userLocation.country ? `, ${userLocation.country}` : ''}.`}
           </p>
           <button onClick={runAnalysis} className="btn-primary text-sm">
             Run analysis

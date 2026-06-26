@@ -5,6 +5,7 @@ import { SecuritySection } from "@/components/settings/SecuritySection";
 import { PreferencesSection } from "@/components/settings/PreferencesSection";
 import { PrivacySection } from "@/components/settings/PrivacySection";
 import { NotificationPreferencesSection } from "@/components/settings/NotificationPreferences";
+import { LocationSection } from "@/components/settings/LocationSection";
 
 export default function SettingsPage() {
   return (
@@ -12,12 +13,13 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Settings</h1>
         <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
-          Manage your account, security, privacy, and preferences.
+          Manage your account, security, privacy, location, and preferences.
         </p>
       </div>
 
       <ProfileSection />
       <SecuritySection />
+      <LocationSection />
       <NotificationPreferencesSection />
       <PrivacySection />
       <PreferencesSection />
