@@ -60,10 +60,33 @@ export const authOptions: NextAuthOptions = {
       : []),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async signIn({ user, account }) {
+      // OAuth providers (Google, GitHub) have already verified the email,
+      // so mark the account verified on first sign-in if it isn't already.
+      if (account && account.provider !== 'credentials' && user?.email) {
+        try {
+          await prisma.user.updateMany({
+            where: { email: user.email, emailVerified: null },
+            data: { emailVerified: new Date() },
+          })
+        } catch (err) {
+          console.error('Failed to auto-verify OAuth user:', err)
+        }
+      }
+      return true
+    },
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id
         token.emailVerified = typeof user.emailVerified === 'string' ? user.emailVerified : (user.emailVerified as Date | null)?.toISOString() || null
+      } else if (token.id) {
+        // Re-read verification status from the DB so it reflects changes
+        // made after login (e.g. the user clicking the verification link).
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { emailVerified: true },
+        })
+        token.emailVerified = dbUser?.emailVerified?.toISOString() || null
       }
       return token
     },
