@@ -9,6 +9,7 @@ import { StatCard } from '@/components/ui/StatCard'
 import { SyncButton } from '@/components/ui/SyncButton'
 import { LinkBankButton } from '@/components/bank/LinkBankButton'
 import { AccountSwitcher } from '@/components/dashboard/AccountSwitcher'
+import { MobileDashboard } from '@/components/dashboard/MobileDashboard'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { CashflowPoint, SpendingCategory } from '@/types'
 
@@ -50,119 +51,114 @@ export function DashboardClient({ data, userName, userId, selectedAccountId }: D
   }, [router, searchParams])
 
   return (
-    <div className="max-w-7xl mx-auto space-y-4 lg:space-y-6 animate-fade-up">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg lg:text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">
-            Good {getGreeting()}, {firstName(userName)}
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
-            {hasData ? "Here's your financial picture this month." : 'Connect a bank account to get started.'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <SyncButton />
-          <LinkBankButton />
-        </div>
+    <>
+      {/* Mobile view */}
+      <div className="block lg:hidden">
+        <MobileDashboard
+          stats={stats}
+          categories={categories}
+          recentTransactions={recentTransactions}
+          hasData={hasData}
+          userName={userName}
+        />
       </div>
 
-      {/* Account Switcher */}
-      <AccountSwitcher selectedAccountId={selectedAccountId} onSelect={handleAccountChange} />
-
-      {!hasData ? (
-        <EmptyState />
-      ) : (
-        <>
-          {/* Stats row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-            <StatCard
-              label="Monthly income"
-              value={fmt(stats.monthlyIncome)}
-              accent="teal"
-            />
-            <StatCard
-              label="Monthly expenses"
-              value={fmt(stats.monthlyExpenses)}
-              change={stats.expenseChange}
-              changeLabel="vs last month"
-            />
-            <StatCard
-              label="Net cashflow"
-              value={fmt(stats.netCashflow)}
-              accent={stats.netCashflow >= 0 ? 'teal' : 'red'}
-            />
-            <StatCard
-              label="Savings rate"
-              value={`${Math.max(0, stats.savingsRate).toFixed(1)}%`}
-              accent={stats.savingsRate >= 20 ? 'teal' : stats.savingsRate >= 10 ? 'amber' : 'red'}
-            />
+      {/* Desktop view */}
+      <div className="hidden lg:block max-w-7xl mx-auto space-y-6 animate-fade-up">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">
+              Good {getGreeting()}, {firstName(userName)}
+            </h1>
+            <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
+              {hasData ? "Here's your financial picture this month." : 'Connect a bank account to get started.'}
+            </p>
           </div>
-
-          {/* Quick access */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <QuickCard href="/dashboard/budgets" label="Budgets" color="teal" desc="Set category limits" />
-            <QuickCard href="/dashboard/goals" label="Savings Goals" color="purple" desc="Track your targets" />
-            <QuickCard href="/dashboard/bills" label="Bills" color="amber" desc="Upcoming due dates" />
-            <QuickCard href="/dashboard/subscriptions" label="Subscriptions" color="pink" desc="Manage recurring" />
-            <QuickCard href="/dashboard/net-worth" label="Net Worth" color="green" desc="Assets & liabilities" />
-            <QuickCard href="/dashboard/debt" label="Debt Planner" color="red" desc="Payoff strategies" />
-            <QuickCard href="/dashboard/investments" label="Investments" color="blue" desc="Stocks & crypto" />
-            <QuickCard href="/dashboard/reports" label="Reports" color="indigo" desc="Monthly summaries" />
+          <div className="flex items-center gap-2">
+            <SyncButton />
+            <LinkBankButton />
           </div>
+        </div>
 
-          {/* Financial health score */}
-          <HealthScoreWidget userId="" />
+        {/* Account Switcher */}
+        <AccountSwitcher selectedAccountId={selectedAccountId} onSelect={handleAccountChange} />
 
-          {/* Cashflow ribbon */}
-          <div className="card p-4 lg:p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Cashflow</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Income and expenses over time</p>
-              </div>
-              <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-teal-600 inline-block" />
-                  Income
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-slate-200 inline-block dark:bg-slate-700" />
-                  Expenses
-                </span>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <div className="min-w-[600px]">
-                <CashflowRibbon data={cashflow} />
-              </div>
-            </div>
-          </div>
-
-          {/* Categories + Transactions */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            <div className="card p-4 lg:p-5 lg:col-span-2">
-              <h2 className="text-sm font-semibold text-slate-900 mb-4 dark:text-slate-100">Spending by category</h2>
-              <CategoryChart data={categories} />
+        {!hasData ? (
+          <EmptyState />
+        ) : (
+          <>
+            {/* Stats row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard label="Monthly income" value={fmt(stats.monthlyIncome)} accent="teal" />
+              <StatCard label="Monthly expenses" value={fmt(stats.monthlyExpenses)} change={stats.expenseChange} changeLabel="vs last month" />
+              <StatCard label="Net cashflow" value={fmt(stats.netCashflow)} accent={stats.netCashflow >= 0 ? 'teal' : 'red'} />
+              <StatCard label="Savings rate" value={`${Math.max(0, stats.savingsRate).toFixed(1)}%`} accent={stats.savingsRate >= 20 ? 'teal' : stats.savingsRate >= 10 ? 'amber' : 'red'} />
             </div>
 
-            <div className="card p-4 lg:p-5 lg:col-span-3">
+            {/* Quick access */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <QuickCard href="/dashboard/budgets" label="Budgets" color="teal" desc="Set category limits" />
+              <QuickCard href="/dashboard/goals" label="Savings Goals" color="purple" desc="Track your targets" />
+              <QuickCard href="/dashboard/bills" label="Bills" color="amber" desc="Upcoming due dates" />
+              <QuickCard href="/dashboard/subscriptions" label="Subscriptions" color="pink" desc="Manage recurring" />
+              <QuickCard href="/dashboard/net-worth" label="Net Worth" color="green" desc="Assets & liabilities" />
+              <QuickCard href="/dashboard/debt" label="Debt Planner" color="red" desc="Payoff strategies" />
+              <QuickCard href="/dashboard/investments" label="Investments" color="blue" desc="Stocks & crypto" />
+              <QuickCard href="/dashboard/reports" label="Reports" color="indigo" desc="Monthly summaries" />
+            </div>
+
+            {/* Financial health score */}
+            <HealthScoreWidget userId="" />
+
+            {/* Cashflow ribbon */}
+            <div className="card p-5">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Recent transactions</h2>
-                <a href="/dashboard/transactions" className="text-xs text-teal-700 hover:underline dark:text-teal-400">
-                  View all
-                </a>
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Cashflow</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">Income and expenses over time</p>
+                </div>
+                <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-teal-600 inline-block" />
+                    Income
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-slate-200 inline-block dark:bg-slate-700" />
+                    Expenses
+                  </span>
+                </div>
               </div>
-              <div className="space-y-1">
-                {recentTransactions.map((tx) => (
-                  <TransactionRow key={tx.id} transaction={tx} />
-                ))}
+              <div className="overflow-x-auto">
+                <div className="min-w-[600px]">
+                  <CashflowRibbon data={cashflow} />
+                </div>
               </div>
             </div>
-          </div>
-        </>
-      )}
-    </div>
+
+            {/* Categories + Transactions */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+              <div className="card p-5 lg:col-span-2">
+                <h2 className="text-sm font-semibold text-slate-900 mb-4 dark:text-slate-100">Spending by category</h2>
+                <CategoryChart data={categories} />
+              </div>
+
+              <div className="card p-5 lg:col-span-3">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Recent transactions</h2>
+                  <a href="/dashboard/transactions" className="text-xs text-teal-700 hover:underline dark:text-teal-400">View all</a>
+                </div>
+                <div className="space-y-1">
+                  {recentTransactions.map((tx) => (
+                    <TransactionRow key={tx.id} transaction={tx} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -177,10 +173,9 @@ function QuickCard({ href, label, desc, color }: { href: string; label: string; 
     blue: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
     indigo: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300',
   }
-  const colorClass = colors[color] || colors.teal
   return (
-    <a href={href} className="card p-3 lg:p-4 card-hover block group">
-      <p className="text-xs font-semibold text-slate-900 group-hover:text-teal-700 transition-colors dark:text-slate-100 dark:group-hover:text-teal-400">
+    <a href={href} className="card p-4 card-hover block group">
+      <p className={`text-xs font-semibold text-slate-900 group-hover:text-teal-700 transition-colors dark:text-slate-100 dark:group-hover:text-teal-400`}>
         {label}
       </p>
       <p className="text-2xs text-slate-400 mt-0.5">{desc}</p>
@@ -190,7 +185,6 @@ function QuickCard({ href, label, desc, color }: { href: string; label: string; 
 
 function HealthScoreWidget({ userId: _ }: { userId: string }) {
   const [score, setScore] = useState<any>(null)
-  const { format: fmt } = useCurrency()
 
   useEffect(() => {
     fetch('/api/health-score').then(r => r.json()).then(setScore).catch(() => {})
@@ -199,21 +193,20 @@ function HealthScoreWidget({ userId: _ }: { userId: string }) {
   if (!score) return null
 
   const scoreColor = score.score >= 80 ? 'text-teal-700 dark:text-teal-400' : score.score >= 60 ? 'text-amber-600 dark:text-amber-400' : 'text-red-500'
+  const strokeColor = score.score >= 80 ? '#0d7c66' : score.score >= 60 ? '#d97706' : '#ef4444'
 
   return (
     <a href="/dashboard/reports" className="card p-4 card-hover block">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs font-medium text-slate-400 uppercase tracking-wide dark:text-slate-500">Financial health score</p>
-          <p className={`text-xl lg:text-2xl font-bold stat-number ${scoreColor}`}>{score.score}/100</p>
+          <p className={`text-2xl font-bold stat-number ${scoreColor}`}>{score.score}/100</p>
           <p className="text-xs text-slate-500 mt-1 dark:text-slate-400">{score.rating}</p>
         </div>
-        <div className="w-14 h-14 lg:w-16 lg:h-16 relative">
-          <svg viewBox="0 0 36 36" className="w-14 h-14 lg:w-16 lg:h-16">
+        <div className="w-16 h-16 relative">
+          <svg viewBox="0 0 36 36" className="w-16 h-16">
             <path className="text-slate-100 dark:text-slate-800" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-            <path stroke={score.score >= 80 ? '#0d7c66' : score.score >= 60 ? '#d97706' : '#ef4444'} strokeWidth="3" fill="none" strokeLinecap="round"
-              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              strokeDasharray={`${score.score}, 100`} />
+            <path stroke={strokeColor} strokeWidth="3" fill="none" strokeLinecap="round" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" strokeDasharray={`${score.score}, 100`} />
           </svg>
         </div>
       </div>
@@ -223,7 +216,7 @@ function HealthScoreWidget({ userId: _ }: { userId: string }) {
 
 function EmptyState() {
   return (
-    <div className="card p-8 lg:p-12 text-center">
+    <div className="card p-12 text-center">
       <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-slate-400">
           <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/>

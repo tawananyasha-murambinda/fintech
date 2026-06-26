@@ -22,10 +22,21 @@ export async function GET() {
         currency: true,
         lastSynced: true,
         createdAt: true,
+        transactions: {
+          select: { amount: true, direction: true },
+        },
       },
     })
 
-    return NextResponse.json({ banks })
+    const banksWithBalance = banks.map((b) => {
+      const balance = b.transactions.reduce((sum, t) => {
+        return sum + (t.direction === 'credit' ? Math.abs(t.amount) : -Math.abs(t.amount))
+      }, 0)
+      const { transactions, ...rest } = b
+      return { ...rest, balance: Math.round(balance * 100) / 100 }
+    })
+
+    return NextResponse.json({ banks: banksWithBalance })
   } catch (err) {
     console.error('Plaid accounts list error:', err)
     return NextResponse.json({ error: 'Failed to load accounts' }, { status: 500 })
