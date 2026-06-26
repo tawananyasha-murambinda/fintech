@@ -1,13 +1,14 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: 'com.fintrack.app',
-  appName: 'FinTrack',
-  webDir: 'public',
+  appId: "com.fintrack.app",
+  appName: "FinTrack",
+  webDir: "public",
   server: {
-    androidScheme: 'https',
-    cleartext: true,
-    hostname: 'localhost',
+    url: "https://fintrack-pearl-eight.vercel.app",
+    androidScheme: "https",
+    iosScheme: "https",
+    cleartext: false,
   },
   android: {
     buildOptions: {
@@ -15,17 +16,17 @@ const config: CapacitorConfig = {
       keystorePassword: undefined,
       keystoreAlias: undefined,
       keystoreAliasPassword: undefined,
-      releaseType: 'APK',
+      releaseType: "APK",
     },
   },
   ios: {
-    scheme: 'App',
+    scheme: "App",
   },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,
-      backgroundColor: '#f0fdf9',
-      androidScaleType: 'CENTER_CROP',
+      backgroundColor: "#f0fdf9",
+      androidScaleType: "CENTER_CROP",
     },
   },
 };

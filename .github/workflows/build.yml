@@ -18,8 +18,8 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          distribution: 'microsoft'
-          java-version: '21'
+          distribution: "microsoft"
+          java-version: "21"
 
       - name: Install dependencies
         run: npm ci
@@ -64,12 +64,9 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync ios
 
-      - name: Install CocoaPods
-        run: cd ios && pod install
-
       - name: Build IPA
         run: |
-          cd ios
+          cd ios/App
           xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos -allowProvisioningUpdates build CODE_SIGNING_ALLOWED=NO || true
           mkdir -p build
           xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos -allowProvisioningUpdates archive -archivePath build/FinTrack.xcarchive CODE_SIGNING_ALLOWED=NO || true
@@ -78,10 +75,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: FinTrack-iOS-Build
-          path: ios/build/
+          path: ios/App/build/
 
       - name: Upload .app
         uses: actions/upload-artifact@v4
         with:
           name: FinTrack-app
-          path: ios/build/FinTrack.xcarchive/Products/Applications/
+          path: ios/App/build/FinTrack.xcarchive/Products/Applications/
