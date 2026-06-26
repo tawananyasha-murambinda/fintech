@@ -6,6 +6,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { TransactionRow } from '@/components/ui/TransactionRow'
 import { LinkBankButton } from '@/components/bank/LinkBankButton'
 import { useCurrency } from '@/hooks/useCurrency'
+import { BottomSheet } from '@/components/ui/BottomSheet'
+import { usePullToRefresh } from '@/hooks/usePullToRefresh'
+import { useHaptics } from '@/hooks/useHaptics'
 
 interface Account {
   id: string
@@ -100,23 +103,38 @@ export function MobileDashboard({ stats, categories, recentTransactions, hasData
   const router = useRouter()
   const searchParams = useSearchParams()
   const carouselRef = useRef<HTMLDivElement>(null)
+  const haptics = useHaptics()
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [quickAddForm, setQuickAddForm] = useState({ description: '', amount: '', direction: 'debit' })
+  const [quickAddError, setQuickAddError] = useState('')
+  const [quickAddSaving, setQuickAddSaving] = useState(false)
 
   // Trigger entrance animations after mount
   useEffect(() => { setMounted(true) }, [])
 
-  useEffect(() => {
-    fetch('/api/plaid/accounts')
-      .then(r => r.json())
-      .then(data => {
-        setAccounts(data.banks || [])
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
+  const fetchAccounts = useCallback(async () => {
+    const res = await fetch('/api/plaid/accounts')
+    const data = await res.json()
+    setAccounts(data.banks || [])
+    setLoading(false)
   }, [])
+
+  useEffect(() => { fetchAccounts() }, [fetchAccounts])
+
+  const handleRefresh = useCallback(async () => {
+    await fetchAccounts()
+    await new Promise(r => setTimeout(r, 300))
+  }, [fetchAccounts])
+
+  const { containerRef, pullDistance, refreshing, pullIndicator } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 70,
+  })
 
   const selectedAccountId = searchParams.get('account')
 
   function selectAccount(accountId: string | null) {
+    haptics.light()
     const params = new URLSearchParams(searchParams.toString())
     if (accountId) params.set('account', accountId)
     else params.delete('account')
@@ -129,7 +147,25 @@ export function MobileDashboard({ stats, categories, recentTransactions, hasData
   if (loading) return <DashboardSkeleton />
 
   return (
-    <div className={`flex flex-col min-h-full pb-2 transition-all duration-500 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
+    <div ref={containerRef} className={`flex flex-col min-h-full pb-2 transition-all duration-500 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
+      {/* ── Pull-to-refresh indicator ──────────────────────── */}
+      {pullIndicator && (
+        <div className="flex items-center justify-center py-3 -mt-1">
+          {refreshing ? (
+            <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <div
+              className="w-6 h-6 text-teal-600 transition-transform duration-200"
+              style={{ transform: `rotate(${Math.min(pullDistance * 2, 180)}deg)` }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M12 5v14M5 12l7 7 7-7" />
+              </svg>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Minimal header ─────────────────────────────────── */}
       <div className={`flex items-center justify-between mb-3 ${mounted ? 'animate-slide-down' : ''}`}>
         <div>
@@ -339,6 +375,109 @@ export function MobileDashboard({ stats, categories, recentTransactions, hasData
           )}
         </>
       )}
+
+      {/* ── Quick-add FAB ───────────────────────────────────── */}
+      <button
+        onClick={() => { haptics.medium(); setShowQuickAdd(true) }}
+        className="fixed bottom-20 right-4 w-12 h-12 bg-teal-700 text-white rounded-full shadow-lg shadow-teal-700/30 flex items-center justify-center press-spring z-40"
+      >
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M11 5v12M5 11h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+        </svg>
+      </button>
+
+      {/* ── Quick-add bottom sheet ──────────────────────────── */}
+      <BottomSheet open={showQuickAdd} onClose={() => setShowQuickAdd(false)} title="Add Transaction">
+          <form onSubmit={async (e) => {
+          e.preventDefault()
+          setQuickAddError('')
+          if (!quickAddForm.description || !quickAddForm.amount) {
+            haptics.error()
+            setQuickAddError('Description and amount are required')
+            return
+          }
+          setQuickAddSaving(true)
+          try {
+            const res = await fetch('/api/manual-transactions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                description: quickAddForm.description,
+                amount: parseFloat(quickAddForm.amount),
+                direction: quickAddForm.direction,
+              }),
+            })
+            if (!res.ok) throw new Error('Failed')
+            haptics.success()
+            setShowQuickAdd(false)
+            setQuickAddForm({ description: '', amount: '', direction: 'debit' })
+            router.refresh()
+          } catch {
+            haptics.error()
+            setQuickAddError('Failed to save transaction')
+          }
+          setQuickAddSaving(false)
+        }} className="space-y-4">
+          <div>
+            <label className="label">Description</label>
+            <input
+              type="text"
+              placeholder="e.g. Coffee shop"
+              value={quickAddForm.description}
+              onChange={e => setQuickAddForm({ ...quickAddForm, description: e.target.value })}
+              className="input text-sm"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="label">Amount</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              value={quickAddForm.amount}
+              onChange={e => setQuickAddForm({ ...quickAddForm, amount: e.target.value })}
+              className="input text-sm"
+            />
+          </div>
+          <div>
+            <label className="label">Type</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setQuickAddForm({ ...quickAddForm, direction: 'debit' })}
+                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  quickAddForm.direction === 'debit'
+                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                }`}
+              >
+                Expense
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickAddForm({ ...quickAddForm, direction: 'credit' })}
+                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  quickAddForm.direction === 'credit'
+                    ? 'bg-teal-700 text-white'
+                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                }`}
+              >
+                Income
+              </button>
+            </div>
+          </div>
+          {quickAddError && <p className="text-xs text-red-500">{quickAddError}</p>}
+          <button
+            type="submit"
+            disabled={quickAddSaving}
+            className="w-full py-2.5 text-sm font-medium text-white bg-teal-700 rounded-lg disabled:opacity-50"
+          >
+            {quickAddSaving ? 'Saving…' : 'Add transaction'}
+          </button>
+        </form>
+      </BottomSheet>
     </div>
   )
 }

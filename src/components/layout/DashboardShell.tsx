@@ -24,7 +24,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
   return (
     <>
       <Sidebar user={user} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden safe-area-top">
         <TopBar user={user} onMenuToggle={() => setSidebarOpen(prev => !prev)} />
         <main id="main-content" className="flex-1 overflow-y-auto pb-16 lg:pb-0 px-4 lg:px-6 py-4 lg:py-6">
           {children}

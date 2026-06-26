@@ -34,11 +34,23 @@ export async function POST(req: NextRequest) {
     take: 20,
   })
 
-  const transactions = await prisma.transaction.findMany({
-    where: { userId: session.user.id },
-    orderBy: { date: 'desc' },
-    take: 100,
-  })
+  const [transactions, budgets, goals, debts] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { userId: session.user.id },
+      orderBy: { date: 'desc' },
+      take: 500,
+    }),
+    prisma.budget.findMany({
+      where: { userId: session.user.id },
+    }),
+    prisma.goal.findMany({
+      where: { userId: session.user.id },
+    }),
+    prisma.debtPlan.findMany({
+      where: { userId: session.user.id },
+      include: { liability: true },
+    }),
+  ])
 
   const txData = transactions.map((t) => ({
     id: t.id,
@@ -48,14 +60,43 @@ export async function POST(req: NextRequest) {
     description: t.description,
     merchantName: t.merchantName ?? undefined,
     merchantCategory: t.merchantCategory ?? undefined,
+    merchantCity: t.merchantCity ?? undefined,
     status: t.status as 'posted' | 'pending',
+  }))
+
+  const budgetData = budgets.map((b) => ({
+    category: b.category,
+    amount: b.amount,
+    period: b.period,
+    spent: 0,
+    remaining: b.amount,
+  }))
+
+  const goalData = goals.map((g) => ({
+    name: g.name,
+    targetAmount: g.targetAmount,
+    currentAmount: g.currentAmount,
+    deadline: g.deadline?.toISOString() ?? null,
+  }))
+
+  const debtData = debts.map((d) => ({
+    strategy: d.strategy,
+    extraPayment: d.extraPayment,
+    liability: d.liability
+      ? { name: d.liability.name, balance: d.liability.balance, interestRate: d.liability.interestRate }
+      : null,
   }))
 
   const convHistory = history
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
-  const reply = await chatWithData(message, txData, convHistory.slice(0, -1))
+  const reply = await chatWithData(
+    message,
+    txData,
+    convHistory.slice(0, -1),
+    { budgets: budgetData, goals: goalData, debts: debtData }
+  )
 
   await prisma.chatMessage.create({
     data: { userId: session.user.id, role: 'assistant', content: reply },

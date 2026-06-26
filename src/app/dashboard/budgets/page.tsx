@@ -219,11 +219,55 @@ export default function BudgetsPage() {
                       }
                     </span>
                   </div>
+
+                  {/* Pace projection */}
+                  <BudgetPace spent={budget.spent} budgeted={budget.amount} fmt={fmt} />
                 </div>
               )
             })}
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+function BudgetPace({ spent, budgeted, fmt }: { spent: number; budgeted: number; fmt: (n: number) => string }) {
+  const now = new Date()
+  const dayOfMonth = now.getDate()
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const monthProgress = dayOfMonth / daysInMonth
+
+  if (monthProgress === 0 || budgeted === 0) return null
+
+  const projectedRate = spent / monthProgress
+  const projectedTotal = projectedRate * 1
+  const willExceed = projectedTotal > budgeted
+  const projectedOvershoot = projectedTotal - budgeted
+
+  return (
+    <div className="mt-2 pt-2 border-t border-slate-50 dark:border-slate-800">
+      <div className="flex items-center justify-between">
+        <span className={`text-2xs ${willExceed ? 'text-amber-600 dark:text-amber-400' : 'text-teal-600 dark:text-teal-400'}`}>
+          {willExceed
+            ? `On pace to exceed by ${fmt(Math.round(projectedOvershoot))}`
+            : `On track to stay under budget`
+          }
+        </span>
+        <span className="text-2xs text-slate-400">
+          {monthProgress < 1
+            ? `${(monthProgress * 100).toFixed(0)}% of month passed`
+            : 'End of month'
+          }
+        </span>
+      </div>
+      {willExceed && (
+        <div className="mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
+          <div
+            className="h-full rounded-full bg-amber-400"
+            style={{ width: `${Math.min(100, (projectedTotal / budgeted) * 100)}%` }}
+          />
+        </div>
       )}
     </div>
   )

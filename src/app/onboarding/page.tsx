@@ -26,7 +26,7 @@ export default function OnboardingPage() {
         <div className="text-left space-y-3 mb-8">
           {[
             {
-              label: "Connect your bank via Teller",
+              label: "Connect your bank via Plaid",
               note: "Read-only access — we never see your password",
             },
             {

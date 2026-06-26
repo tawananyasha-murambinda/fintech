@@ -188,6 +188,10 @@ html.dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
 /* === ANIMATION UTILITIES === */
 
 .stagger-1 { animation-delay: 50ms; }

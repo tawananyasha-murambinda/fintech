@@ -23,6 +23,7 @@
     "@capacitor/android": "^6.2.1",
     "@capacitor/cli": "^6.2.1",
     "@capacitor/core": "^6.2.1",
+    "@capacitor/haptics": "6.0.3",
     "@capacitor/ios": "^6.2.1",
     "@capacitor/push-notifications": "^6.0.5",
     "@next-auth/prisma-adapter": "^1.0.7",

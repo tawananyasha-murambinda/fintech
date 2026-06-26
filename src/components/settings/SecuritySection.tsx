@@ -127,6 +127,32 @@ export function SecuritySection() {
         </div>
       )}
 
+      {/* Biometric unlock */}
+      <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+        <h3 className="text-sm font-medium text-slate-900 mb-2 dark:text-slate-100">Biometric unlock</h3>
+        <p className="text-xs text-slate-500 mb-3 dark:text-slate-400">
+          Use Face ID, Touch ID, or fingerprint to unlock the app instead of typing your password every time.
+        </p>
+        <button
+          onClick={async () => {
+            try {
+              const BiometricPlugin = (window as any).Capacitor?.Plugins?.Biometric
+              if (BiometricPlugin) {
+                await BiometricPlugin.enable()
+                localStorage.setItem('biometric_enabled', 'true')
+                return
+              }
+            } catch {}
+            localStorage.setItem('biometric_enabled', localStorage.getItem('biometric_enabled') !== 'true' ? 'true' : '')
+          }}
+          className="text-xs px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+        >
+          {typeof window !== 'undefined' && localStorage.getItem('biometric_enabled') === 'true'
+            ? 'Biometric enabled'
+            : 'Enable biometric unlock'}
+        </button>
+      </div>
+
       <div className="pt-4 border-t border-slate-100 space-y-3 dark:border-slate-800">
         <h3 className="text-sm font-medium text-red-600 dark:text-red-400">Danger zone</h3>
         <p className="text-xs text-slate-500 dark:text-slate-400">

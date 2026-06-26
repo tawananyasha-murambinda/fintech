@@ -196,6 +196,48 @@ export default function DebtPage() {
             </div>
           )}
 
+          {liabilities.filter(l => l.interestRate && l.minPayment).length >= 2 && (
+            <div className="card p-5">
+              <h2 className="text-sm font-semibold text-slate-900 mb-3 dark:text-slate-100">Strategy comparison</h2>
+              <p className="text-xs text-slate-400 mb-4">How snowball vs avalanche compares on your current debts.</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="text-left pb-2 font-medium text-slate-400">Debt</th>
+                      <th className="text-right pb-2 font-medium text-slate-400">Balance</th>
+                      <th className="text-right pb-2 font-medium text-slate-400">Rate</th>
+                      <th className="text-right pb-2 font-medium text-slate-400 text-teal-700 dark:text-teal-400">Snowball months</th>
+                      <th className="text-right pb-2 font-medium text-slate-400 text-red-600 dark:text-red-400">Avalanche months</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {liabilities.filter(l => l.interestRate && l.minPayment).map(l => {
+                      const snowball = calculatePayoff(l.balance, l.interestRate!, l.minPayment!, 0, 'snowball')
+                      const avalanche = calculatePayoff(l.balance, l.interestRate!, l.minPayment!, 0, 'avalanche')
+                      return (
+                        <tr key={l.id} className="border-b border-slate-50 dark:border-slate-800">
+                          <td className="py-2.5 font-medium text-slate-900 dark:text-slate-100">{l.name}</td>
+                          <td className="py-2.5 text-right text-slate-700 dark:text-slate-300">{fmt(l.balance)}</td>
+                          <td className="py-2.5 text-right text-slate-500">{l.interestRate}%</td>
+                          <td className="py-2.5 text-right font-medium text-teal-700 dark:text-teal-400">{snowball.months}mo</td>
+                          <td className="py-2.5 text-right font-medium text-red-600 dark:text-red-400">{avalanche.months}mo</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <p className="text-xs text-slate-600 dark:text-slate-300">
+                  <span className="font-semibold">Snowball</span> pays smallest balances first (psychological wins).
+                  <span className="font-semibold ml-2">Avalanche</span> targets highest interest rates first (saves the most money).
+                  The best strategy depends on whether you need momentum or math on your side.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="card p-5">
               <h2 className="text-sm font-semibold text-slate-900 mb-3 dark:text-slate-100">Snowball order (by balance)</h2>

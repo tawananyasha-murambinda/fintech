@@ -64,6 +64,19 @@ export default function LoginForm() {
         </button>
       </div>
 
+      {/* Biometric note for Capacitor */}
+      <div className="mb-6 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-teal-600 shrink-0">
+          <path d="M8 1.5L2 4v4c0 3.31 2.69 6 6 6s6-2.69 6-6V4L8 1.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+          <path d="M5.5 8l1.5 1.5L10.5 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        <div className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+          {typeof window !== 'undefined' && 'Capacitor' in (window as any)
+            ? 'Using the app? Google/GitHub login opens your system browser for security, then returns here.'
+            : 'Enable biometric unlock in Settings after signing in for quick access.'}
+        </div>
+      </div>
+
       <div className="flex items-center gap-3 mb-6">
         <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
         <span className="text-xs text-slate-400 dark:text-slate-500">or</span>

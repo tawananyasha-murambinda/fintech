@@ -22,7 +22,7 @@ interface AnalysisInput {
   prevPeriodCategories?: Record<string, number>
 }
 
-const MODEL = 'claude-3-5-sonnet-20241022'
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022'
 
 function cleanCategory(cat?: string | null) {
   return (cat || 'Uncategorized').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -752,33 +752,198 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
 export async function chatWithData(
   userMessage: string,
   transactions: Transaction[],
-  conversationHistory: { role: 'user' | 'assistant'; content: string }[]
+  conversationHistory: { role: 'user' | 'assistant'; content: string }[],
+  context?: {
+    budgets?: { category: string; amount: number; period: string; spent: number; remaining: number }[]
+    goals?: { name: string; targetAmount: number; currentAmount: number; deadline: string | null }[]
+    debts?: { strategy: string; extraPayment: number; liability: { name: string; balance: number; interestRate?: number | null } | null }[]
+  }
 ): Promise<string> {
-  const summary = {
-    count: transactions.length,
-    totalExpenses: transactions.filter((t) => t.direction === 'debit').reduce((s, t) => s + Math.abs(t.amount), 0),
-    totalIncome: transactions.filter((t) => t.direction === 'credit').reduce((s, t) => s + Math.abs(t.amount), 0),
-    recentTransactions: transactions.slice(0, 20),
+  const totalExpenses = transactions.filter((t) => t.direction === 'debit').reduce((s, t) => s + Math.abs(t.amount), 0)
+  const totalIncome = transactions.filter((t) => t.direction === 'credit').reduce((s, t) => s + Math.abs(t.amount), 0)
+
+  const byCategory: Record<string, number> = {}
+  for (const t of transactions) {
+    if (t.direction !== 'debit') continue
+    const cat = cleanCategory(t.merchantCategory)
+    byCategory[cat] = (byCategory[cat] || 0) + Math.abs(t.amount)
+  }
+  const topCategories = Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 10)
+
+  let contextStr = ''
+  if (context?.budgets?.length) {
+    contextStr += `\nBudgets:\n${context.budgets.map(b => `- ${b.category}: ${b.amount}/${b.spent} spent (${b.remaining} remaining)`).join('\n')}\n`
+  }
+  if (context?.goals?.length) {
+    contextStr += `\nGoals:\n${context.goals.map(g => `- ${g.name}: ${g.currentAmount}/${g.targetAmount}${g.deadline ? ` by ${g.deadline}` : ''}`).join('\n')}\n`
+  }
+  if (context?.debts?.length) {
+    contextStr += `\nDebt Plans:\n${context.debts.map(d => `- ${d.liability?.name || 'Unknown'} (${d.strategy}): extra ${d.extraPayment}/mo`).join('\n')}\n`
   }
 
-  const systemPrompt = `You are a personal finance assistant with access to the user's transaction data. Be concise, specific, and actionable. Always reference actual numbers from their data when relevant.
+  const systemPrompt = `You are a personal finance assistant with access to the user's transaction data. Be concise, specific, and actionable. Always reference actual numbers.
 
-Current transaction summary:
-${JSON.stringify(summary, null, 2)}`
+Transaction summary: ${transactions.length} transactions, $${totalIncome.toFixed(2)} income, $${totalExpenses.toFixed(2)} expenses.
+Top categories: ${topCategories.map(([c, v]) => `${c} ($${v.toFixed(2)})`).join(', ')}${contextStr}
 
-  const messages = [
+When you need more specific data, use the available tools to search transactions, get category breakdowns, or find merchant information.`
+
+  const tools: any[] = [
+    {
+      name: 'search_transactions',
+      description: 'Search transactions by merchant, category, amount range, or date range. Returns up to 50 results.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search term for merchant name or description' },
+          category: { type: 'string', description: 'Filter by category (e.g. Food & Dining, Shopping)' },
+          min_amount: { type: 'number', description: 'Minimum amount filter' },
+          max_amount: { type: 'number', description: 'Maximum amount filter' },
+          direction: { type: 'string', enum: ['debit', 'credit'], description: 'credit or debit' },
+          days_back: { type: 'number', description: 'How many days back to search' },
+          limit: { type: 'number', description: 'Max results (default 20)' },
+        },
+      },
+    },
+    {
+      name: 'get_category_totals',
+      description: 'Get total spending per category, optionally filtered by date range.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          days_back: { type: 'number', description: 'Number of days to look back' },
+          direction: { type: 'string', enum: ['debit', 'credit'], description: 'credit or debit' },
+        },
+      },
+    },
+    {
+      name: 'get_merchant_info',
+      description: 'Get detailed spending info for a specific merchant.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          merchant_name: { type: 'string', description: 'Merchant name to look up' },
+        },
+        required: ['merchant_name'],
+      },
+    },
+  ]
+
+  function searchTransactions(args: Record<string, any>): Transaction[] {
+    let results = [...transactions]
+    if (args.query) {
+      const q = args.query.toLowerCase()
+      results = results.filter(t => (t.merchantName || t.description || '').toLowerCase().includes(q))
+    }
+    if (args.category) {
+      const cat = args.category.toLowerCase()
+      results = results.filter(t => cleanCategory(t.merchantCategory).toLowerCase().includes(cat))
+    }
+    if (args.min_amount !== undefined) results = results.filter(t => Math.abs(t.amount) >= args.min_amount)
+    if (args.max_amount !== undefined) results = results.filter(t => Math.abs(t.amount) <= args.max_amount)
+    if (args.direction) results = results.filter(t => t.direction === args.direction)
+    if (args.days_back) {
+      const cutoff = new Date(Date.now() - args.days_back * 86400000).toISOString()
+      results = results.filter(t => t.date >= cutoff)
+    }
+    const limit = args.limit || 20
+    results = results.slice(0, limit)
+    return results.map(t => ({ ...t, amount: Math.abs(t.amount) }))
+  }
+
+  function getCategoryTotals(args: Record<string, any>): { category: string; total: number; count: number }[] {
+    let filtered = [...transactions]
+    if (args.direction) filtered = filtered.filter(t => t.direction === args.direction)
+    if (args.days_back) {
+      const cutoff = new Date(Date.now() - args.days_back * 86400000).toISOString()
+      filtered = filtered.filter(t => t.date >= cutoff)
+    }
+    const cats: Record<string, { total: number; count: number }> = {}
+    for (const t of filtered) {
+      const cat = cleanCategory(t.merchantCategory || 'Uncategorized')
+      if (!cats[cat]) cats[cat] = { total: 0, count: 0 }
+      cats[cat].total += Math.abs(t.amount)
+      cats[cat].count++
+    }
+    return Object.entries(cats).map(([category, data]) => ({ category, ...data })).sort((a, b) => b.total - a.total)
+  }
+
+  function getMerchantInfo(args: Record<string, any>): { merchantName: string; total: number; count: number; avgAmount: number; category: string } | null {
+    const q = args.merchant_name?.toLowerCase()
+    if (!q) return null
+    const txns = transactions.filter(t => (t.merchantName || t.description || '').toLowerCase().includes(q))
+    if (txns.length === 0) return null
+    const total = txns.reduce((s, t) => s + Math.abs(t.amount), 0)
+    return {
+      merchantName: txns[0].merchantName || txns[0].description,
+      total,
+      count: txns.length,
+      avgAmount: total / txns.length,
+      category: cleanCategory(txns[0].merchantCategory),
+    }
+  }
+
+  const messages: any[] = [
     ...conversationHistory,
-    { role: 'user' as const, content: userMessage },
+    { role: 'user', content: userMessage },
   ]
 
   try {
-    const response = await client.messages.create({
+    let response = await client.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 2048,
       system: systemPrompt,
       messages,
+      tools,
     })
-    return response.content[0].type === 'text' ? response.content[0].text : ''
+
+    let finalContent = ''
+
+    for (const block of response.content) {
+      if (block.type === 'text') {
+        finalContent += block.text
+      } else if (block.type === 'tool_use') {
+        const args = block.input as Record<string, any>
+        let result: any
+
+        switch (block.name) {
+          case 'search_transactions':
+            result = searchTransactions(args)
+            break
+          case 'get_category_totals':
+            result = getCategoryTotals(args)
+            break
+          case 'get_merchant_info':
+            result = getMerchantInfo(args)
+            break
+          default:
+            result = { error: 'Unknown tool' }
+        }
+
+        messages.push({ role: 'assistant', content: response.content })
+        messages.push({
+          role: 'user',
+          content: [{
+            type: 'tool_result',
+            tool_use_id: block.id,
+            content: JSON.stringify(result),
+          }],
+        })
+
+        const followUp = await client.messages.create({
+          model: MODEL,
+          max_tokens: 2048,
+          system: systemPrompt,
+          messages,
+        })
+
+        for (const fb of followUp.content) {
+          if (fb.type === 'text') finalContent += fb.text
+        }
+      }
+    }
+
+    return finalContent || 'I analyzed your data but could not generate a response.'
   } catch (err) {
     console.error('AI chat failed, using local fallback:', err)
     return chatLocalFallback(userMessage, transactions, conversationHistory)
