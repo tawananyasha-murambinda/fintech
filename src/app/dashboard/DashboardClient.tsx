@@ -10,6 +10,7 @@ import { SyncButton } from "@/components/ui/SyncButton";
 import { LinkBankButton } from "@/components/bank/LinkBankButton";
 import { AccountSwitcher } from "@/components/dashboard/AccountSwitcher";
 import { MobileDashboard } from "@/components/dashboard/MobileDashboard";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 import { useCurrency } from "@/hooks/useCurrency";
 import type { CashflowPoint, SpendingCategory } from "@/types";
 
@@ -260,6 +261,9 @@ export function DashboardClient({
           </>
         )}
       </div>
+
+      {/* AI Chat Widget - shown on both mobile and desktop */}
+      <ChatWidget />
     </>
   );
 }
