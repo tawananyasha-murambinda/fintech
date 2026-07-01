@@ -18,6 +18,7 @@ model User {
   country       String?
   latitude      Float?
   longitude     Float?
+  currency      String    @default("USD")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
