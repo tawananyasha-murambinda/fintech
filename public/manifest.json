@@ -4,8 +4,8 @@
   "description": "Personal finance tracking with AI-powered insights",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0d7c66",
+  "background_color": "#0d0d1a",
+  "theme_color": "#0d0d1a",
   "categories": ["finance", "productivity"],
   "orientation": "portrait",
   "icons": [
