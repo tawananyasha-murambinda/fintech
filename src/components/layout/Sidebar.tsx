@@ -100,9 +100,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
       {/* Logo */}
       <div className="px-5 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-teal-700 rounded-md flex items-center justify-center shrink-0">
-            <span className="text-white text-xs font-bold">F</span>
-          </div>
+          <img src="/icon-192.png" alt="" width={28} height={28} className="rounded-md shrink-0" />
           <span className="font-semibold text-slate-900 tracking-tight text-sm dark:text-slate-100">FinTrack</span>
         </div>
         <button onClick={onClose} className="lg:hidden text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">

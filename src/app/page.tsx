@@ -7,9 +7,7 @@ export default function HomePage() {
       {/* Nav */}
       <nav className="border-b border-slate-100 px-6 py-4 flex items-center justify-between max-w-6xl mx-auto">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-teal-700 rounded-md flex items-center justify-center">
-            <span className="text-white text-xs font-bold">F</span>
-          </div>
+          <img src="/icon-192.png" alt="" width={28} height={28} className="rounded-md" />
           <span className="font-semibold text-slate-900 tracking-tight">FinTrack</span>
         </div>
         <div className="flex items-center gap-3">

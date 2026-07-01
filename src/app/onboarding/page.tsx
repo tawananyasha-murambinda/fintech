@@ -26,9 +26,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
       <div className="max-w-md w-full text-center animate-fade-up">
         {/* Logo */}
-        <div className="w-12 h-12 bg-teal-700 rounded-xl flex items-center justify-center mx-auto mb-6">
-          <span className="text-white font-bold text-lg">F</span>
-        </div>
+        <img src="/icon-192.png" alt="" width={48} height={48} className="rounded-xl mx-auto mb-6" />
 
         {step === "bank" ? (
           <>
