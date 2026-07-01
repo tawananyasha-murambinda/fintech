@@ -1334,7 +1334,6 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
     const highestTx = transactions.filter(t => t.direction === 'debit').sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))[0]
 
     return `Financial summary\n\n• Income: ${money(incomeTotal)}\n• Expenses: ${money(expenseTotal)}\n• Net: ${money(netCashflow)}\n• Transactions: ${txCount} total\n• Top category: ${topCat?.[0] || 'N/A'} (${topCatPct}% of spending)\n• Top merchant: ${topMerchant?.[0] || 'N/A'} (${money(topMerchant?.[1].total || 0)})${monthTrend}\n\n• Spending diversity: ${catCount} categories\n• Biggest single transaction: ${highestTx ? `${money(Math.abs(highestTx.amount))} at ${highestTx.merchantName || highestTx.description}` : 'N/A'}\n• Savings rate: ${incomeTotal > 0 ? `${(Math.max(0, netCashflow) / incomeTotal * 100).toFixed(0)}%` : 'N/A'}`
-    return `Financial summary\n\n• Income: $${incomeTotal.toFixed(2)}\n• Expenses: $${expenseTotal.toFixed(2)}\n• Net: $${netCashflow.toFixed(2)}\n• Transactions: ${txCount} total\n• Top category: ${topCat?.[0] || 'N/A'} (${topCatPct}% of spending)\n• Top merchant: ${topMerchant?.[0] || 'N/A'} ($${topMerchant?.[1].total.toFixed(2) || '0'})${monthTrend}\n\n• Spending diversity: ${catCount} categories\n• Biggest single transaction: ${highestTx ? `$${Math.abs(highestTx.amount).toFixed(2)} at ${highestTx.merchantName || highestTx.description}` : 'N/A'}\n• Savings rate: ${incomeTotal > 0 ? `${(Math.max(0, netCashflow) / incomeTotal * 100).toFixed(0)}%` : 'N/A'}`
   }
 
   // ── INCOME ──
@@ -1390,7 +1389,6 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
     }
 
     return `Your expenses have ${direction} by ${Math.abs(change).toFixed(0)}% ${arrow}\nThis month: ${money(thisMonthExpenses)} vs Last month: ${money(lastMonthExpenses)}${trendDetails}${biggestIncrease ? `\n\nFastest growing: ${biggestIncrease.cat} (↑ ${biggestIncrease.catChange.toFixed(0)}%)` : ''}${biggestDecrease ? `\nBiggest drop: ${biggestDecrease.cat} (↓ ${Math.abs(biggestDecrease.catChange).toFixed(0)}%)` : ''}`
-    return `Your expenses have ${direction} by ${Math.abs(change).toFixed(0)}% ${arrow}\nThis month: $${thisMonthExpenses.toFixed(2)} vs Last month: $${lastMonthExpenses.toFixed(2)}${trendDetails}${biggestIncrease ? `\n\nFastest growing: ${biggestIncrease.cat} (↑ ${biggestIncrease.catChange.toFixed(0)}%)` : ''}${biggestDecrease ? `\nBiggest drop: ${biggestDecrease.cat} (↓ ${Math.abs(biggestDecrease.catChange).toFixed(0)}%)` : ''}`
   }
 
   // ── BUDGET ──
@@ -1436,8 +1434,6 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
 AT A GLANCE
 • Top category: ${topCatName} (${money(topCatAmt)})
 • Top merchant: ${topMerchName} (${money(topMerchAmt)})
-• Top category: ${topCatName} ($${topCatAmt.toFixed(2)})
-• Top merchant: ${topMerchName} ($${topMerchAmt.toFixed(2)})
 • Spending categories: ${catCount}
 • Savings rate: ${savingsRate}%
 • This month: ${money(thisMonthExpenses)} spent${lastMonthExpenses > 0 ? ` (${((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses * 100).toFixed(0)}% vs last month)` : ''}
