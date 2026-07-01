@@ -30,6 +30,7 @@ export function SyncButton() {
 
   return (
     <button
+      data-sync-btn
       onClick={handleSync}
       disabled={syncing}
       className="btn-secondary flex items-center gap-2 text-xs py-2"

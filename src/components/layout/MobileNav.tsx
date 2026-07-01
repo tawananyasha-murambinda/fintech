@@ -15,9 +15,9 @@ const TABS = [
     icon: <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M3 6h16M3 11h12M3 16h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
   },
   {
-    href: '/dashboard/reports',
+    href: '/dashboard/intelligence',
     label: 'Analytics',
-    icon: <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M3 17l5-5 4 4 7-8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+    icon: <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M8 12.5c.5 1.1 1.5 1.9 3 1.9s2.5-.8 3-1.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="13" cy="9" r="1" fill="currentColor"/></svg>,
   },
   {
     href: '/dashboard/accounts',

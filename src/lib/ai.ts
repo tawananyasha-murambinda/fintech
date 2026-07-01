@@ -13,6 +13,31 @@ import type {
 } from '@/types'
 import { findLocalAlternatives, geocodeCity } from './geocode'
 
+const CATEGORY_GROUPS: Record<string, string[]> = {
+  'Food & Dining': ['Food & Dining', 'Groceries', 'Restaurant', 'Coffee Shops', 'Bars & Drinks', 'Fast Food'],
+  'Transportation': ['Transportation', 'Gas & Fuel', 'Parking', 'Public Transit', 'Ride Share', 'Tolls'],
+  'Entertainment': ['Entertainment', 'Streaming', 'Movies & Shows', 'Games', 'Music', 'Events'],
+  'Shopping': ['Shopping', 'Retail', 'Clothing', 'Electronics', 'Department Stores', 'Online Shopping'],
+  'Bills & Utilities': ['Utilities', 'Phone', 'Internet', 'Insurance', 'Electricity', 'Water', 'Gas'],
+  'Health & Fitness': ['Health & Fitness', 'Pharmacy', 'Gym', 'Doctor', 'Dental', 'Medical'],
+  'Travel': ['Travel', 'Flights', 'Hotels', 'Lodging', 'Car Rental'],
+  'Education': ['Education', 'Tuition', 'Books', 'Courses'],
+}
+
+const CATEGORY_SYNONYMS: Record<string, string[]> = {
+  food: ['Food & Dining', 'Groceries', 'Restaurant', 'Coffee Shops', 'Dining'],
+  dining: ['Food & Dining', 'Restaurant', 'Bars & Drinks'],
+  groceries: ['Groceries', 'Food & Dining'],
+  transport: ['Transportation', 'Gas & Fuel', 'Public Transit', 'Ride Share'],
+  gas: ['Gas & Fuel', 'Transportation'],
+  entertainment: ['Entertainment', 'Streaming', 'Movies & Shows'],
+  streaming: ['Streaming', 'Entertainment'],
+  shopping: ['Shopping', 'Retail'],
+  health: ['Health & Fitness', 'Pharmacy', 'Medical'],
+  fitness: ['Health & Fitness', 'Gym'],
+  travel: ['Travel', 'Flights', 'Hotels'],
+} as const
+
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 interface AnalysisInput {
@@ -26,6 +51,81 @@ const MODEL = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022'
 
 function cleanCategory(cat?: string | null) {
   return (cat || 'Uncategorized').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function mergeCategoryGroups(
+  byCategory: Record<string, { total: number; count: number }>
+): Record<string, { total: number; count: number }> {
+  const merged: Record<string, { total: number; count: number }> = {}
+
+  for (const [rawCat, data] of Object.entries(byCategory)) {
+    let assigned = false
+    for (const [groupName, members] of Object.entries(CATEGORY_GROUPS)) {
+      if (members.some(m => rawCat.toLowerCase().includes(m.toLowerCase()))) {
+        if (!merged[groupName]) merged[groupName] = { total: 0, count: 0 }
+        merged[groupName].total += data.total
+        merged[groupName].count += data.count
+        assigned = true
+        break
+      }
+    }
+    if (!assigned) {
+      merged[rawCat] = { total: data.total, count: data.count }
+    }
+  }
+
+  return merged
+}
+
+function detectAnomalies(
+  transactions: Transaction[],
+  byCategory: Record<string, { total: number; count: number }>,
+): { type: 'spending_spike' | 'unusual_merchant' | 'weekend_pattern'; label: string; detail: string; severity: 'info' | 'warning' | 'critical' }[] {
+  const anomalies: ReturnType<typeof detectAnomalies> = []
+  const merged = mergeCategoryGroups(byCategory)
+  const entries = Object.entries(merged).sort((a, b) => b[1].total - a[1].total)
+
+  if (entries.length >= 2) {
+    const top = entries[0]
+    const second = entries[1]
+    if (top[1].total > second[1].total * 3) {
+      anomalies.push({
+        type: 'spending_spike',
+        label: `Heavy concentration in ${top[0]}`,
+        detail: `${top[0]} (${top[1].total.toFixed(2)}) is ${(top[1].total / Math.max(second[1].total, 1)).toFixed(0)}x your next category ${second[0]} (${second[1].total.toFixed(2)}). Consider if this is sustainable.`,
+        severity: 'warning',
+      })
+    }
+  }
+
+  const weekendDebits = transactions.filter(t => {
+    if (t.direction !== 'debit') return false
+    const d = new Date(t.date)
+    return d.getDay() === 0 || d.getDay() === 6
+  })
+  const weekendTotal = weekendDebits.reduce((s, t) => s + Math.abs(t.amount), 0)
+  const weekdayDebits = transactions.filter(t => {
+    if (t.direction !== 'debit') return false
+    const d = new Date(t.date)
+    return d.getDay() !== 0 && d.getDay() !== 6
+  })
+  const weekdayTotal = weekdayDebits.reduce((s, t) => s + Math.abs(t.amount), 0)
+  const weekendCount = weekendDebits.length
+  const weekdayCount = weekdayDebits.length || 1
+
+  const weekendAvg = weekendTotal / Math.max(weekendCount, 1)
+  const weekdayAvg = weekdayTotal / weekdayCount
+
+  if (weekendAvg > weekdayAvg * 1.5 && weekendCount >= 3) {
+    anomalies.push({
+      type: 'weekend_pattern',
+      label: 'Weekend spending spike',
+      detail: `Your average weekend transaction (${weekendAvg.toFixed(2)}) is ${(weekendAvg / weekdayAvg * 100 - 100).toFixed(0)}% higher than weekday avg (${weekdayAvg.toFixed(2)}).`,
+      severity: 'info',
+    })
+  }
+
+  return anomalies
 }
 
 function aggregateDebits(transactions: Transaction[]) {
@@ -691,7 +791,7 @@ function determineCashflowHealth(income: number, expenses: number): AiAnalysis['
   return 'concerning'
 }
 
-function sanitizeAiResponse(raw: string): Partial<AiAnalysis> {
+function sanitizeAiResponse(raw: string): Record<string, any> {
   const cleaned = raw
     .replace(/```json\s?|```\s?/gi, '')
     .replace(/^[^{]*/g, '')
@@ -726,30 +826,58 @@ export async function analyzeSpending(input: AnalysisInput): Promise<AiAnalysis>
   const hiddenRecurringCharges = detectHiddenRecurringCharges(transactions)
   const sustainabilityScore = calculateSustainabilityScore(transactions)
 
-  // Build AI prompt for real-world local alternatives and narrative
+  const anomalies = detectAnomalies(transactions, byCategory)
+  const mergedCatBreakdown = mergeCategoryGroups(byCategory)
+  const topMerged = Object.entries(mergedCatBreakdown)
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 5)
+    .map(([c, d]) => `${c}: ${d.total.toFixed(2)}`)
+
+  // Detect top 3 growing merchants from recurring trends
+  const growingCharges = recurringTrends.filter(t => t.trendPercent > 0).slice(0, 3)
+  const topSubOverlaps = subscriptionOverlaps.slice(0, 3)
+
   const topLocations = locationInsights.slice(0, 3)
-  const prompt = `You are a hyper-local personal finance analyst. Given this spending data, write a 2-3 sentence summary and one actionable top insight. Be specific and reference real spending locations when relevant.
+  const prompt = `You are a personal finance analyst analyzing this user's spending. Be detailed, specific, and actionable. Reference exact amounts and merchants.
 
 Period: ${period}
 Total income: ${totalIncome.toFixed(2)}
 Total expenses: ${totalExpenses.toFixed(2)}
+Savings rate: ${totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100).toFixed(0) : 'N/A'}%
 Transaction count: ${transactions.length}
-User location hint: ${userLocation ? JSON.stringify(userLocation) : 'not provided'}
+User location: ${userLocation ? `${userLocation.city || ''} ${userLocation.country || ''}` : 'not available'}
 
-Top spending categories:
-${categoryBreakdown.slice(0, 6).map((c) => `- ${c.category}: ${c.total.toFixed(2)} (${c.percentage.toFixed(0)}%)`).join('\n')}
+Spending by category (merged groups):
+${topMerged.map(l => `- ${l}`).join('\n')}
 
-Top spending locations:
-${topLocations.map((l) => `- ${l.city}${l.country ? `, ${l.country}` : ''}: ${l.totalSpent.toFixed(2)}`).join('\n') || 'No location data'}
+All categories:
+${categoryBreakdown.slice(0, 8).map((c) => `- ${c.category}: ${c.total.toFixed(2)} (${c.percentage.toFixed(0)}%, ${c.trend > 0 ? '+' : ''}${c.trend.toFixed(0)}% vs prev)`).join('\n')}
+
+Anomalies detected:
+${anomalies.length > 0 ? anomalies.map(a => `- [${a.severity}] ${a.label}: ${a.detail}`).join('\n') : '- None detected'}
+
+Rising recurring charges:
+${growingCharges.length > 0 ? growingCharges.map(t => `- ${t.merchantName}: avg ${t.avgAmount.toFixed(2)} (↑ ${t.trendPercent.toFixed(0)}%)`).join('\n') : '- None detected with >5% change'}
+
+Subscription overlaps:
+${topSubOverlaps.length > 0 ? topSubOverlaps.map(s => `- ${s.category}: ${s.merchants.map(m => m.name).join(', ')} (${s.totalMonthly.toFixed(2)}/mo)`).join('\n') : '- None detected'}
+
+Top locations:
+${topLocations.map((l) => `- ${l.city}${l.country ? `, ${l.country}` : ''}: ${l.totalSpent.toFixed(2)}`).join('\n') || '- No location data'}
+
+Top merchants (with alternatives):
+${merchantAlternatives.slice(0, 4).map(m => `- ${m.merchantName}: ${m.totalSpent.toFixed(2)} (${m.visitCount} visits, avg ${m.avgTransaction.toFixed(2)}/visit)`).join('\n')}
 
 Return ONLY a JSON object with this exact shape and no other text:
 {
-  "summary": "2-3 sentence plain English overview",
-  "topInsight": "single most actionable insight in one sentence"
+  "summary": "3-4 sentence plain English overview of financial health",
+  "topInsight": "single most actionable, specific insight referencing real merchants and dollar amounts",
+  "savingsSuggestions": ["3-4 specific savings tips with dollar amounts, e.g. 'Switching from Starbucks ($45/mo) to home coffee saves ~$540/yr'"]
 }`
 
   let summary = 'Your spending has been analyzed based on the selected period.'
   let topInsight = 'Review your top categories and locations to find the best opportunities to save.'
+  let savingsSuggestions: string[] = []
 
   try {
     const message = await client.messages.create({
@@ -762,8 +890,28 @@ Return ONLY a JSON object with this exact shape and no other text:
     const parsed = sanitizeAiResponse(text)
     if (parsed.summary) summary = parsed.summary
     if (parsed.topInsight) topInsight = parsed.topInsight
+    if (parsed.savingsSuggestions?.length) savingsSuggestions = parsed.savingsSuggestions
   } catch (err) {
     console.error('AI narrative failed, using fallback:', err)
+  }
+
+  // Merge AI savings suggestions into existing opportunities
+  if (savingsSuggestions.length > 0) {
+    for (const suggestion of savingsSuggestions) {
+      const estimateMatch = suggestion.match(/\$?(\d+(?:,\d{3})*(?:\.\d{1,2})?)\/yr/)
+      const monthlyEstimate = estimateMatch ? Math.round(parseFloat(estimateMatch[1].replace(/,/g, '')) / 12) : Math.round(totalExpenses * 0.05)
+      const titleMatch = suggestion.match(/^([^:]+)/)
+      const title = titleMatch ? titleMatch[1].trim() : suggestion.slice(0, 50)
+
+      if (!savingsOpportunities.some(o => o.title.toLowerCase() === title.toLowerCase())) {
+        savingsOpportunities.push({
+          title,
+          description: suggestion,
+          estimatedMonthlySavings: monthlyEstimate,
+          difficulty: monthlyEstimate > totalExpenses * 0.15 ? 'hard' : monthlyEstimate > totalExpenses * 0.08 ? 'medium' : 'easy',
+        })
+      }
+    }
   }
 
   return {
@@ -897,29 +1045,37 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
       mentionedCategories.push(cat)
     }
   }
-  // Broad food keywords
-  if (/food|dining|eat|restaurant|groceries|coffee|drink|lunch|dinner|breakfast|meal|snack|takeout|delivery|pizza|sushi|burger/i.test(msg)) {
+  // Use CATEGORY_SYNONYMS for broader matching
+  for (const [keyword, matchingCategories] of Object.entries(CATEGORY_SYNONYMS)) {
+    if (msg.includes(keyword)) {
+      for (const matchedCat of matchingCategories) {
+        const cat = categories.find(([c]) => c.toLowerCase() === matchedCat.toLowerCase())
+        if (cat && !mentionedCategories.includes(cat[0])) {
+          mentionedCategories.push(cat[0])
+        }
+      }
+    }
+  }
+  // Also do broad keyword matching for sub-words that synonym map might miss
+  if (/eat|lunch|dinner|breakfast|meal|snack|takeout|delivery|pizza|sushi|burger|brunch/i.test(msg)) {
     const foodCats = categories.filter(([cat]) => /food|dining|groceries|coffee|restaurant|drink|eating/i.test(cat))
     for (const [cat] of foodCats) {
       if (!mentionedCategories.includes(cat)) mentionedCategories.push(cat)
     }
   }
-  // Broad transport keywords
-  if (/transport|gas|fuel|uber|lyft|rideshare|train|bus|subway|metro|parking|toll/i.test(msg)) {
+  if (/uber|lyft|rideshare|train|bus|subway|metro|parking|toll/i.test(msg)) {
     const transportCats = categories.filter(([cat]) => /transport|gas|fuel|auto|vehicle|travel/i.test(cat))
     for (const [cat] of transportCats) {
       if (!mentionedCategories.includes(cat)) mentionedCategories.push(cat)
     }
   }
-  // Broad shopping keywords
-  if (/shop|retail|store|amazon|online.*buy|purchase|clothes|electronics/i.test(msg)) {
+  if (/online.*buy|clothes|electronics|amazon/i.test(msg)) {
     const shopCats = categories.filter(([cat]) => /shop|retail|merchandise|apparel|electroni/i.test(cat))
     for (const [cat] of shopCats) {
       if (!mentionedCategories.includes(cat)) mentionedCategories.push(cat)
     }
   }
-  // Broad entertainment keywords
-  if (/entertain|stream|movie|game|concert|netflix|hulu|spotify|subscription|subs/i.test(msg)) {
+  if (/movie|game|concert|netflix|hulu|spotify/i.test(msg)) {
     const entCats = categories.filter(([cat]) => /entertain|stream|subscription|media|recreation/i.test(cat))
     for (const [cat] of entCats) {
       if (!mentionedCategories.includes(cat)) mentionedCategories.push(cat)
