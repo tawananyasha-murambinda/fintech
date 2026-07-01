@@ -71,7 +71,7 @@ export default function CashflowPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Cash Flow Calendar</h1>
+            <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Cash Flow Calendar</h1>
             <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Projected account balances day-by-day based on known bills and income.</p>
           </div>
         </div>
@@ -83,8 +83,8 @@ export default function CashflowPage() {
         </div>
       ) : !data ? (
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-cyan-500/20">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+          <div className="w-14 h-14 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white dark:text-slate-900">
               <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
               <path d="M3 8h18" stroke="currentColor" strokeWidth="1.5"/>
               <path d="M8 12h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -98,15 +98,15 @@ export default function CashflowPage() {
         <>
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Monthly income</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Monthly income</p>
               <p className="text-lg font-bold text-teal-600 dark:text-teal-400">{fmt(data.income)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Monthly bills</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Monthly bills</p>
               <p className="text-lg font-bold text-rose-500">{fmt(data.monthlyBills)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Projected end balance</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Projected end balance</p>
               <p className={`text-lg font-bold ${data.projectedBalance >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-500'}`}>
                 {fmt(data.projectedBalance)}
               </p>

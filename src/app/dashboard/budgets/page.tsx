@@ -85,7 +85,7 @@ export default function BudgetsPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Budgets</h1>
+            <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Budgets</h1>
             <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Set spending limits per category and track progress.</p>
           </div>
         </div>
@@ -146,8 +146,8 @@ export default function BudgetsPage() {
         </div>
       ) : budgets.length === 0 ? (
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/20">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+          <div className="w-14 h-14 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white dark:text-slate-900">
               <rect x="3" y="6" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
               <path d="M3 10h18" stroke="currentColor" strokeWidth="1.5"/>
             </svg>
@@ -162,15 +162,15 @@ export default function BudgetsPage() {
         <>
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1">Budgeted</p>
+              <p className="text-2xs text-slate-400 font-medium mb-1">Budgeted</p>
               <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{fmt(totalBudgeted)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1">Spent</p>
+              <p className="text-2xs text-slate-400 font-medium mb-1">Spent</p>
               <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{fmt(totalSpent)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1">Remaining</p>
+              <p className="text-2xs text-slate-400 font-medium mb-1">Remaining</p>
               <p className={`text-lg font-semibold ${totalBudgeted - totalSpent >= 0 ? 'text-teal-700 dark:text-teal-400' : 'text-red-500'}`}>
                 {fmt(totalBudgeted - totalSpent)}
               </p>

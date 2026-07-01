@@ -48,7 +48,7 @@ export default function AlertsPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Spending Alerts</h1>
+            <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Spending Alerts</h1>
             <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
               Notifications about overspending, price changes, and unusual charges.
             </p>
@@ -67,8 +67,8 @@ export default function AlertsPage() {
         </div>
       ) : alerts.length === 0 ? (
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-rose-500/20">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+          <div className="w-14 h-14 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white dark:text-slate-900">
               <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>

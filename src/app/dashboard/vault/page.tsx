@@ -111,7 +111,7 @@ export default function VaultPage() {
             </svg>
           </div>
           <div>
-            <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Savings Vault</h2>
+            <h2 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Savings Vault</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">Set money aside and save automatically</p>
           </div>
         </div>
@@ -152,8 +152,8 @@ export default function VaultPage() {
 
       {vaults.length === 0 ? (
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/20">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+          <div className="w-14 h-14 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white dark:text-slate-900">
               <path d="M12 2L3 7v6c0 5.25 9 9 9 9s9-3.75 9-9V7l-9-5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>

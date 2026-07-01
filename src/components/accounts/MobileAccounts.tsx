@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { LinkBankButton } from '@/components/bank/LinkBankButton'
 import { SyncButton } from '@/components/ui/SyncButton'
+import { GradientHeader } from '@/components/layout/GradientHeader'
 
 interface LinkedBank {
   id: string
@@ -54,22 +55,22 @@ export function MobileAccounts({ banks, loading, onUnlink }: MobileAccountsProps
 
   return (
     <div className="flex flex-col min-h-full pb-2">
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Accounts</h1>
-          <p className="text-xs text-slate-400">{banks.length} linked</p>
-        </div>
-        <div className="flex gap-2">
-          <SyncButton />
-          <LinkBankButton />
-        </div>
-      </div>
+      <GradientHeader
+        title="Cards & accounts"
+        subtitle={`${banks.length} linked`}
+        action={
+          <div className="flex gap-2">
+            <SyncButton />
+            <LinkBankButton />
+          </div>
+        }
+      />
 
       {banks.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-xs">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-600/20">
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" className="text-white">
+            <div className="w-16 h-16 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-4">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" className="text-white dark:text-slate-900">
                 <rect x="4" y="6" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.8"/>
                 <path d="M4 10h20" stroke="currentColor" strokeWidth="1.8"/>
               </svg>

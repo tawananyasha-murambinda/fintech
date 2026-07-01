@@ -77,7 +77,7 @@ export default function DebtPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Debt Payoff Planner</h1>
+            <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Debt Payoff Planner</h1>
             <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
               Snowball and avalanche calculators showing payoff dates and interest saved.
             </p>
@@ -93,8 +93,8 @@ export default function DebtPage() {
         </div>
       ) : liabilities.length === 0 ? (
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-500/20">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+          <div className="w-14 h-14 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white dark:text-slate-900">
               <path d="M12 2v20M2 12h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               <path d="M8 12l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -110,15 +110,15 @@ export default function DebtPage() {
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-3">
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-2xs text-slate-400 font-medium uppercase tracking-wider mb-1">Total debt</p>
+              <p className="text-2xs text-slate-400 font-medium mb-1">Total debt</p>
               <p className="text-lg font-semibold stat-number text-red-500">{fmt(totalDebt)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-2xs text-slate-400 font-medium uppercase tracking-wider mb-1">Accounts</p>
+              <p className="text-2xs text-slate-400 font-medium mb-1">Accounts</p>
               <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{liabilities.length}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-2xs text-slate-400 font-medium uppercase tracking-wider mb-1">Avg interest rate</p>
+              <p className="text-2xs text-slate-400 font-medium mb-1">Avg interest rate</p>
               <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 {liabilities.filter(l => l.interestRate).length > 0
                   ? (liabilities.filter(l => l.interestRate).reduce((s, l) => s + (l.interestRate || 0), 0) / liabilities.filter(l => l.interestRate).length).toFixed(1) + '%'
@@ -126,7 +126,7 @@ export default function DebtPage() {
               </p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-2xs text-slate-400 font-medium uppercase tracking-wider mb-1">Active plans</p>
+              <p className="text-2xs text-slate-400 font-medium mb-1">Active plans</p>
               <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{plans.length}</p>
             </div>
           </div>
@@ -137,7 +137,7 @@ export default function DebtPage() {
             <form onSubmit={createPlan} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Liability</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5 dark:text-slate-400">Liability</label>
                   <select value={selectedLiability} onChange={e => setSelectedLiability(e.target.value)} className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700" required>
                     <option value="">Choose...</option>
                     {liabilities.map(l => (
@@ -146,14 +146,14 @@ export default function DebtPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Strategy</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5 dark:text-slate-400">Strategy</label>
                   <select value={strategy} onChange={e => setStrategy(e.target.value as any)} className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700">
                     <option value="avalanche">Avalanche (highest rate)</option>
                     <option value="snowball">Snowball (smallest balance)</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Extra payment/mo</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5 dark:text-slate-400">Extra payment/mo</label>
                   <input type="number" step="0.01" min="0" placeholder="50" className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500"
                     value={extraPayment} onChange={e => setExtraPayment(e.target.value)} />
                 </div>

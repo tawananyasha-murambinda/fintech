@@ -13,6 +13,40 @@ import type {
 } from '@/types'
 import { findLocalAlternatives } from './geocode'
 
+// ── Currency formatting for AI output ──────────────────────────────
+// The assistant runs on the server, so it must be told the user's currency
+// explicitly (the browser localStorage setting isn't visible here).
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$', EUR: '€', GBP: '£', CAD: 'C$', AUD: 'A$', JPY: '¥',
+}
+const CURRENCY_LOCALES: Record<string, string> = {
+  USD: 'en-US', EUR: 'de-DE', GBP: 'en-GB', CAD: 'en-CA', AUD: 'en-AU', JPY: 'ja-JP',
+}
+
+let AI_CURRENCY = 'USD'
+export function setAiCurrency(code?: string | null) {
+  AI_CURRENCY = code && CURRENCY_SYMBOLS[code] ? code : 'USD'
+}
+
+// Format a number as money in the active AI currency. Used everywhere the
+// assistant emits an amount, so output is consistent with the user's setting.
+function money(amount: number, opts?: { decimals?: 0 | 2 }): string {
+  const code = AI_CURRENCY
+  const locale = CURRENCY_LOCALES[code] || 'en-US'
+  const decimals = opts?.decimals ?? (code === 'JPY' ? 0 : 2)
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency', currency: code,
+      minimumFractionDigits: decimals, maximumFractionDigits: decimals,
+    }).format(amount)
+  } catch {
+    const sym = CURRENCY_SYMBOLS[code] || '$'
+    return `${sym}${amount.toFixed(decimals)}`
+  }
+}
+function currencySymbol() { return CURRENCY_SYMBOLS[AI_CURRENCY] || '$' }
+function currencyName() { return AI_CURRENCY }
+
 const CATEGORY_GROUPS: Record<string, string[]> = {
   'Food & Dining': ['Food & Dining', 'Groceries', 'Restaurant', 'Coffee Shops', 'Bars & Drinks', 'Fast Food'],
   'Transportation': ['Transportation', 'Gas & Fuel', 'Parking', 'Public Transit', 'Ride Share', 'Tolls'],
@@ -45,6 +79,7 @@ interface AnalysisInput {
   period: 'week' | 'month' | 'quarter'
   userLocation?: { city?: string; country?: string }
   prevPeriodCategories?: Record<string, number>
+  currency?: string
 }
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022'
@@ -92,7 +127,7 @@ function detectAnomalies(
       anomalies.push({
         type: 'spending_spike',
         label: `Heavy concentration in ${top[0]}`,
-        detail: `${top[0]} (${top[1].total.toFixed(2)}) is ${(top[1].total / Math.max(second[1].total, 1)).toFixed(0)}x your next category ${second[0]} (${second[1].total.toFixed(2)}). Consider if this is sustainable.`,
+        detail: `${top[0]} (${money(top[1].total)}) is ${(top[1].total / Math.max(second[1].total, 1)).toFixed(0)}x your next category ${second[0]} (${money(second[1].total)}). Consider if this is sustainable.`,
         severity: 'warning',
       })
     }
@@ -120,7 +155,7 @@ function detectAnomalies(
     anomalies.push({
       type: 'weekend_pattern',
       label: 'Weekend spending spike',
-      detail: `Your average weekend transaction (${weekendAvg.toFixed(2)}) is ${(weekendAvg / weekdayAvg * 100 - 100).toFixed(0)}% higher than weekday avg (${weekdayAvg.toFixed(2)}).`,
+      detail: `Your average weekend transaction (${money(weekendAvg)}) is ${(weekendAvg / weekdayAvg * 100 - 100).toFixed(0)}% higher than weekday avg (${money(weekdayAvg)}).`,
       severity: 'info',
     })
   }
@@ -248,9 +283,9 @@ function generateLocationSuggestions(
 
   // Data-driven: location significance
   if (locationPct >= 25) {
-    suggestions.push(`${locationName} makes up ${locationPct.toFixed(0)}% of all your spending ($${totalSpent.toFixed(2)}) — your highest location. Even a 10% reduction here would save ~$${(totalSpent * 0.1).toFixed(0)}.`)
+    suggestions.push(`${locationName} makes up ${locationPct.toFixed(0)}% of all your spending (${money(totalSpent)}) — your highest location. Even a 10% reduction here would save ~${money((totalSpent * 0.1), { decimals: 0 })}.`)
   } else if (locationPct >= 10) {
-    suggestions.push(`You've spent $${totalSpent.toFixed(2)} in ${locationName} (${locationPct.toFixed(0)}% of total). ${merchants[0] ? `Your top merchant here is ${merchants[0].name} ($${merchants[0].total.toFixed(2)}).` : ''}`)
+    suggestions.push(`You've spent ${money(totalSpent)} in ${locationName} (${locationPct.toFixed(0)}% of total). ${merchants[0] ? `Your top merchant here is ${merchants[0].name} (${money(merchants[0].total)}).` : ''}`)
   }
 
   // Data-driven: top category specifics with merchant details
@@ -263,18 +298,18 @@ function generateLocationSuggestions(
       const avgPerVisit = topMerchant.count > 0 ? (topMerchant.total / topMerchant.count) : 0
       if (/food|dining|restaurant|coffee|drink/i.test(topCat)) {
         const weeklyVisits = topMerchant.count > 0 ? Math.max(1, Math.round(topMerchant.count / 4.3)) : 1
-        suggestions.push(`You spent $${topMerchant.total.toFixed(2)} across ${topMerchant.count} visits to ${topMerchant.name} in ${locationName} (${weeklyVisits}x/week avg). Cutting 1 visit/week saves ~$${(avgPerVisit * 4.3).toFixed(0)}/mo.`)
+        suggestions.push(`You spent ${money(topMerchant.total)} across ${topMerchant.count} visits to ${topMerchant.name} in ${locationName} (${weeklyVisits}x/week avg). Cutting 1 visit/week saves ~${money((avgPerVisit * 4.3), { decimals: 0 })}/mo.`)
       } else if (/transport|gas|fuel/i.test(topCat)) {
-        suggestions.push(`$${topCatSpend.toFixed(2)} went to ${topCat.toLowerCase()} in ${locationName}. ${topMerchant ? `Your top spend is $${topMerchant.total.toFixed(2)} at ${topMerchant.name}.` : ''} Check if public transit or ride-pooling could reduce this.`)
+        suggestions.push(`${money(topCatSpend)} went to ${topCat.toLowerCase()} in ${locationName}. ${topMerchant ? `Your top spend is ${money(topMerchant.total)} at ${topMerchant.name}.` : ''} Check if public transit or ride-pooling could reduce this.`)
       } else if (/shop|retail/i.test(topCat)) {
-        suggestions.push(`Retail spending in ${locationName}: $${topCatSpend.toFixed(2)} total. ${topMerchant ? `The biggest is ${topMerchant.name} at $${topMerchant.total.toFixed(2)} (${topMerchant.count} visits).` : ''} Try a 48-hour wait before non-essential purchases.`)
+        suggestions.push(`Retail spending in ${locationName}: ${money(topCatSpend)} total. ${topMerchant ? `The biggest is ${topMerchant.name} at ${money(topMerchant.total)} (${topMerchant.count} visits).` : ''} Try a 48-hour wait before non-essential purchases.`)
       } else if (/entertain|stream|subscription/i.test(topCat)) {
-        suggestions.push(`Entertainment in ${locationName} costs $${topCatSpend.toFixed(2)}. ${topMerchant ? `You've spent $${topMerchant.total.toFixed(2)} at ${topMerchant.name}.` : ''} Look for bundled plans or annual billing discounts.`)
+        suggestions.push(`Entertainment in ${locationName} costs ${money(topCatSpend)}. ${topMerchant ? `You've spent ${money(topMerchant.total)} at ${topMerchant.name}.` : ''} Look for bundled plans or annual billing discounts.`)
       } else {
-        suggestions.push(`Your top category in ${locationName} is ${topCat} ($${topCatSpend.toFixed(2)}, ${catPct.toFixed(0)}% of location spend). ${topMerchant ? `Main merchant: ${topMerchant.name} ($${topMerchant.total.toFixed(2)}).` : ''}`)
+        suggestions.push(`Your top category in ${locationName} is ${topCat} (${money(topCatSpend)}, ${catPct.toFixed(0)}% of location spend). ${topMerchant ? `Main merchant: ${topMerchant.name} (${money(topMerchant.total)}).` : ''}`)
       }
     } else {
-      suggestions.push(`Your top category in ${locationName} is ${topCat} at $${topCatSpend.toFixed(2)} (${catPct.toFixed(0)}% of what you spend here).`)
+      suggestions.push(`Your top category in ${locationName} is ${topCat} at ${money(topCatSpend)} (${catPct.toFixed(0)}% of what you spend here).`)
     }
   }
 
@@ -282,16 +317,16 @@ function generateLocationSuggestions(
   if (merchants.length > 0 && merchants[0].total > 0) {
     const topMerchantPct = (merchants[0].total / totalSpent) * 100
     if (topMerchantPct > 40) {
-      suggestions.push(`${merchants[0].name} accounts for ${topMerchantPct.toFixed(0)}% of your ${locationName} spending ($${merchants[0].total.toFixed(2)}). High concentration — diversifying could save money.`)
+      suggestions.push(`${merchants[0].name} accounts for ${topMerchantPct.toFixed(0)}% of your ${locationName} spending (${money(merchants[0].total)}). High concentration — diversifying could save money.`)
     }
   }
 
   // Data-driven: low-significance locations get a lighter suggestion
   if (suggestions.length === 0 && totalSpent > 0) {
     if (merchants.length > 0) {
-      suggestions.push(`You spent $${totalSpent.toFixed(2)} across ${merchants.length} merchant${merchants.length > 1 ? 's' : ''} in ${locationName}. ${merchants[0] ? `Top: ${merchants[0].name} ($${merchants[0].total.toFixed(2)}).` : ''}`)
+      suggestions.push(`You spent ${money(totalSpent)} across ${merchants.length} merchant${merchants.length > 1 ? 's' : ''} in ${locationName}. ${merchants[0] ? `Top: ${merchants[0].name} (${money(merchants[0].total)}).` : ''}`)
     } else {
-      suggestions.push(`$${totalSpent.toFixed(2)} spent in ${locationName}. Review if every expense was necessary.`)
+      suggestions.push(`${money(totalSpent)} spent in ${locationName}. Review if every expense was necessary.`)
     }
   }
 
@@ -373,15 +408,15 @@ function generateDataDrivenAlternatives(
     add(
       'Meal prep / cook at home',
       Math.round(monthly * 0.5), Math.round(avgTx), Math.round(avgTx * 0.3),
-      `You visit ${merchantName} ~${freq}x/week (€${avgTx.toFixed(2)}/visit). Home cooking could cut that by ~50%, saving ~€${(monthly * 0.5).toFixed(0)}.`,
+      `You visit ${merchantName} ~${freq}x/week (${money(avgTx)}/visit). Home cooking could cut that by ~50%, saving ~${money((monthly * 0.5), { decimals: 0 })}.`,
       'primary',
-      `~€${Math.round(avgTx * 0.3)}/meal at home`,
+      `~${money(Math.round(avgTx * 0.3), { decimals: 0 })}/meal at home`,
     )
     if (monthly > 100) {
       add(
         'Set a dining budget',
         Math.round(monthly * 0.25), Math.round(monthly), Math.round(monthly * 0.75),
-        `Capping ${merchantName} at 75% of current spend (€${(monthly * 0.75).toFixed(0)}) saves €${(monthly * 0.25).toFixed(0)} while still letting you eat out.`,
+        `Capping ${merchantName} at 75% of current spend (${money((monthly * 0.75), { decimals: 0 })}) saves ${money((monthly * 0.25), { decimals: 0 })} while still letting you eat out.`,
         'secondary',
       )
     }
@@ -391,13 +426,13 @@ function generateDataDrivenAlternatives(
     add(
       'Public transit / carpool',
       Math.round(monthly * 0.35), Math.round(monthly), Math.round(monthly * 0.65),
-      `At €${monthly.toFixed(0)}/mo on ${merchantName}, even 2 days/week on transit saves ~€${(monthly * 0.35).toFixed(0)}.`,
+      `At ${money(monthly, { decimals: 0 })}/mo on ${merchantName}, even 2 days/week on transit saves ~${money((monthly * 0.35), { decimals: 0 })}.`,
       'primary',
     )
     add(
       'Fuel rewards / gas apps',
       Math.round(monthly * 0.1), Math.round(monthly), Math.round(monthly * 0.9),
-      `Gas rewards apps and loyalty programs save ~10% — worth ~€${(monthly * 0.1).toFixed(0)}/mo on your current spend.`,
+      `Gas rewards apps and loyalty programs save ~10% — worth ~${money((monthly * 0.1), { decimals: 0 })}/mo on your current spend.`,
       'secondary',
     )
   }
@@ -406,7 +441,7 @@ function generateDataDrivenAlternatives(
     add(
       'Annual billing',
       Math.round(monthly * 0.15), Math.round(monthly), Math.round(monthly * 0.85),
-      `${merchantName} likely offers 15–20% off with annual billing — saving ~€${(monthly * 0.15).toFixed(0)}/mo.`,
+      `${merchantName} likely offers 15–20% off with annual billing — saving ~${money((monthly * 0.15), { decimals: 0 })}/mo.`,
       'primary',
     )
     add(
@@ -422,13 +457,13 @@ function generateDataDrivenAlternatives(
     add(
       '24-hour purchase rule',
       Math.round(monthly * 0.2), Math.round(monthly), Math.round(monthly * 0.8),
-      `At ~${freq}x/week visits to ${merchantName} averaging €${avgTx.toFixed(2)} each, waiting 24h before buying could cut impulse spend by ~20%.`,
+      `At ~${freq}x/week visits to ${merchantName} averaging ${money(avgTx)} each, waiting 24h before buying could cut impulse spend by ~20%.`,
       'primary',
     )
     add(
       'Cashback / price tracker',
       Math.round(monthly * 0.12), Math.round(monthly), Math.round(monthly * 0.88),
-      `Using cashback apps and price tracking on your €${monthly.toFixed(0)}/${merchantName.split(' ')[0] || ''} spend recovers ~€${(monthly * 0.12).toFixed(0)}.`,
+      `Using cashback apps and price tracking on your ${money(monthly, { decimals: 0 })}/${merchantName.split(' ')[0] || ''} spend recovers ~${money((monthly * 0.12), { decimals: 0 })}.`,
       'secondary',
     )
   }
@@ -438,7 +473,7 @@ function generateDataDrivenAlternatives(
       add(
         'Off-peak / annual membership',
         Math.round(monthly * 0.2), Math.round(monthly), Math.round(monthly * 0.8),
-        `€${monthly.toFixed(0)} at ${merchantName} — many gyms offer 20% off annual or off-peak plans.`,
+        `${money(monthly, { decimals: 0 })} at ${merchantName} — many gyms offer 20% off annual or off-peak plans.`,
         'primary',
       )
       add(
@@ -451,7 +486,7 @@ function generateDataDrivenAlternatives(
       add(
         'Generic / in-network alternatives',
         Math.round(monthly * 0.3), Math.round(monthly), Math.round(monthly * 0.7),
-        `Generic brands and in-network pharmacies typically save 30% on your €${monthly.toFixed(0)} health spend.`,
+        `Generic brands and in-network pharmacies typically save 30% on your ${money(monthly, { decimals: 0 })} health spend.`,
         'primary',
       )
     }
@@ -461,7 +496,7 @@ function generateDataDrivenAlternatives(
     add(
       'Loyalty / bulk discounts',
       Math.round(monthly * 0.15), Math.round(monthly), Math.round(monthly * 0.85),
-      `You spend €${monthly.toFixed(0)} at ${merchantName}. Check if they offer loyalty rewards or bulk pricing.`,
+      `You spend ${money(monthly, { decimals: 0 })} at ${merchantName}. Check if they offer loyalty rewards or bulk pricing.`,
       'primary',
     )
     add(
@@ -842,6 +877,7 @@ function sanitizeAiResponse(raw: string): Record<string, any> {
 }
 
 export async function analyzeSpending(input: AnalysisInput): Promise<AiAnalysis> {
+  setAiCurrency(input.currency)
   const { transactions, period, userLocation, prevPeriodCategories } = input
 
   const { debits, totalExpenses, totalIncome, byCategory, byMerchant, byLocation } = aggregateDebits(transactions)
@@ -867,7 +903,7 @@ export async function analyzeSpending(input: AnalysisInput): Promise<AiAnalysis>
   const topMerged = Object.entries(mergedCatBreakdown)
     .sort((a, b) => b[1].total - a[1].total)
     .slice(0, 5)
-    .map(([c, d]) => `${c}: ${d.total.toFixed(2)}`)
+    .map(([c, d]) => `${c}: ${money(d.total)}`)
 
   // Detect top 3 growing merchants from recurring trends
   const growingCharges = recurringTrends.filter(t => t.trendPercent > 0).slice(0, 3)
@@ -877,8 +913,8 @@ export async function analyzeSpending(input: AnalysisInput): Promise<AiAnalysis>
   const prompt = `You are a personal finance analyst analyzing this user's spending. Be detailed, specific, and actionable. Reference exact amounts and merchants.
 
 Period: ${period}
-Total income: ${totalIncome.toFixed(2)}
-Total expenses: ${totalExpenses.toFixed(2)}
+Total income: ${money(totalIncome)}
+Total expenses: ${money(totalExpenses)}
 Savings rate: ${totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100).toFixed(0) : 'N/A'}%
 Transaction count: ${transactions.length}
 User location: ${userLocation ? `${userLocation.city || ''} ${userLocation.country || ''}` : 'not available'}
@@ -887,22 +923,22 @@ Spending by category (merged groups):
 ${topMerged.map(l => `- ${l}`).join('\n')}
 
 All categories:
-${categoryBreakdown.slice(0, 8).map((c) => `- ${c.category}: ${c.total.toFixed(2)} (${c.percentage.toFixed(0)}%, ${c.trend > 0 ? '+' : ''}${c.trend.toFixed(0)}% vs prev)`).join('\n')}
+${categoryBreakdown.slice(0, 8).map((c) => `- ${c.category}: ${money(c.total)} (${c.percentage.toFixed(0)}%, ${c.trend > 0 ? '+' : ''}${c.trend.toFixed(0)}% vs prev)`).join('\n')}
 
 Anomalies detected:
 ${anomalies.length > 0 ? anomalies.map(a => `- [${a.severity}] ${a.label}: ${a.detail}`).join('\n') : '- None detected'}
 
 Rising recurring charges:
-${growingCharges.length > 0 ? growingCharges.map(t => `- ${t.merchantName}: avg ${t.avgAmount.toFixed(2)} (↑ ${t.trendPercent.toFixed(0)}%)`).join('\n') : '- None detected with >5% change'}
+${growingCharges.length > 0 ? growingCharges.map(t => `- ${t.merchantName}: avg ${money(t.avgAmount)} (↑ ${t.trendPercent.toFixed(0)}%)`).join('\n') : '- None detected with >5% change'}
 
 Subscription overlaps:
-${topSubOverlaps.length > 0 ? topSubOverlaps.map(s => `- ${s.category}: ${s.merchants.map(m => m.name).join(', ')} (${s.totalMonthly.toFixed(2)}/mo)`).join('\n') : '- None detected'}
+${topSubOverlaps.length > 0 ? topSubOverlaps.map(s => `- ${s.category}: ${s.merchants.map(m => m.name).join(', ')} (${money(s.totalMonthly)}/mo)`).join('\n') : '- None detected'}
 
 Top locations:
-${topLocations.map((l) => `- ${l.city}${l.country ? `, ${l.country}` : ''}: ${l.totalSpent.toFixed(2)}`).join('\n') || '- No location data'}
+${topLocations.map((l) => `- ${l.city}${l.country ? `, ${l.country}` : ''}: ${money(l.totalSpent)}`).join('\n') || '- No location data'}
 
 Top merchants (with alternatives):
-${merchantAlternatives.slice(0, 4).map(m => `- ${m.merchantName}: ${m.totalSpent.toFixed(2)} (${m.visitCount} visits, avg ${m.avgTransaction.toFixed(2)}/visit)`).join('\n')}
+${merchantAlternatives.slice(0, 4).map(m => `- ${m.merchantName}: ${money(m.totalSpent)} (${m.visitCount} visits, avg ${money(m.avgTransaction)}/visit)`).join('\n')}
 
 Return ONLY a JSON object with this exact shape and no other text:
 {
@@ -1159,7 +1195,7 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
   if (greeting) {
     const topCatName = categories[0]?.[0] || 'uncategorized'
     const topMerchName = merchants[0]?.[0] || 'unknown'
-    return `Hi! I've analyzed your finances across ${txCount} transactions. You've earned $${incomeTotal.toFixed(2)} and spent $${expenseTotal.toFixed(2)}${categories[0] ? `. Your biggest category is ${topCatName} ($${categories[0][1].total.toFixed(2)}), and your top merchant is ${topMerchName} ($${merchants[0][1].total.toFixed(2)})` : ''}. What would you like to know about your spending?`
+    return `Hi! I've analyzed your finances across ${txCount} transactions. You've earned ${money(incomeTotal)} and spent ${money(expenseTotal)}${categories[0] ? `. Your biggest category is ${topCatName} (${money(categories[0][1].total)}), and your top merchant is ${topMerchName} (${money(merchants[0][1].total)})` : ''}. What would you like to know about your spending?`
   }
 
   // Thanks
@@ -1190,11 +1226,11 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
 
     const timePhrase = periodLabel || 'all time'
     const details = catData.map(c =>
-      `• ${c.name}: $${c.periodTotal.toFixed(2)}${c.pct > 0 ? ` (${c.pct.toFixed(1)}% of ${timePhrase} expenses, ${useTx.filter(t => t.direction === 'debit' && cleanCategory(t.merchantCategory) === c.name).length} transactions)` : ''}`
+      `• ${c.name}: ${money(c.periodTotal)}${c.pct > 0 ? ` (${c.pct.toFixed(1)}% of ${timePhrase} expenses, ${useTx.filter(t => t.direction === 'debit' && cleanCategory(t.merchantCategory) === c.name).length} transactions)` : ''}`
     ).join('\n')
 
     const merchantLine = relatedMerchants.length > 0
-      ? `\n\nTop merchants: ${relatedMerchants.map(([n, d]) => `${n} ($${d.total.toFixed(2)} total)`).join(', ')}`
+      ? `\n\nTop merchants: ${relatedMerchants.map(([n, d]) => `${n} (${money(d.total)} total)`).join(', ')}`
       : ''
 
     // MoM comparison for this category
@@ -1209,10 +1245,10 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
     if (lastMonthCatSpend > 0) {
       const change = ((thisMonthCatSpend - lastMonthCatSpend) / lastMonthCatSpend) * 100
       const arrow = change > 0 ? '↑' : '↓'
-      trendLine = `\n\nTrend: ${arrow} ${Math.abs(change).toFixed(0)}% ${change > 0 ? 'more' : 'less'} this month vs last ($${lastMonthCatSpend.toFixed(2)} → $${thisMonthCatSpend.toFixed(2)})`
+      trendLine = `\n\nTrend: ${arrow} ${Math.abs(change).toFixed(0)}% ${change > 0 ? 'more' : 'less'} this month vs last (${money(lastMonthCatSpend)} → ${money(thisMonthCatSpend)})`
     }
 
-    return `You've spent $${totalPeriod.toFixed(2)} on ${mentionedCategories.length === 1 ? mentionedCategories[0] : 'these categories'} in ${timePhrase}:\n${details}${merchantLine}${trendLine}`
+    return `You've spent ${money(totalPeriod)} on ${mentionedCategories.length === 1 ? mentionedCategories[0] : 'these categories'} in ${timePhrase}:\n${details}${merchantLine}${trendLine}`
   }
 
   // ── MERCHANT-SPECIFIC QUESTIONS ──
@@ -1223,7 +1259,7 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
       avg: merchantMap[name].count > 0 ? merchantMap[name].total / merchantMap[name].count : 0,
     }))
     return `Spending at ${mentionedMerchants.length === 1 ? 'this merchant' : 'these merchants'}:\n${items.map(m =>
-      `• ${m.name}: $${m.total.toFixed(2)} (${m.count} visits, avg $${m.avg.toFixed(2)}/visit, ${m.category})`
+      `• ${m.name}: ${money(m.total)} (${m.count} visits, avg ${money(m.avg)}/visit, ${m.category})`
     ).join('\n')}`
   }
 
@@ -1239,7 +1275,7 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
       const ratio = (cost / Math.max(disposable, 1)) * 100
       const savingsRate = (Math.max(0, netCashflow) / incomeTotal) * 100
 
-      if (cost <= 0) return `A $${cost.toFixed(2)} purchase is essentially free — go for it!`
+      if (cost <= 0) return `A ${money(cost)} purchase is essentially free — go for it!`
 
       let advice = ''
       if (cost <= 0) {
@@ -1251,10 +1287,10 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
       } else {
         const shortfall = cost - Math.max(0, disposable)
         const monthsToSave = Math.ceil(shortfall / Math.max(disposable, 1))
-        advice = `You're $${shortfall.toFixed(2)} short. At your current savings rate (${savingsRate.toFixed(0)}%), you could save for it in about ${monthsToSave} month${monthsToSave > 1 ? 's' : ''}.`
+        advice = `You're ${money(shortfall)} short. At your current savings rate (${savingsRate.toFixed(0)}%), you could save for it in about ${monthsToSave} month${monthsToSave > 1 ? 's' : ''}.`
       }
 
-      return `A $${cost.toFixed(2)} purchase: ${advice}\n\nYour disposable income: $${Math.max(0, disposable).toFixed(2)}/mo\nIncome: $${incomeTotal.toFixed(2)}/mo\nExpenses: $${expenseTotal.toFixed(2)}/mo\nSavings rate: ${savingsRate.toFixed(0)}%`
+      return `A ${money(cost)} purchase: ${advice}\n\nYour disposable income: ${money(Math.max(0, disposable))}/mo\nIncome: ${money(incomeTotal)}/mo\nExpenses: ${money(expenseTotal)}/mo\nSavings rate: ${savingsRate.toFixed(0)}%`
     }
   }
 
@@ -1265,13 +1301,13 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
     const suggestions = categories.slice(0, 3).map(([cat, data]) => {
       const pct = expenseTotal > 0 ? ((data.total / expenseTotal) * 100).toFixed(0) : '0'
       const tenPct = data.total * 0.1
-      return `• ${cat}: $${data.total.toFixed(2)} (${pct}% of expenses) — a 10% reduction saves $${tenPct.toFixed(2)}/mo`
+      return `• ${cat}: ${money(data.total)} (${pct}% of expenses) — a 10% reduction saves ${money(tenPct)}/mo`
     })
 
     // Find specific merchant savings opportunities
     const topMerchant = merchants[0]
     const merchantTip = topMerchant
-      ? `\n\nTop merchant tip: You've spent $${topMerchant[1].total.toFixed(2)} at ${topMerchant[0]} (${topMerchant[1].count} visits). Cutting frequency by 1 visit/month could save ~$${(topMerchant[1].total / topMerchant[1].count * 0.5).toFixed(2)}.`
+      ? `\n\nTop merchant tip: You've spent ${money(topMerchant[1].total)} at ${topMerchant[0]} (${topMerchant[1].count} visits). Cutting frequency by 1 visit/month could save ~${money((topMerchant[1].total / topMerchant[1].count * 0.5))}.`
       : ''
 
     const savingsRate = incomeTotal > 0 ? ((netCashflow / incomeTotal) * 100).toFixed(0) : 'N/A'
@@ -1289,7 +1325,7 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
     if (lastMonthExpenses > 0) {
       const change = ((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses) * 100
       const arrow = change > 0 ? '↑' : '↓'
-      monthTrend = `\n• This month vs last: ${arrow} ${Math.abs(change).toFixed(0)}% ($${lastMonthExpenses.toFixed(2)} → $${thisMonthExpenses.toFixed(2)})`
+      monthTrend = `\n• This month vs last: ${arrow} ${Math.abs(change).toFixed(0)}% (${money(lastMonthExpenses)} → ${money(thisMonthExpenses)})`
     }
 
     // Category diversity
@@ -1297,7 +1333,7 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
     const topCatPct = topCat ? ((topCat[1].total / expenseTotal) * 100).toFixed(0) : '0'
     const highestTx = transactions.filter(t => t.direction === 'debit').sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))[0]
 
-    return `📊 Financial Summary\n\n• Income: $${incomeTotal.toFixed(2)}\n• Expenses: $${expenseTotal.toFixed(2)}\n• Net: $${netCashflow.toFixed(2)}\n• Transactions: ${txCount} total\n• Top category: ${topCat?.[0] || 'N/A'} (${topCatPct}% of spending)\n• Top merchant: ${topMerchant?.[0] || 'N/A'} ($${topMerchant?.[1].total.toFixed(2) || '0'})${monthTrend}\n\n• Spending diversity: ${catCount} categories\n• Biggest single transaction: ${highestTx ? `$${Math.abs(highestTx.amount).toFixed(2)} at ${highestTx.merchantName || highestTx.description}` : 'N/A'}\n• Savings rate: ${incomeTotal > 0 ? `${(Math.max(0, netCashflow) / incomeTotal * 100).toFixed(0)}%` : 'N/A'}`
+    return `Financial summary\n\n• Income: ${money(incomeTotal)}\n• Expenses: ${money(expenseTotal)}\n• Net: ${money(netCashflow)}\n• Transactions: ${txCount} total\n• Top category: ${topCat?.[0] || 'N/A'} (${topCatPct}% of spending)\n• Top merchant: ${topMerchant?.[0] || 'N/A'} (${money(topMerchant?.[1].total || 0)})${monthTrend}\n\n• Spending diversity: ${catCount} categories\n• Biggest single transaction: ${highestTx ? `${money(Math.abs(highestTx.amount))} at ${highestTx.merchantName || highestTx.description}` : 'N/A'}\n• Savings rate: ${incomeTotal > 0 ? `${(Math.max(0, netCashflow) / incomeTotal * 100).toFixed(0)}%` : 'N/A'}`
   }
 
   // ── INCOME ──
@@ -1311,14 +1347,14 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
         return acc
       }, {})
     ).sort((a, b) => b[1] - a[1])
-    return `Your total income is $${incomeTotal.toFixed(2)} across ${incomeTx.length} transactions.\nSource: ${topIncome.slice(0, 3).map(([n, v]) => `${n} ($${v.toFixed(2)})`).join(', ') || 'N/A'}\n\nMonthly expenses: $${expenseTotal.toFixed(2)}\nRemaining: $${netCashflow.toFixed(2)} (${incomeTotal > 0 ? `${(netCashflow / incomeTotal * 100).toFixed(0)}%` : 'N/A'} of income)`
+    return `Your total income is ${money(incomeTotal)} across ${incomeTx.length} transactions.\nSource: ${topIncome.slice(0, 3).map(([n, v]) => `${n} (${money(v)})`).join(', ') || 'N/A'}\n\nMonthly expenses: ${money(expenseTotal)}\nRemaining: ${money(netCashflow)} (${incomeTotal > 0 ? `${(netCashflow / incomeTotal * 100).toFixed(0)}%` : 'N/A'} of income)`
   }
 
   // ── MERCHANT LIST ──
   if (isAskingMerchants) {
     if (merchants.length === 0) return "No merchant data available yet."
     return `Your top merchants by spending:\n${merchants.slice(0, 8).map(([n, d], i) =>
-      `• ${n}: $${d.total.toFixed(2)} (${d.count} visits, ${d.category})`
+      `• ${n}: ${money(d.total)} (${d.count} visits, ${d.category})`
     ).join('\n')}\n\nTotal merchants: ${merchants.length}`
   }
 
@@ -1348,27 +1384,27 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
     let trendDetails = ''
     if (catTrends.length > 0) {
       trendDetails = `\n\nCategory trends (this month vs last):\n${catTrends.slice(0, 5).map(c =>
-        `• ${c.cat}: ${c.catChange > 0 ? '↑' : '↓'} ${Math.abs(c.catChange).toFixed(0)}% ($${c.lastMonth.toFixed(2)} → $${c.thisMonth.toFixed(2)})`
+        `• ${c.cat}: ${c.catChange > 0 ? '↑' : '↓'} ${Math.abs(c.catChange).toFixed(0)}% (${money(c.lastMonth)} → ${money(c.thisMonth)})`
       ).join('\n')}`
     }
 
-    return `Your expenses have ${direction} by ${Math.abs(change).toFixed(0)}% ${arrow}\nThis month: $${thisMonthExpenses.toFixed(2)} vs Last month: $${lastMonthExpenses.toFixed(2)}${trendDetails}${biggestIncrease ? `\n\n📈 Fastest growing: ${biggestIncrease.cat} (↑ ${biggestIncrease.catChange.toFixed(0)}%)` : ''}${biggestDecrease ? `\n📉 Biggest drop: ${biggestDecrease.cat} (↓ ${Math.abs(biggestDecrease.catChange).toFixed(0)}%)` : ''}`
+    return `Your expenses have ${direction} by ${Math.abs(change).toFixed(0)}% ${arrow}\nThis month: ${money(thisMonthExpenses)} vs Last month: ${money(lastMonthExpenses)}${trendDetails}${biggestIncrease ? `\n\nFastest growing: ${biggestIncrease.cat} (↑ ${biggestIncrease.catChange.toFixed(0)}%)` : ''}${biggestDecrease ? `\nBiggest drop: ${biggestDecrease.cat} (↓ ${Math.abs(biggestDecrease.catChange).toFixed(0)}%)` : ''}`
   }
 
   // ── BUDGET ──
   if (isAskingBudget) {
-    if (categories.length === 0) return `Your total expenses are $${expenseTotal.toFixed(2)}. Set up category budgets to get more specific suggestions.`
+    if (categories.length === 0) return `Your total expenses are ${money(expenseTotal)}. Set up category budgets to get more specific suggestions.`
     return `Here's your current spending by category:\n${categories.slice(0, 5).map(([c, d]) =>
-      `• ${c}: $${d.total.toFixed(2)} (${d.count} transactions)`
-    ).join('\n')}\n\nTotal: $${expenseTotal.toFixed(2)}\n\nConsider setting monthly budgets for your top categories in the Budgets section. A good starting point is ${categories[0] ? `capping ${categories[0][0]} at $${(categories[0][1].total * 1.1).toFixed(0)}` : ''}.`
+      `• ${c}: ${money(d.total)} (${d.count} transactions)`
+    ).join('\n')}\n\nTotal: ${money(expenseTotal)}\n\nConsider setting monthly budgets for your top categories in the Budgets section. A good starting point is ${categories[0] ? `capping ${categories[0][0]} at ${money((categories[0][1].total * 1.1), { decimals: 0 })}` : ''}.`
   }
 
   // ── LARGEST / TOP ──
   if (isAskingLargest) {
     const largestTx = transactions.filter(t => t.direction === 'debit').sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 5)
     return `Your largest expenses:\n${largestTx.map((t, i) =>
-      `• $${Math.abs(t.amount).toFixed(2)} — ${t.merchantName || t.description} (${new Date(t.date).toLocaleDateString()})`
-    ).join('\n')}\n\nTop category overall: ${categories[0]?.[0] || 'N/A'} ($${categories[0]?.[1].total.toFixed(2) || '0'})`
+      `• ${money(Math.abs(t.amount))} — ${t.merchantName || t.description} (${new Date(t.date).toLocaleDateString()})`
+    ).join('\n')}\n\nTop category overall: ${categories[0]?.[0] || 'N/A'} (${money(categories[0]?.[1].total || 0)})`
   }
 
   // ── WEEKLY ──
@@ -1377,12 +1413,12 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
     const weekTx = transactions.filter(t => t.date >= weekAgo)
     const weekExp = weekTx.filter(t => t.direction === 'debit').reduce((s, t) => s + Math.abs(t.amount), 0)
     const weekInc = weekTx.filter(t => t.direction === 'credit').reduce((s, t) => s + Math.abs(t.amount), 0)
-    return `This week (last 7 days):\n• Spent: $${weekExp.toFixed(2)}\n• Earned: $${weekInc.toFixed(2)}\n• Net: $${(weekInc - weekExp).toFixed(2)}\n• Transactions: ${weekTx.length}`
+    return `This week (last 7 days):\n• Spent: ${money(weekExp)}\n• Earned: ${money(weekInc)}\n• Net: ${money((weekInc - weekExp))}\n• Transactions: ${weekTx.length}`
   }
 
   // ── MONTHLY ──
   if (isAskingMonthly) {
-    return `This month so far:\n• Spent: $${thisMonthExpenses.toFixed(2)}\n• Earned: $${thisMonthIncome.toFixed(2)}\n• Net: $${(thisMonthIncome - thisMonthExpenses).toFixed(2)}${lastMonthExpenses > 0 ? `\n• Change vs last month: ${((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses * 100).toFixed(0)}%` : ''}\n\nDaily average spend: $${thisMonthExpenses / Math.max(1, now.getDate())}`
+    return `This month so far:\n• Spent: ${money(thisMonthExpenses)}\n• Earned: ${money(thisMonthIncome)}\n• Net: ${money((thisMonthIncome - thisMonthExpenses))}${lastMonthExpenses > 0 ? `\n• Change vs last month: ${((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses * 100).toFixed(0)}%` : ''}\n\nDaily average spend: ${money(thisMonthExpenses / Math.max(1, now.getDate()))}`
   }
 
   // ── DEFAULT: COMPREHENSIVE OVERVIEW ──
@@ -1393,16 +1429,16 @@ function chatLocalFallback(userMessage: string, transactions: Transaction[], con
   const catCount = categories.length
   const savingsRate = incomeTotal > 0 ? ((Math.max(0, netCashflow) / incomeTotal) * 100).toFixed(0) : 'N/A'
 
-  return `I have ${txCount} transactions analyzed ($${incomeTotal.toFixed(2)} income, $${expenseTotal.toFixed(2)} expenses).
+  return `I have ${txCount} transactions analyzed (${money(incomeTotal)} income, ${money(expenseTotal)} expenses).
 
-📊 AT A GLANCE
-• Top category: ${topCatName} ($${topCatAmt.toFixed(2)})
-• Top merchant: ${topMerchName} ($${topMerchAmt.toFixed(2)})
+AT A GLANCE
+• Top category: ${topCatName} (${money(topCatAmt)})
+• Top merchant: ${topMerchName} (${money(topMerchAmt)})
 • Spending categories: ${catCount}
 • Savings rate: ${savingsRate}%
-• This month: $${thisMonthExpenses.toFixed(2)} spent${lastMonthExpenses > 0 ? ` (${((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses * 100).toFixed(0)}% vs last month)` : ''}
+• This month: ${money(thisMonthExpenses)} spent${lastMonthExpenses > 0 ? ` (${((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses * 100).toFixed(0)}% vs last month)` : ''}
 
-💡 Try asking:
+ Try asking:
 • "How much did I spend on dining in the last 3 months?"
 • "Can I afford a $500 purchase?"
 • "Where can I save money?"
@@ -1420,8 +1456,10 @@ export async function chatWithData(
     goals?: { name: string; targetAmount: number; currentAmount: number; deadline: string | null }[]
     debts?: { strategy: string; extraPayment: number; liability: { name: string; balance: number; interestRate?: number | null } | null }[]
     userLocation?: { city?: string; country?: string }
+    currency?: string
   }
 ): Promise<string> {
+  setAiCurrency(context?.currency)
   const totalExpenses = transactions.filter((t) => t.direction === 'debit').reduce((s, t) => s + Math.abs(t.amount), 0)
   const totalIncome = transactions.filter((t) => t.direction === 'credit').reduce((s, t) => s + Math.abs(t.amount), 0)
 
@@ -1450,8 +1488,10 @@ export async function chatWithData(
 
   const systemPrompt = `You are a personal finance assistant with access to the user's transaction data. Be concise, specific, and actionable. Always reference actual numbers.
 
-Transaction summary: ${transactions.length} transactions, $${totalIncome.toFixed(2)} income, $${totalExpenses.toFixed(2)} expenses.
-Top categories: ${topCategories.map(([c, v]) => `${c} ($${v.toFixed(2)})`).join(', ')}${contextStr}
+IMPORTANT: The user's currency is ${currencyName()} (symbol ${currencySymbol()}). Always format money using the ${currencySymbol()} symbol and ${currencyName()} amounts. Never use $ or USD unless the currency is USD.
+
+Transaction summary: ${transactions.length} transactions, ${money(totalIncome)} income, ${money(totalExpenses)} expenses.
+Top categories: ${topCategories.map(([c, v]) => `${c} (${money(v)})`).join(', ')}${contextStr}
 ${locationStr}
 
 When you need more specific data, use the available tools to search transactions, get category breakdowns, or find merchant information.`

@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { detectUserLocation, saveUserLocation, getUserLocation } from '@/lib/location'
+import { GradientHeader } from '@/components/layout/GradientHeader'
+import { Disclosure } from '@/components/ui/Disclosure'
 import type { AiAnalysis } from '@/types'
 
 const PERIODS = [
@@ -12,42 +14,42 @@ const PERIODS = [
 ]
 
 const CATEGORY_COLORS = [
-  'from-violet-500 to-violet-600',
-  'from-teal-500 to-teal-600',
-  'from-amber-500 to-amber-600',
-  'from-rose-500 to-rose-600',
-  'from-blue-500 to-blue-600',
-  'from-emerald-500 to-emerald-600',
-  'from-pink-500 to-pink-600',
-  'from-indigo-500 to-indigo-600',
-  'from-cyan-500 to-cyan-600',
-  'from-orange-500 to-orange-600',
+  'from-slate-800 to-slate-800',
+  'from-slate-700 to-slate-700',
+  'from-slate-600 to-slate-600',
+  'from-slate-500 to-slate-500',
+  'from-slate-400 to-slate-400',
+  'from-blue-700 to-blue-700',
+  'from-blue-600 to-blue-600',
+  'from-blue-500 to-blue-500',
+  'from-blue-400 to-blue-400',
+  'from-slate-300 to-slate-300',
 ]
 
 const CATEGORY_HEX_COLORS = [
-  '#8b5cf6',
-  '#14b8a6',
-  '#f59e0b',
-  '#f43f5e',
-  '#3b82f6',
-  '#10b981',
-  '#ec4899',
-  '#6366f1',
-  '#06b6d4',
-  '#f97316',
+  '#1e293b',
+  '#334155',
+  '#475569',
+  '#64748b',
+  '#94a3b8',
+  '#1848d6',
+  '#1e5eff',
+  '#5c85ff',
+  '#8fadff',
+  '#cbd5e1',
 ]
 
 const CATEGORY_BG_CLASSES = [
-  'bg-violet-500',
-  'bg-teal-500',
-  'bg-amber-500',
-  'bg-rose-500',
+  'bg-slate-800',
+  'bg-slate-700',
+  'bg-slate-600',
+  'bg-slate-500',
+  'bg-slate-400',
+  'bg-blue-700',
+  'bg-blue-600',
   'bg-blue-500',
-  'bg-emerald-500',
-  'bg-pink-500',
-  'bg-indigo-500',
-  'bg-cyan-500',
-  'bg-orange-500',
+  'bg-blue-400',
+  'bg-slate-300',
 ]
 
 function cleanCategory(cat: string) {
@@ -203,12 +205,16 @@ export default function IntelligencePage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-up">
+      {/* Mobile gradient header */}
+      <div className="lg:hidden">
+        <GradientHeader title="Insights" subtitle="Spending breakdown" />
+      </div>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="hidden lg:flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Intelligence</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Insights</h1>
           <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
-            AI-powered analysis of your spending patterns and savings opportunities.
+            A clear breakdown of your spending and where you could save.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -231,6 +237,26 @@ export default function IntelligencePage() {
             ) : analysis ? 'Re-analyse' : 'Run analysis'}
           </button>
         </div>
+      </div>
+
+      {/* Mobile controls */}
+      <div className="lg:hidden flex items-center gap-2 -mt-2">
+        <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5 dark:bg-slate-900 flex-1">
+          {PERIODS.map(p => (
+            <button key={p.value} onClick={() => setPeriod(p.value as any)}
+              className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                period === p.value
+                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100'
+                  : 'text-slate-500 dark:text-slate-400'
+              }`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={runAnalysis} disabled={loading}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white disabled:opacity-60 shadow-sm">
+          {loading ? 'Analysing…' : analysis ? 'Re-analyse' : 'Run analysis'}
+        </button>
       </div>
 
       {/* Loading */}
@@ -265,9 +291,9 @@ export default function IntelligencePage() {
                 Set your city to get hyper-local recommendations — specific bus lines, nearby supermarkets, and route details tailored to where you live.
               </p>
               <ul className="mt-2 space-y-1">
-                <li className="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><span className="text-emerald-500">→</span>Know which bus line to take instead of Uber, with exact fare estimates</li>
-                <li className="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><span className="text-emerald-500">→</span>Find the nearest discount supermarket to cook at home instead of eating out</li>
-                <li className="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><span className="text-emerald-500">→</span>Get walking/cycling estimates with time and distance comparisons</li>
+                <li className="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-400 shrink-0 mt-1.5" />Know which bus line to take instead of Uber, with exact fare estimates</li>
+                <li className="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-400 shrink-0 mt-1.5" />Find the nearest discount supermarket to cook at home instead of eating out</li>
+                <li className="text-2xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-slate-400 shrink-0 mt-1.5" />Get walking/cycling estimates with time and distance comparisons</li>
               </ul>
               <div className="flex items-center gap-2 mt-3">
                 <button onClick={async () => {
@@ -293,8 +319,8 @@ export default function IntelligencePage() {
       {/* Empty state */}
       {!loading && !analysis && !error && (
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/20">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+          <div className="w-14 h-14 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white dark:text-slate-900">
               <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5"/>
               <path d="M8.5 14.5C9.2 16 10.5 17 12 17s2.8-1 3.5-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               <circle cx="9.5" cy="10.5" r="1.2" fill="currentColor"/>
@@ -328,19 +354,19 @@ export default function IntelligencePage() {
               <div className="flex items-start justify-between gap-6">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="w-6 h-6 rounded-lg bg-violet-100 dark:bg-violet-950 flex items-center justify-center">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-violet-600 dark:text-violet-400"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-slate-600 dark:text-slate-300"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     </div>
-                    <span className="text-xs font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider">Financial snapshot</span>
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Financial snapshot</span>
                   </div>
                   <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-4">{analysis.summary}</p>
-                  <div className="bg-gradient-to-r from-teal-50 to-teal-50/50 dark:from-teal-950 dark:to-teal-950/50 rounded-xl px-4 py-3 border border-teal-100 dark:border-teal-900/40">
+                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 border border-teal-100 dark:border-teal-900/40">
                     <div className="flex items-start gap-3">
                       <div className="w-5 h-5 rounded-full bg-teal-600 flex items-center justify-center shrink-0 mt-0.5">
-                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-white"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-white dark:text-slate-900"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                       </div>
                       <div>
-                        <p className="text-2xs font-semibold text-teal-600 dark:text-teal-400 uppercase tracking-wider">Top insight</p>
+                        <p className="text-2xs font-semibold text-teal-600 dark:text-teal-400">Top insight</p>
                         <p className="text-sm text-teal-800 dark:text-teal-200 mt-0.5 leading-relaxed">{analysis.topInsight}</p>
                       </div>
                     </div>
@@ -348,11 +374,11 @@ export default function IntelligencePage() {
                 </div>
                 <div className="shrink-0 flex flex-col items-center gap-4">
                   <div className="text-center">
-                    <p className="text-2xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Financial health</p>
+                    <p className="text-2xs text-slate-400 dark:text-slate-500 mb-2">Financial health</p>
                     <HealthRing score={analysis.sustainabilityScore ?? 50} size={96} />
                   </div>
                   <div className="text-center">
-                    <p className="text-2xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Suggested budget</p>
+                    <p className="text-2xs text-slate-400 dark:text-slate-500 mb-1">Suggested budget</p>
                     <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{fmt(analysis.monthlyBudgetSuggestion)}<span className="text-xs text-slate-400 font-normal dark:text-slate-500">/mo</span></p>
                   </div>
                 </div>
@@ -368,7 +394,7 @@ export default function IntelligencePage() {
                 { label: 'Savings found', value: `${analysis.savingsOpportunities.length}`, color: 'text-teal-600 dark:text-teal-400' },
               ].map((m, i) => (
                 <div key={i} className="px-5 py-3.5 border-r border-slate-100 dark:border-slate-800 last:border-0">
-                  <p className="text-2xs text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">{m.label}</p>
+                  <p className="text-2xs text-slate-400 dark:text-slate-500 mb-0.5">{m.label}</p>
                   <p className={`text-sm font-bold ${m.color}`}>{m.value}</p>
                 </div>
               ))}
@@ -424,26 +450,21 @@ export default function IntelligencePage() {
                 <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Savings opportunities</h2>
               </div>
               <p className="text-xs text-slate-400 mb-4 ml-8 dark:text-slate-500">Actionable ways to reduce spending</p>
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {analysis.savingsOpportunities.map((opp, i) => (
-                  <div key={i} className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-                    <div className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${
-                      opp.difficulty === 'easy' ? 'bg-gradient-to-br from-teal-500 to-teal-600' :
-                      opp.difficulty === 'medium' ? 'bg-gradient-to-br from-amber-500 to-amber-600' :
-                      'bg-gradient-to-br from-slate-500 to-slate-600'
-                    }`}>{i + 1}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{opp.title}</p>
+                  <Disclosure
+                    key={i}
+                    title={
+                      <span className="flex items-center gap-2">
+                        <span className="shrink-0 w-6 h-6 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center text-2xs font-bold">{i + 1}</span>
+                        <span className="truncate">{opp.title}</span>
                         <DifficultyBadge difficulty={opp.difficulty} />
-                      </div>
-                      <p className="text-xs text-slate-500 leading-relaxed dark:text-slate-400">{opp.description}</p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-2xs text-slate-400 dark:text-slate-500">Save up to</p>
-                      <p className="text-base font-bold text-teal-600 dark:text-teal-400">{fmt(opp.estimatedMonthlySavings)}<span className="text-xs font-normal text-teal-500 dark:text-teal-500">/mo</span></p>
-                    </div>
-                  </div>
+                      </span>
+                    }
+                    value={<span className="text-teal-600 dark:text-teal-400">{fmt(opp.estimatedMonthlySavings)}/mo</span>}
+                  >
+                    {opp.description}
+                  </Disclosure>
                 ))}
               </div>
             </div>
@@ -464,7 +485,7 @@ export default function IntelligencePage() {
                   {analysis.spendingPatterns.map((pattern, i) => (
                     <div key={i} className="rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 p-3.5">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-2xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{pattern.title}</span>
+                        <span className="text-2xs font-semibold text-slate-400 dark:text-slate-500">{pattern.title}</span>
                         <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{pattern.value}</span>
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400">{pattern.description}</p>
@@ -527,7 +548,7 @@ export default function IntelligencePage() {
                           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{merchant.merchantName}</p>
                           <p className="text-2xs text-slate-400 mt-0.5 dark:text-slate-500">
                             {cleanCategory(merchant.category)} · {merchant.visitCount} visit{merchant.visitCount !== 1 ? 's' : ''} · avg {fmt(merchant.avgTransaction)}
-                            {merchant.locationContext && <span className="ml-1.5 text-emerald-500">· {merchant.locationContext.replace('You live in', '📍')}</span>}
+                            {merchant.locationContext && <span className="ml-1.5 text-emerald-500">· {merchant.locationContext.replace('You live in ', '')}</span>}
                           </p>
                         </div>
                         <div className="shrink-0 text-right ml-3">
@@ -583,7 +604,7 @@ export default function IntelligencePage() {
                             <div key={j} className="flex items-center justify-between rounded-lg bg-white dark:bg-slate-800 px-3 py-2 border border-slate-100 dark:border-slate-700">
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-2xs text-slate-400 dark:text-slate-500 font-medium uppercase">Also</span>
+                                  <span className="text-2xs text-slate-400 dark:text-slate-500 font-medium">Also</span>
                                   <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{alt.name}</p>
                                 </div>
                                 <p className="text-2xs text-slate-500 dark:text-slate-400 mt-px truncate">{alt.reason}</p>

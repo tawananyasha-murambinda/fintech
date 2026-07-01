@@ -38,7 +38,7 @@ export default function ReportsPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Monthly & Yearly Reports</h1>
+            <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Monthly & Yearly Reports</h1>
             <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Income, expenses, top categories, and savings rate.</p>
           </div>
         </div>
@@ -78,19 +78,19 @@ export default function ReportsPage() {
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Income</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Income</p>
               <p className="text-xl font-bold text-teal-600 dark:text-teal-400">{fmt(report.income)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Expenses</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Expenses</p>
               <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{fmt(report.expenses)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Net cashflow</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Net cashflow</p>
               <p className={`text-xl font-bold ${report.netCashflow >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-500'}`}>{fmt(report.netCashflow)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Savings rate</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Savings rate</p>
               <p className={`text-xl font-bold ${report.savingsRate >= 20 ? 'text-teal-600' : report.savingsRate >= 10 ? 'text-amber-600' : 'text-rose-500'}`}>
                 {report.savingsRate.toFixed(1)}%
               </p>

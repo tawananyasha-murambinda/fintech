@@ -59,7 +59,7 @@ export default function RewardsPage() {
           </svg>
         </div>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Rewards Optimizer</h1>
+          <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Rewards Optimizer</h1>
           <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
             Find the best credit card for each merchant category to maximize cashback and points.
           </p>
@@ -95,7 +95,7 @@ export default function RewardsPage() {
 
               return (
                 <div key={i} className="flex items-start gap-4 p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-slate-900 dark:bg-slate-100 flex items-center justify-center text-white text-xs font-bold shrink-0">
                     {rec.card.split(' ').map(w => w[0]).slice(0, 2).join('')}
                   </div>
                   <div className="flex-1">

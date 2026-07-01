@@ -12,7 +12,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: { default: 'FinTrack', template: '%s — FinTrack' },
-  description: 'Intelligent personal finance. Linked accounts, AI-powered analysis, smarter spending.',
+  description: 'Personal finance made simple. Linked accounts, clear spending, smarter budgets.',
   manifest: '/manifest.json',
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'FinTrack' },
   icons: {

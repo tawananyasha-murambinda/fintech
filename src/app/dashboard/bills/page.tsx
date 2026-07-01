@@ -126,7 +126,7 @@ export default function BillsPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Bills & Calendar</h1>
+            <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Bills & Calendar</h1>
             <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Track recurring bills and upcoming due dates.</p>
           </div>
         </div>
@@ -140,25 +140,25 @@ export default function BillsPage() {
         <form onSubmit={saveBill} className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Name *</label>
+              <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">Name *</label>
               <input type="text" placeholder="Rent" value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="input text-sm" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Amount *</label>
+              <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">Amount *</label>
               <input type="number" step="0.01" min="0" placeholder="1500" value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
                 className="input text-sm" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Due date (day) *</label>
+              <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">Due date (day) *</label>
               <input type="number" min="1" max="31" placeholder="1" value={form.dueDate}
                 onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
                 className="input text-sm" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Frequency</label>
+              <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">Frequency</label>
               <select value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })}
                 className="input text-sm">
                 <option value="monthly">Monthly</option>
@@ -168,7 +168,7 @@ export default function BillsPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Category</label>
+              <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">Category</label>
               <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
                 className="input text-sm">
                 <option value="">None</option>
@@ -176,7 +176,7 @@ export default function BillsPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Reminder (days before)</label>
+              <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">Reminder (days before)</label>
               <input type="number" min="0" max="30" value={form.reminderDays}
                 onChange={(e) => setForm({ ...form, reminderDays: e.target.value })}
                 className="input text-sm" />
@@ -195,8 +195,8 @@ export default function BillsPage() {
         </div>
       ) : bills.length === 0 ? (
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-rose-500/20">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+          <div className="w-14 h-14 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white dark:text-slate-900">
               <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
               <path d="M3 8h18" stroke="currentColor" strokeWidth="1.5"/>
               <path d="M8 12h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -213,17 +213,17 @@ export default function BillsPage() {
         <>
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Total monthly</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Total monthly</p>
               <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{fmt(totalMonthly)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Active bills</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Active bills</p>
               <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
                 {bills.filter((b) => b.isActive).length}
               </p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Due this week</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Due this week</p>
               <p className={`text-lg font-bold ${upcomingBills.length > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-teal-600 dark:text-teal-400'}`}>
                 {upcomingBills.length}
               </p>

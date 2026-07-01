@@ -93,7 +93,7 @@ export default function NetWorthPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Net Worth</h1>
+            <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Net Worth</h1>
             <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Track assets, liabilities, and total net worth over time.</p>
           </div>
         </div>
@@ -111,12 +111,12 @@ export default function NetWorthPage() {
         <form onSubmit={showForm === 'asset' ? createAsset : createLiability} className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Name</label>
+              <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">Name</label>
               <input type="text" required placeholder={showForm === 'asset' ? 'Home value' : 'Credit card'} className="input text-sm"
                 value={form.name || ''} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Type</label>
+              <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">Type</label>
               <select className="input text-sm" value={form.type || ''} onChange={(e) => setForm({ ...form, type: e.target.value })}>
                 <option value="">Select...</option>
                 {(showForm === 'asset' ? ASSET_TYPES : LIABILITY_TYPES).map(t => (
@@ -125,19 +125,19 @@ export default function NetWorthPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">{showForm === 'asset' ? 'Value' : 'Balance'}</label>
+              <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">{showForm === 'asset' ? 'Value' : 'Balance'}</label>
               <input type="number" step="0.01" required placeholder="0.00" className="input text-sm"
                 value={form.value || form.balance || ''} onChange={(e) => setForm({ ...form, [showForm === 'asset' ? 'value' : 'balance']: e.target.value })} />
             </div>
             {showForm === 'liability' && (
               <>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Interest rate %</label>
+                  <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">Interest rate %</label>
                   <input type="number" step="0.01" placeholder="5.99" className="input text-sm"
                     value={form.interestRate || ''} onChange={(e) => setForm({ ...form, interestRate: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500">Min payment</label>
+                  <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">Min payment</label>
                   <input type="number" step="0.01" placeholder="50" className="input text-sm"
                     value={form.minPayment || ''} onChange={(e) => setForm({ ...form, minPayment: e.target.value })} />
                 </div>
@@ -158,15 +158,15 @@ export default function NetWorthPage() {
         <>
           <div className="grid grid-cols-3 gap-4">
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Total assets</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Total assets</p>
               <p className="text-2xl font-bold text-teal-600 dark:text-teal-400">{fmt(totalAssets)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Total liabilities</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Total liabilities</p>
               <p className="text-2xl font-bold text-rose-500">{fmt(totalLiabilities)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Net worth</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Net worth</p>
               <p className={`text-2xl font-bold ${netWorth >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-500'}`}>
                 {fmt(netWorth)}
               </p>

@@ -65,7 +65,7 @@ export default function RulesPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Categorization Rules</h1>
+            <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Categorization Rules</h1>
             <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
               Auto-categorize transactions based on merchant, description, or amount.
             </p>
@@ -81,7 +81,7 @@ export default function RulesPage() {
         <form onSubmit={createRule} className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Match type</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5 dark:text-slate-400">Match type</label>
               <select className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700" value={form.matchType} onChange={e => setForm({ ...form, matchType: e.target.value })}>
                 <option value="merchant">Merchant name</option>
                 <option value="description">Description</option>
@@ -90,18 +90,18 @@ export default function RulesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Match value</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5 dark:text-slate-400">Match value</label>
               <input type="text" required placeholder="Starbucks" className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500"
                 value={form.matchValue} onChange={e => setForm({ ...form, matchValue: e.target.value })} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Category</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5 dark:text-slate-400">Category</label>
               <select className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
                 {COMMON_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Priority</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5 dark:text-slate-400">Priority</label>
               <input type="number" min="0" className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500" value={form.priority}
                 onChange={e => setForm({ ...form, priority: e.target.value })} />
             </div>
@@ -119,8 +119,8 @@ export default function RulesPage() {
         </div>
       ) : rules.length === 0 ? (
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-orange-500/20">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+          <div className="w-14 h-14 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white dark:text-slate-900">
               <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
               <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
               <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>

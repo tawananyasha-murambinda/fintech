@@ -48,7 +48,7 @@ const GROUPS: NavGroup[] = [
     label: 'Analytics',
     icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4h8v8H4V4z" stroke="currentColor" strokeWidth="1.4"/><path d="M4 8h8" stroke="currentColor" strokeWidth="1.4"/></svg>,
     items: [
-      { href: '/dashboard/intelligence', label: 'AI Analytics' },
+      { href: '/dashboard/intelligence', label: 'Insights' },
       { href: '/dashboard/reports', label: 'Reports' },
       { href: '/dashboard/cashflow', label: 'Cash Flow' },
       { href: '/dashboard/alerts', label: 'Alerts' },
