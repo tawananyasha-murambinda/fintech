@@ -46,6 +46,7 @@ export interface MerchantAlternative {
   visitCount: number
   avgTransaction: number
   locationContext?: string
+  error?: string
   alternatives: {
     name: string
     estimatedSavings: number

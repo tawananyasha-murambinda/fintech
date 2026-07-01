@@ -536,6 +536,14 @@ export default function IntelligencePage() {
                         </div>
                       </div>
 
+                      {/* API error warning */}
+                      {merchant.error && (
+                        <div className="mb-2 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1.5 flex items-start gap-2">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-amber-500 shrink-0 mt-0.5" stroke="currentColor" strokeWidth="2"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>
+                          <p className="text-2xs text-amber-700 dark:text-amber-400">{merchant.error}</p>
+                        </div>
+                      )}
+
                       {/* Primary recommendation — featured */}
                       {primary && (
                         <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/40 dark:to-slate-900 p-3 mb-2">

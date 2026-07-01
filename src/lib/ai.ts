@@ -315,6 +315,7 @@ async function buildMerchantAlternatives(
     const merchantCity = data.city || userLocation?.city
     const merchantCountry = data.country || userLocation?.country
 
+    let altError: string | undefined
     if (merchantCity) {
       try {
         const result = await findLocalAlternatives(
@@ -325,6 +326,7 @@ async function buildMerchantAlternatives(
         locationContext = result.locationContext || (userLocation?.city && !data.city
           ? `Based near ${userLocation.city}. `
           : undefined)
+        altError = result.error
       } catch {}
     }
 
@@ -342,6 +344,7 @@ async function buildMerchantAlternatives(
       visitCount: data.count,
       avgTransaction: avgTx,
       locationContext,
+      error: altError,
       alternatives,
     })
   }
