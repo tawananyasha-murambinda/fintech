@@ -1,277 +1,145 @@
-const cache = new Map<string, { lat: number; lon: number; displayName: string }>()
+import { haversine } from '@/lib/haversine'
+import { getIngredientPrices, getReferencePrice } from '@/lib/prices'
+
+const geocodeCache = new Map<string, { lat: number; lon: number; displayName: string }>()
+const searchCache = new Map<string, { name: string; lat: number; lon: number; type: string }[]>()
+let lastNominatimCall = 0
+
+async function rateLimitedFetch(url: string): Promise<any> {
+  const now = Date.now()
+  const elapsed = now - lastNominatimCall
+  if (elapsed < 1100) await new Promise(r => setTimeout(r, 1100 - elapsed))
+  lastNominatimCall = Date.now()
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'FinTrack/1.0' },
+    signal: AbortSignal.timeout(7000),
+  })
+  return res.json()
+}
 
 export async function geocodeCity(city: string, country?: string | null) {
   const key = `${city}|${country || ''}`
-  if (cache.has(key)) return cache.get(key)!
-
+  if (geocodeCache.has(key)) return geocodeCache.get(key)!
   try {
     const q = country ? `${city}, ${country}` : city
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`
-    const res = await fetch(url, { headers: { 'User-Agent': 'FinTrack/1.0' } })
-    const data = await res.json()
+    const data = await rateLimitedFetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`
+    )
     if (data && data[0]) {
       const result = {
         lat: parseFloat(data[0].lat),
         lon: parseFloat(data[0].lon),
         displayName: data[0].display_name,
       }
-      cache.set(key, result)
+      geocodeCache.set(key, result)
       return result
     }
-  } catch (err) {
-    console.error('Geocode error:', err)
-  }
+  } catch { /* proceed */ }
   return null
+}
+
+async function searchPlaces(query: string, city: string, country?: string | null, limit = 8): Promise<{ name: string; lat: number; lon: number; type: string }[]> {
+  const cacheKey = `${query}|${city}|${country}|${limit}`
+  if (searchCache.has(cacheKey)) return searchCache.get(cacheKey)!
+  try {
+    const q = country ? `${query}+in+${city}+${country}` : `${query}+in+${city}`
+    const data = await rateLimitedFetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=${limit}`
+    )
+    const results = (data || [])
+      .filter((d: any) => d.name)
+      .map((d: any) => ({
+        name: d.name,
+        lat: parseFloat(d.lat),
+        lon: parseFloat(d.lon),
+        type: d.type,
+      }))
+    searchCache.set(cacheKey, results)
+    return results
+  } catch { return [] }
 }
 
 function estimateTripKm(amount: number): number {
   return Math.max(1, Math.round((amount * 0.7) / 1.5))
 }
 
-function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371
-  const dLat = (lat2 - lat1) * (Math.PI / 180)
-  const dLon = (lon2 - lon1) * (Math.PI / 180)
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
-}
-
 function fmtCurrency(n: number): string {
   return n.toFixed(2)
 }
 
-async function fetchOverpass(query: string): Promise<any[]> {
-  const res = await fetch('https://overpass-api.de/api/interpreter', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${encodeURIComponent(query)}`,
-  })
-  const data = await res.json()
-  return data.elements || []
+function localTransitInfo(city: string): { operator: string; note: string } {
+  const known: Record<string, string> = {
+    amsterdam: 'GVB', rotterdam: 'RET', utrecht: 'U-OV',
+    'den haag': 'HTM', eindhoven: 'Hermes', groningen: 'Qbuzz',
+    maastricht: 'Arriva', nijmegen: 'Hermes', haarlem: 'Connexxion',
+    vlissingen: 'Connexxion', goes: 'Connexxion', middelburg: 'Connexxion',
+    breda: 'Arriva', tilburg: 'Arriva', arnhem: 'Hermes',
+    amersfoort: 'Connexxion', leeuwarden: 'Arriva', denbosch: 'Arriva',
+    zwolle: 'Blauwnet', dordrecht: 'Arriva', leiden: 'Arriva',
+    delft: 'RET', almere: 'Connexxion', hilversum: 'Connexxion',
+  }
+  const op = known[city.toLowerCase().trim()] || 'public transit'
+  const note = op !== 'public transit'
+    ? `${op} operates the bus/tram network in ${city}. `
+    : `Check the local transit schedule in ${city}. `
+  return { operator: op, note }
 }
 
-async function findTransportAlternatives(
-  geo: { lat: number; lon: number },
-  city: string,
-  _country: string | undefined,
-  merchantName: string,
-  avgTransaction: number,
-  userCity: string,
-) {
-  const tripKm = estimateTripKm(avgTransaction)
-  const transitCostPerKm = 0.15
-  const transitBaseFare = 1.05
-  const transitFare = transitBaseFare + tripKm * transitCostPerKm
-  const savings = Math.round(avgTransaction - transitFare)
-  const isUserHome = city.toLowerCase() === userCity.toLowerCase()
-  const locPhrase = isUserHome ? `You live in ${userCity}` : `In ${city}`
-
-  const stops = await fetchOverpass(`[out:json][timeout:8];
-    nwr["highway"="bus_stop"](around:3000,${geo.lat},${geo.lon});
-    out center 5;`)
-
-  const namedStops = stops.filter((el: any) => el.tags?.name).slice(0, 5)
-
-  if (namedStops.length > 0) {
-    const best = namedStops[0]
-    const stopDist = haversine(geo.lat, geo.lon, best.lat || best.center?.lat, best.lon || best.center?.lon)
-    const operator = best.tags.operator || best.tags.network || 'public transit'
-    const routeRef = best.tags.route_ref || best.tags.ref || ''
-    const routeInfo = routeRef ? ` line ${routeRef}` : ''
-    const stopName = best.tags.name
-
-    return {
-      locationContext: isUserHome ? `You live in ${userCity}. ` : `${city} is one of your spending locations. `,
-      alternatives: [
-        {
-          name: `${operator} bus${routeInfo}`,
-          estimatedSavings: savings,
-          originalCost: Math.round(avgTransaction),
-          alternativeCost: Math.round(transitFare),
-          reason: `${locPhrase}. Your ${merchantName} trip (est. ${tripKm} km) costs ~€${fmtCurrency(avgTransaction)}. Take ${stopName} stop${routeInfo} — only ~€${fmtCurrency(transitFare)} for the same distance, saving €${savings}.`,
-          distance: `${stopDist.toFixed(1)} km from city center`,
-          type: 'primary' as const,
-          detail: `Take bus${routeInfo} from ${stopName}`,
-        },
-        ...(tripKm <= 10
-          ? [{
-              name: 'Cycle instead',
-              estimatedSavings: Math.round(avgTransaction - tripKm * 0.05),
-              originalCost: Math.round(avgTransaction),
-              alternativeCost: Math.round(tripKm * 0.05),
-              reason: `Same ${tripKm} km by bike costs ~€${fmtCurrency(tripKm * 0.05)} in maintenance. Takes ~${Math.round(tripKm * 4)} min but saves €${Math.round(avgTransaction - tripKm * 0.05)}.`,
-              distance: `${tripKm} km`,
-              type: 'secondary' as const,
-              detail: `${tripKm} km · ~${Math.round(tripKm * 4)} min cycle`,
-            }]
-          : []),
-        ...(tripKm <= 3
-          ? [{
-              name: 'Walk it',
-              estimatedSavings: Math.round(avgTransaction),
-              originalCost: Math.round(avgTransaction),
-              alternativeCost: 0,
-              reason: `${tripKm} km is walkable in ~${Math.round(tripKm * 12)} min. Free, healthy, and saves €${Math.round(avgTransaction)}.`,
-              distance: `${tripKm} km`,
-              type: 'secondary' as const,
-              detail: `${Math.round(tripKm * 12)} min walk`,
-            }]
-          : []),
-      ],
-    }
-  }
-
-  return null
+async function findNearbyBusStops(city: string, country?: string | null): Promise<{ name: string; lat: number; lon: number }[]> {
+  const results = await searchPlaces('bus stop', city, country, 5)
+  return results.filter(r => r.type === 'bus_stop').map(r => ({ name: r.name, lat: r.lat, lon: r.lon }))
 }
 
-async function findFoodAlternatives(
-  geo: { lat: number; lon: number },
-  city: string,
-  _country: string | undefined,
-  merchantName: string,
-  avgTransaction: number,
-) {
-  const homeCost = Math.round(avgTransaction * 0.25)
-  const savings = Math.round(avgTransaction - homeCost)
-
-  const markets = (await fetchOverpass(`[out:json][timeout:8];
-    nwr["shop"="supermarket"](around:2000,${geo.lat},${geo.lon});
-    out center 5;`))
-    .filter((el: any) => {
-      const n = (el.tags?.name || '').toLowerCase()
-      return /aldi|lidl|dirk|plus|jumbo|ah|aldi|coop|spar|netto|dekamarkt|vomar|hoogvliet|boni|picnic/.test(n)
-    })
-    .slice(0, 3)
-
-  const cheapEats = (await fetchOverpass(`[out:json][timeout:8];
-    nwr["amenity"~"restaurant|fast_food"](around:2000,${geo.lat},${geo.lon});
-    out center 8;`))
-    .filter((el: any) => el.tags?.name && !el.tags.name.toLowerCase().includes(merchantName.toLowerCase()))
-    .slice(0, 4)
-
-  const alts: any[] = []
-
-  if (markets.length > 0) {
-    const m = markets[0]
-    const dist = haversine(geo.lat, geo.lon, m.lat || m.center?.lat, m.lon || m.center?.lon)
-
-    alts.push({
-      name: `Cook at home (${m.tags.name})`,
-      estimatedSavings: savings,
-      originalCost: Math.round(avgTransaction),
-      alternativeCost: homeCost,
-      reason: `A €${fmtCurrency(avgTransaction)} meal at ${merchantName}. Instead, buy ingredients at ${m.tags.name} (${dist.toFixed(1)} km away) for ~€${homeCost}. Save €${savings} per meal.`,
-      distance: `${dist.toFixed(1)} km`,
-      type: 'primary',
-      detail: `${m.tags.name} · ~€${homeCost} for ingredients`,
-    })
-  } else {
-    alts.push({
-      name: 'Cook at home',
-      estimatedSavings: savings,
-      originalCost: Math.round(avgTransaction),
-      alternativeCost: homeCost,
-      reason: `A €${fmtCurrency(avgTransaction)} meal at ${merchantName} costs ~4x ingredients. Home cooking: ~€${homeCost}. Save €${savings} per meal.`,
-      type: 'primary',
-    })
-  }
-
-  if (cheapEats.length > 0) {
-    const ce = cheapEats[0]
-    const ceDist = haversine(geo.lat, geo.lon, ce.lat || ce.center?.lat, ce.lon || ce.center?.lon)
-    const cheapCost = Math.round(avgTransaction * 0.7)
-
-    alts.push({
-      name: `${ce.tags.name} (nearby)`,
-      estimatedSavings: Math.round(avgTransaction - cheapCost),
-      originalCost: Math.round(avgTransaction),
-      alternativeCost: cheapCost,
-      reason: `Try ${ce.tags.name} instead — ${ceDist.toFixed(1)} km away, estimated ~€${cheapCost} vs €${fmtCurrency(avgTransaction)} at ${merchantName}.`,
-      distance: `${ceDist.toFixed(1)} km`,
-      type: 'secondary',
-      detail: `~€${cheapCost}/meal · ${ceDist.toFixed(1)} km away`,
-    })
-  }
-
-  alts.push({
-    name: 'Pack lunch / meal prep',
-    estimatedSavings: Math.round(avgTransaction * 0.7),
-    originalCost: Math.round(avgTransaction),
-    alternativeCost: Math.round(avgTransaction * 0.3),
-    reason: `Packing lunch costs ~€${Math.round(avgTransaction * 0.3)} vs €${fmtCurrency(avgTransaction)} at ${merchantName}. Over 22 workdays: save ~€${Math.round(avgTransaction * 0.7 * 22)}/mo.`,
-    type: 'secondary',
-  })
-
-  return { alternatives: alts }
+async function findNearbySupermarkets(city: string, country?: string | null): Promise<{ name: string; lat: number; lon: number }[]> {
+  const discounters = ['aldi', 'lidl', 'dirk', 'plus', 'spar', 'netto']
+  const all = await searchPlaces('supermarket', city, country, 10)
+  const sorted = all.filter(r => discounters.some(d => r.name.toLowerCase().includes(d)))
+  const others = all.filter(r => !discounters.some(d => r.name.toLowerCase().includes(d)))
+  return [...sorted, ...others].slice(0, 3).map(r => ({ name: r.name, lat: r.lat, lon: r.lon }))
 }
 
-async function findCoffeeAlternatives(
-  geo: { lat: number; lon: number },
-  _city: string,
-  merchantName: string,
-  avgTransaction: number,
-) {
-  const homeCost = 0.30
-  const savings = Math.round(avgTransaction - homeCost)
+type Ingredient = { name: string; price: number }
 
-  const cafes = (await fetchOverpass(`[out:json][timeout:8];
-    nwr["amenity"="cafe"](around:1000,${geo.lat},${geo.lon});
-    out center 5;`))
-    .filter((el: any) => el.tags?.name && !el.tags.name.toLowerCase().includes(merchantName.toLowerCase()))
-    .slice(0, 2)
+const MEAL_INGREDIENTS: { match: RegExp; meal: string; ingredientNames: string[] }[] = [
+  { match: /kfc|popeyes|fried.?chicken|chicken.?shop/i, meal: 'Fried chicken meal',
+    ingredientNames: ['Chicken breast (200g)', 'Pasta (500g)', 'Tomato sauce'] },
+  { match: /chicken|nando|stros|henk/i, meal: 'Grilled chicken meal',
+    ingredientNames: ['Chicken thigh (300g)', 'Rice (500g)', 'Mixed vegetables'] },
+  { match: /mcdonald|burger.?king|wendy|burger|fast.?food|quick/i, meal: 'Burger meal',
+    ingredientNames: ['Ground beef (400g)', 'Bread rolls (4)', 'Cheese (100g)', 'Tomatoes'] },
+  { match: /pizza|domino|new.?york.?pizza/i, meal: 'Homemade pizza',
+    ingredientNames: ['Pizza dough mix', 'Mozzarella (200g)', 'Tomatoes', 'Mixed vegetables'] },
+  { match: /italian|pasta|spaghetti|lasagna|mama|olive.?garden/i, meal: 'Pasta meal',
+    ingredientNames: ['Pasta (500g)', 'Tomato sauce', 'Ground beef (300g)', 'Cheese (100g)'] },
+  { match: /sushi|asian|chinese|thai|japanese|vietnam|indonesian|bami|nasi/i, meal: 'Stir-fry meal',
+    ingredientNames: ['Chicken breast (200g)', 'Rice (500g)', 'Mixed vegetables', 'Eggs (2)'] },
+  { match: /mexican|taco|burrito|quesadilla/i, meal: 'Taco meal',
+    ingredientNames: ['Ground beef (400g)', 'Mixed vegetables', 'Cheese (100g)'] },
+  { match: /subway|sandwich|sub.?way|baguette|brood/i, meal: 'Homemade sandwich',
+    ingredientNames: ['Bread rolls (2)', 'Chicken breast (200g)', 'Cheese (100g)', 'Tomatoes'] },
+  { match: /fish|seafood|vishandel/i, meal: 'Fish meal',
+    ingredientNames: ['Fish fillet (300g)', 'Potatoes (1kg)', 'Mixed vegetables'] },
+  { match: /indian|curry|tandoor|bombay|korma/i, meal: 'Curry meal',
+    ingredientNames: ['Chicken thigh (300g)', 'Rice (500g)', 'Mixed vegetables'] },
+  { match: /breakfast|brunch|pancake|waffle|omelet/i, meal: 'Homemade breakfast',
+    ingredientNames: ['Eggs (6)', 'Bread rolls (2)', 'Milk (1L)'] },
+  { match: /takeout|take.?away|chinees|chin/i, meal: 'Takeout-style meal',
+    ingredientNames: ['Chicken breast (200g)', 'Rice (500g)', 'Mixed vegetables'] },
+  { match: /steak|grill|loin|ribeye|entrecote/i, meal: 'Pan-seared steak meal',
+    ingredientNames: ['Beef steak (250g)', 'Potatoes (1kg)', 'Mixed vegetables'] },
+  { match: /restaurant|cafe|bistro|eatery|diner|tavern|bar|grill|kitchen/i, meal: 'Home-cooked meal',
+    ingredientNames: ['Chicken breast (200g)', 'Rice (500g)', 'Mixed vegetables'] },
+]
 
-  const alts: any[] = [
-    {
-      name: 'Brew at home',
-      estimatedSavings: savings,
-      originalCost: Math.round(avgTransaction),
-      alternativeCost: Math.round(homeCost),
-      reason: `A €${fmtCurrency(avgTransaction)} coffee at ${merchantName}. Home-brewed: ~€${fmtCurrency(homeCost)} per cup. Save €${savings} per cup.`,
-      type: 'primary',
-      detail: `~€${fmtCurrency(homeCost)} per cup at home`,
-    },
-  ]
-
-  if (cafes.length > 0) {
-    alts.push({
-      name: cafes[0].tags.name,
-      estimatedSavings: Math.round(avgTransaction * 0.3),
-      originalCost: Math.round(avgTransaction),
-      alternativeCost: Math.round(avgTransaction * 0.7),
-      reason: `Try ${cafes[0].tags.name} — likely cheaper coffee near you.`,
-      type: 'secondary',
-    })
+async function getIngredientBreakdown(merchantName: string, mealCost: number): Promise<{ meal: string; items: { name: string; price: number; supermarket: string; source: string }[]; total: number }> {
+  const matched = MEAL_INGREDIENTS.find(b => b.match.test(merchantName))
+  if (matched) {
+    const { items, total } = await getIngredientPrices(matched.ingredientNames)
+    return { meal: matched.meal, items, total }
   }
-
-  return { alternatives: alts }
-}
-
-function generateGenericAlternatives(
-  merchantName: string,
-  avgTransaction: number,
-) {
-  const alts: any[] = [
-    {
-      name: 'Compare 2-3 alternatives',
-      estimatedSavings: Math.round(avgTransaction * 0.15),
-      originalCost: Math.round(avgTransaction),
-      alternativeCost: Math.round(avgTransaction * 0.85),
-      reason: `Shopping around for what you buy at ${merchantName} typically saves ~15% (€${Math.round(avgTransaction * 0.15)} per visit).`,
-      type: 'primary',
-    },
-    {
-      name: 'Loyalty / bulk discounts',
-      estimatedSavings: Math.round(avgTransaction * 0.1),
-      originalCost: Math.round(avgTransaction),
-      alternativeCost: Math.round(avgTransaction * 0.9),
-      reason: 'Check for loyalty rewards, student discounts, or bulk pricing.',
-      type: 'secondary',
-    },
-  ]
-  return { alternatives: alts }
+  const genericTotal = Math.round(mealCost * 0.25 * 100) / 100
+  const prices = await getIngredientPrices(['Chicken breast (200g)', 'Rice (500g)', 'Mixed vegetables'])
+  return { meal: 'Home-cooked meal', items: prices.items, total: prices.total }
 }
 
 export async function findLocalAlternatives(
@@ -281,7 +149,7 @@ export async function findLocalAlternatives(
   merchantName: string,
   avgTransaction?: number,
   userCity?: string,
-  visitCount?: number,
+  _visitCount?: number,
 ): Promise<{
   locationContext?: string
   alternatives: {
@@ -295,34 +163,230 @@ export async function findLocalAlternatives(
     detail?: string
   }[]
 }> {
-  const geo = await geocodeCity(city, country)
-  if (!geo) return { alternatives: [] }
-
   const cleanCat = category.toLowerCase().replace(/_/g, ' ')
   const userHome = userCity || city
   const avgTx = avgTransaction || 15
+  const isUserHome = city.toLowerCase() === userHome.toLowerCase()
+  const locPhrase = isUserHome ? `You live in ${userHome}` : `In ${city}`
 
-  try {
-    // Transport / rideshare
-    if (/rideshare|uber|lyft|taxi|transport|gas|fuel/.test(cleanCat) && !/parking|toll/.test(cleanCat)) {
-      const result = await findTransportAlternatives(geo, city, country, merchantName, avgTx, userHome)
-      if (result) return result
+  // Geolocate the city for distance calculations
+  const geo = await geocodeCity(userHome, country)
+
+  // --- TRANSPORT ---
+  if (/rideshare|uber|lyft|taxi|transport|gas|fuel/.test(cleanCat) && !/parking|toll/.test(cleanCat)) {
+    const tripKm = estimateTripKm(avgTx)
+    const transit = localTransitInfo(userHome)
+    const transitFare = Math.round(1.05 + tripKm * 0.15)
+    const savings = Math.round(avgTx - transitFare)
+
+    const alts: any[] = []
+
+    // Look up real bus stops
+    const stops = await findNearbyBusStops(userHome, country)
+    if (stops.length > 0) {
+      const stopNames = [...new Set(stops.map(s => s.name))].slice(0, 3).join(', ')
+      alts.push({
+        name: `${transit.operator} bus (${stopNames})`,
+        estimatedSavings: savings,
+        originalCost: Math.round(avgTx),
+        alternativeCost: transitFare,
+        reason: `${locPhrase}. Your ${merchantName} trip (est. ${tripKm} km) costs ~€${fmtCurrency(avgTx)}. ${transit.note}Nearest stops: ${stopNames}. A bus for ${tripKm} km is ~€${transitFare} — saving you €${savings} per trip.`,
+        type: 'primary' as const,
+        detail: `~€${transitFare} · stops: ${stopNames}`,
+      })
+    } else {
+      alts.push({
+        name: `${transit.operator} bus/tram`,
+        estimatedSavings: savings,
+        originalCost: Math.round(avgTx),
+        alternativeCost: transitFare,
+        reason: `${locPhrase}. Your ${merchantName} trip (est. ${tripKm} km) costs ~€${fmtCurrency(avgTx)}. ${transit.note}A bus for ${tripKm} km is ~€${transitFare} — saving you €${savings} per trip.`,
+        type: 'primary' as const,
+        detail: `~€${transitFare} · ${tripKm} km trip`,
+      })
     }
 
-    // Food / dining
-    if (/food.*dining|restaurant|fast food|kfc|mcdonald|pizza|takeout|burger|dining|groceries/.test(cleanCat)) {
-      const result = await findFoodAlternatives(geo, city, country, merchantName, avgTx)
-      if (result.alternatives.length > 0) return result
+    if (tripKm <= 10) {
+      const cycleTime = Math.round(tripKm * 4)
+      alts.push({
+        name: 'Cycle instead',
+        estimatedSavings: Math.round(avgTx - tripKm * 0.05),
+        originalCost: Math.round(avgTx),
+        alternativeCost: Math.round(tripKm * 0.05),
+        reason: `Same ${tripKm} km by bike costs ~€${fmtCurrency(tripKm * 0.05)} in maintenance. Takes ~${cycleTime} min and saves €${Math.round(avgTx - tripKm * 0.05)}.`,
+        type: 'secondary' as const,
+        detail: `${tripKm} km · ~${cycleTime} min cycle`,
+      })
     }
 
-    // Coffee
-    if (/coffee/.test(cleanCat)) {
-      const result = await findCoffeeAlternatives(geo, city, merchantName, avgTx)
-      if (result.alternatives.length > 0) return result
+    if (tripKm <= 3) {
+      const walkTime = Math.round(tripKm * 12)
+      alts.push({
+        name: 'Walk it',
+        estimatedSavings: Math.round(avgTx),
+        originalCost: Math.round(avgTx),
+        alternativeCost: 0,
+        reason: `${tripKm} km is walkable in ~${walkTime} min. Free and saves €${Math.round(avgTx)}.`,
+        type: 'secondary' as const,
+        detail: `${walkTime} min walk`,
+      })
     }
-  } catch (err) {
-    console.error('findLocalAlternatives error:', err)
+
+    return {
+      locationContext: isUserHome ? `You live in ${userHome}. ` : `${city} is one of your spending locations. `,
+      alternatives: alts,
+    }
   }
 
-  return generateGenericAlternatives(merchantName, avgTx)
+  // --- FOOD & DINING ---
+  if (/food.*dining|restaurant|fast food|kfc|mcdonald|pizza|takeout|burger|dining|groceries/.test(cleanCat)) {
+    const breakdown = await getIngredientBreakdown(merchantName, Math.round(avgTx))
+    const homeCost = breakdown.total
+    const savings = Math.round(avgTx - homeCost)
+
+    const alts: any[] = []
+
+    // Find real supermarkets nearby
+    const markets = await findNearbySupermarkets(userHome, country)
+    if (markets.length > 0 && geo) {
+      const m = markets[0]
+      const dist = haversine(geo.lat, geo.lon, m.lat, m.lon)
+      const items = breakdown.items.map(i => `${i.name} (€${i.price.toFixed(2)})`).join(' + ')
+      alts.push({
+        name: `Cook at home (${m.name})`,
+        estimatedSavings: savings,
+        originalCost: Math.round(avgTx),
+        alternativeCost: homeCost,
+        reason: `${locPhrase}. A €${fmtCurrency(avgTx)} meal at ${merchantName}. Instead, buy at ${m.name} (${dist.toFixed(1)} km): ${items} = €${homeCost.toFixed(2)} total. Save €${savings} per meal.`,
+        distance: `${dist.toFixed(1)} km`,
+        type: 'primary' as const,
+        detail: `${m.name} · ${items}`,
+      })
+    } else {
+      const items = breakdown.items.map(i => `${i.name} (€${i.price.toFixed(2)})`).join(' + ')
+      alts.push({
+        name: 'Cook at home',
+        estimatedSavings: savings,
+        originalCost: Math.round(avgTx),
+        alternativeCost: homeCost,
+        reason: `${locPhrase}. A €${fmtCurrency(avgTx)} meal at ${merchantName}. Home cooking: ${items} = €${homeCost.toFixed(2)}. Save €${savings} per meal.`,
+        type: 'primary' as const,
+        detail: `${items} = €${homeCost.toFixed(2)}`,
+      })
+    }
+
+    // Find cheaper restaurants nearby
+    const cheapEats = await searchPlaces('restaurant', userHome, country, 6)
+    const others = cheapEats.filter(r => !merchantName.toLowerCase().includes(r.name.toLowerCase()))
+    if (others.length > 0 && geo) {
+      const ce = others[0]
+      const ceDist = haversine(geo.lat, geo.lon, ce.lat, ce.lon)
+      const cheapCost = Math.round(avgTx * 0.7)
+      alts.push({
+        name: `${ce.name} (nearby)`,
+        estimatedSavings: Math.round(avgTx - cheapCost),
+        originalCost: Math.round(avgTx),
+        alternativeCost: cheapCost,
+        reason: `Try ${ce.name} instead — ${ceDist.toFixed(1)} km away, estimated ~€${cheapCost} vs €${fmtCurrency(avgTx)} at ${merchantName}.`,
+        distance: `${ceDist.toFixed(1)} km`,
+        type: 'secondary' as const,
+        detail: `~€${cheapCost}/meal · ${ceDist.toFixed(1)} km`,
+      })
+    }
+
+    alts.push({
+      name: 'Pack lunch / meal prep',
+      estimatedSavings: Math.round(avgTx * 0.7),
+      originalCost: Math.round(avgTx),
+      alternativeCost: Math.round(avgTx * 0.3),
+      reason: `Packing lunch costs ~€${Math.round(avgTx * 0.3)} vs €${fmtCurrency(avgTx)} at ${merchantName}. Over 22 workdays: save ~€${Math.round(avgTx * 0.7 * 22)}/mo.`,
+      type: 'secondary' as const,
+    })
+
+    return {
+      locationContext: isUserHome ? `You live in ${userHome}. ` : `${city} is one of your spending locations. `,
+      alternatives: alts,
+    }
+  }
+
+  // --- COFFEE ---
+  if (/coffee/.test(cleanCat)) {
+    return {
+      locationContext: isUserHome ? `You live in ${userHome}. ` : `${city} is one of your spending locations. `,
+      alternatives: [{
+        name: 'Brew at home',
+        estimatedSavings: Math.round(avgTx - 0.30),
+        originalCost: Math.round(avgTx),
+        alternativeCost: 0.30,
+        reason: `A €${fmtCurrency(avgTx)} coffee at ${merchantName}. Home-brewed: ~€0.30 per cup. Save €${Math.round(avgTx - 0.30)} per cup.`,
+        type: 'primary' as const,
+        detail: '~€0.30 per cup at home',
+      }],
+    }
+  }
+
+  // --- SHOPPING ---
+  if (/shopping|retail|merchandise|clothing|electronics/.test(cleanCat)) {
+    return {
+      locationContext: `Based near ${userHome}. `,
+      alternatives: [{
+        name: 'Second-hand / thrift stores',
+        estimatedSavings: Math.round(avgTx * 0.5),
+        originalCost: Math.round(avgTx),
+        alternativeCost: Math.round(avgTx * 0.5),
+        reason: `Second-hand alternatives in ${userHome} typically save ~50% on items you'd buy new at ${merchantName}. Check local thrift shops.`,
+        type: 'primary' as const,
+        detail: `~€${Math.round(avgTx * 0.5)} saved per visit`,
+      }, {
+        name: 'Wait 48h before buying',
+        estimatedSavings: Math.round(avgTx * 0.2),
+        originalCost: Math.round(avgTx),
+        alternativeCost: Math.round(avgTx * 0.8),
+        reason: `${merchantName} spend averages €${fmtCurrency(avgTx)}/visit. A 48h cooling period reduces impulse purchases by ~20%.`,
+        type: 'secondary' as const,
+      }],
+    }
+  }
+
+  // --- ENTERTAINMENT ---
+  if (/entertainment|streaming|subscription|movies|games/.test(cleanCat)) {
+    return {
+      locationContext: `Based near ${userHome}. `,
+      alternatives: [{
+        name: 'Annual billing',
+        estimatedSavings: Math.round(avgTx * 0.15),
+        originalCost: Math.round(avgTx),
+        alternativeCost: Math.round(avgTx * 0.85),
+        reason: `${merchantName} likely offers 15-20% off with annual billing — saving ~€${Math.round(avgTx * 0.15)}/mo.`,
+        type: 'primary' as const,
+      }, {
+        name: 'Ad-supported / family plan',
+        estimatedSavings: Math.round(avgTx * 0.25),
+        originalCost: Math.round(avgTx),
+        alternativeCost: Math.round(avgTx * 0.75),
+        reason: 'Downgrading to ad-supported tiers or splitting a family plan cuts costs significantly.',
+        type: 'secondary' as const,
+      }],
+    }
+  }
+
+  // --- GENERIC FALLBACK ---
+  return {
+    locationContext: `Based near ${userHome}. `,
+    alternatives: [{
+      name: 'Compare 2-3 alternatives',
+      estimatedSavings: Math.round(avgTx * 0.15),
+      originalCost: Math.round(avgTx),
+      alternativeCost: Math.round(avgTx * 0.85),
+      reason: `Shopping around for what you buy at ${merchantName} in ${userHome} typically saves ~15% (€${Math.round(avgTx * 0.15)} per visit).`,
+      type: 'primary' as const,
+    }, {
+      name: 'Loyalty / bulk discounts',
+      estimatedSavings: Math.round(avgTx * 0.1),
+      originalCost: Math.round(avgTx),
+      alternativeCost: Math.round(avgTx * 0.9),
+      reason: 'Check for loyalty rewards, student discounts, or bulk pricing.',
+      type: 'secondary' as const,
+    }],
+  }
 }

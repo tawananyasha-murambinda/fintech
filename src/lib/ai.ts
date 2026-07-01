@@ -11,7 +11,7 @@ import type {
   CashflowForecast,
   SpendingPattern,
 } from '@/types'
-import { findLocalAlternatives, geocodeCity } from './geocode'
+import { findLocalAlternatives } from './geocode'
 
 const CATEGORY_GROUPS: Record<string, string[]> = {
   'Food & Dining': ['Food & Dining', 'Groceries', 'Restaurant', 'Coffee Shops', 'Bars & Drinks', 'Fast Food'],
