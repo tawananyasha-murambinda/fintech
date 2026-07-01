@@ -149,11 +149,11 @@ export function MobileTransactions({
       {/* Summary row */}
       <div className="grid grid-cols-2 gap-2 mb-3">
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-3">
-          <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-0.5">Income</p>
+          <p className="text-2xs text-slate-400 font-medium mb-0.5">Income</p>
           <p className="text-base font-semibold stat-number text-teal-700 dark:text-teal-400">{fmt(totalCredits)}</p>
         </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-3">
-          <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-0.5">Expenses</p>
+          <p className="text-2xs text-slate-400 font-medium mb-0.5">Expenses</p>
           <p className="text-base font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(totalDebits)}</p>
         </div>
       </div>
@@ -413,14 +413,14 @@ function MobileTransactionItem({ tx, fmt }: { tx: Transaction; fmt: (n: number) 
             <div className="space-y-4">
               {tx.description && tx.description !== name && (
                 <div>
-                  <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-0.5">Description</p>
+                  <p className="text-2xs text-slate-400 font-medium mb-0.5">Description</p>
                   <p className="text-sm text-slate-700 dark:text-slate-300">{tx.description}</p>
                 </div>
               )}
 
               {/* Recategorization */}
               <div>
-                <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1.5">Category</p>
+                <p className="text-2xs text-slate-400 font-medium mb-1.5">Category</p>
                 <div className="flex gap-2">
                   <select
                     value={selectedCategory}
@@ -461,7 +461,7 @@ function MobileTransactionItem({ tx, fmt }: { tx: Transaction; fmt: (n: number) 
               )}
 
               <div>
-                <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-0.5">Status</p>
+                <p className="text-2xs text-slate-400 font-medium mb-0.5">Status</p>
                 <span className={`badge ${tx.status === 'posted' ? 'badge-credit' : 'badge-pending'}`}>
                   {tx.status}
                 </span>

@@ -175,8 +175,8 @@ export async function findLocalAlternatives(
   const geo = await tryApiOrFallback(() => geocodeCity(userHome, country), null)
   const locPhrase = isUserHome ? `You live in ${userHome}` : `In ${city}`
   const locCtx = isUserHome
-    ? `You live in ${userHome}. ${geo ? '' : '⚠️ Location lookup unavailable.'} `
-    : `${city} is one of your spending locations. ${geo ? '' : '⚠️ Location lookup unavailable.'} `
+    ? `You live in ${userHome}. ${geo ? '' : 'Location lookup unavailable.'} `
+    : `${city} is one of your spending locations. ${geo ? '' : 'Location lookup unavailable.'} `
 
   // --- TRANSPORT ---
   if (/transport|travel|rideshare|uber|lyft|taxi|gas|fuel|auto|car|commute|train|bus|metro|tram|parking|toll/.test(cleanCat)) {

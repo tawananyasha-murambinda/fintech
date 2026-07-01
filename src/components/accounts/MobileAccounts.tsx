@@ -68,8 +68,8 @@ export function MobileAccounts({ banks, loading, onUnlink }: MobileAccountsProps
       {banks.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-xs">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-600/20">
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" className="text-white">
+            <div className="w-16 h-16 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-4">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" className="text-white dark:text-slate-900">
                 <rect x="4" y="6" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.8"/>
                 <path d="M4 10h20" stroke="currentColor" strokeWidth="1.8"/>
               </svg>

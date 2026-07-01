@@ -75,33 +75,33 @@ export default function InvestmentsPage() {
         <form onSubmit={createInvestment} className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Name</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5 dark:text-slate-400">Name</label>
               <input type="text" required placeholder="Apple Inc." className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500"
                 value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Type</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5 dark:text-slate-400">Type</label>
               <select className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
                 {INVESTMENT_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Ticker (optional)</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5 dark:text-slate-400">Ticker (optional)</label>
               <input type="text" placeholder="AAPL" className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500"
                 value={form.ticker} onChange={e => setForm({ ...form, ticker: e.target.value.toUpperCase() })} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Shares</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5 dark:text-slate-400">Shares</label>
               <input type="number" step="any" min="0" placeholder="10" className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500"
                 value={form.shares} onChange={e => setForm({ ...form, shares: e.target.value })} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Cost basis (avg price)</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5 dark:text-slate-400">Cost basis (avg price)</label>
               <input type="number" step="0.01" min="0" placeholder="150.00" className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500"
                 value={form.costBasis} onChange={e => setForm({ ...form, costBasis: e.target.value })} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Current price</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5 dark:text-slate-400">Current price</label>
               <input type="number" step="0.01" min="0" placeholder="175.00" className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500"
                 value={form.currentPrice} onChange={e => setForm({ ...form, currentPrice: e.target.value })} />
             </div>
@@ -118,8 +118,8 @@ export default function InvestmentsPage() {
         </div>
       ) : investments.length === 0 ? (
         <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/20">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+          <div className="w-14 h-14 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white dark:text-slate-900">
               <path d="M12 2v20M2 12h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               <path d="M7 12l3-3 3 3 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -135,15 +135,15 @@ export default function InvestmentsPage() {
           {/* Summary cards */}
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-2xs text-slate-400 font-medium uppercase tracking-wider mb-1">Total value</p>
+              <p className="text-2xs text-slate-400 font-medium mb-1">Total value</p>
               <p className="text-lg font-semibold stat-number text-teal-700 dark:text-teal-400">{fmt(totalValue)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-2xs text-slate-400 font-medium uppercase tracking-wider mb-1">Cost basis</p>
+              <p className="text-2xs text-slate-400 font-medium mb-1">Cost basis</p>
               <p className="text-lg font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(totalCostBasis)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-2xs text-slate-400 font-medium uppercase tracking-wider mb-1">Gain/Loss</p>
+              <p className="text-2xs text-slate-400 font-medium mb-1">Gain/Loss</p>
               <p className={`text-lg font-semibold stat-number ${totalGain >= 0 ? 'text-teal-700 dark:text-teal-400' : 'text-red-500'}`}>
                 {totalGain >= 0 ? '+' : ''}{fmt(totalGain)}
               </p>
@@ -161,7 +161,7 @@ export default function InvestmentsPage() {
                 <div key={inv.id} className="px-5 py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${inv.type === 'crypto' ? 'bg-gradient-to-br from-amber-500 to-amber-600' : inv.type === 'stock' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : inv.type === 'etf' ? 'bg-gradient-to-br from-purple-500 to-purple-600' : 'bg-gradient-to-br from-slate-500 to-slate-600'}`}>
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${inv.type === 'crypto' ? 'bg-slate-900 dark:bg-slate-100' : inv.type === 'stock' ? 'bg-slate-900 dark:bg-slate-100' : inv.type === 'etf' ? 'bg-slate-900 dark:bg-slate-100' : 'bg-slate-900 dark:bg-slate-100'}`}>
                         {inv.ticker || inv.name.charAt(0).toUpperCase()}
                       </div>
                       <div>

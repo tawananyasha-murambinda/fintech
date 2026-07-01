@@ -104,15 +104,15 @@ export default function TransactionsPage() {
         {!loading && (
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1 dark:text-slate-500">Income</p>
+              <p className="text-2xs text-slate-400 font-medium mb-1 dark:text-slate-500">Income</p>
               <p className="text-lg font-semibold stat-number text-teal-700 dark:text-teal-400">{fmt(totalCredits)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1 dark:text-slate-500">Expenses</p>
+              <p className="text-2xs text-slate-400 font-medium mb-1 dark:text-slate-500">Expenses</p>
               <p className="text-lg font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(totalDebits)}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-              <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1 dark:text-slate-500">Net</p>
+              <p className="text-2xs text-slate-400 font-medium mb-1 dark:text-slate-500">Net</p>
               <p className={`text-lg font-semibold stat-number ${totalCredits - totalDebits >= 0 ? 'text-teal-700 dark:text-teal-400' : 'text-red-500 dark:text-red-400'}`}>
                 {fmt(totalCredits - totalDebits)}
               </p>
@@ -182,8 +182,8 @@ export default function TransactionsPage() {
             </div>
           ) : transactions.length === 0 ? (
             <div className="p-16 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/20">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+              <div className="w-14 h-14 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white dark:text-slate-900">
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5"/>
                   <path d="M8.5 14.5C9.2 16 10.5 17 12 17s2.8-1 3.5-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                   <circle cx="9.5" cy="10.5" r="1.2" fill="currentColor"/>
