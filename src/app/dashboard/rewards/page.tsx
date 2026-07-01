@@ -52,16 +52,21 @@ export default function RewardsPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-up">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="w-7 h-7 rounded-xl bg-pink-100 dark:bg-pink-950 flex items-center justify-center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-pink-600 dark:text-pink-400">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">Rewards Optimizer</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Rewards Optimizer</h1>
           <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
             Find the best credit card for each merchant category to maximize cashback and points.
           </p>
         </div>
       </div>
 
-      <div className="card p-5">
+      <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
         <h2 className="text-sm font-semibold text-slate-900 mb-4 dark:text-slate-100">Category analysis</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -89,7 +94,7 @@ export default function RewardsPage() {
               const yearlyReward = monthlyReward * 12
 
               return (
-                <div key={i} className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl dark:bg-slate-800">
+                <div key={i} className="flex items-start gap-4 p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
                     {rec.card.split(' ').map(w => w[0]).slice(0, 2).join('')}
                   </div>
@@ -117,11 +122,11 @@ export default function RewardsPage() {
         )}
       </div>
 
-      <div className="card p-5">
+      <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
         <h2 className="text-sm font-semibold text-slate-900 mb-4 dark:text-slate-100">Your card portfolio</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {CARDS.map(card => (
-            <div key={card.name} className="p-4 bg-slate-50 rounded-xl dark:bg-slate-800">
+            <div key={card.name} className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
               <div className="flex items-center gap-2 mb-1">
                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{card.name}</p>
                 <span className="text-2xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">{card.type}</span>

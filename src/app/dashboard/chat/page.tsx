@@ -70,32 +70,40 @@ export default function ChatPage() {
 
   return (
     <div className="max-w-3xl mx-auto h-[calc(100vh-8rem)] flex flex-col animate-fade-up">
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">Financial Assistant</h1>
-        <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
-          Ask questions about your spending, get saving tips, or check if you can afford something.
-        </p>
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-7 h-7 rounded-xl bg-violet-100 dark:bg-violet-950 flex items-center justify-center shrink-0">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-violet-600 dark:text-violet-400">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Financial Assistant</h1>
+          <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
+            Ask questions about your spending, get saving tips, or check if you can afford something.
+          </p>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-1">
         {!historyLoaded ? (
           <div className="flex items-center justify-center py-16">
-            <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+            <div className="w-10 h-10 border-[3px] border-teal-600 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="text-center max-w-sm">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="mx-auto mb-4 text-slate-300">
+          <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-violet-500/20">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
                 <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              <h2 className="text-sm font-semibold text-slate-900 mb-2 dark:text-slate-100">Start a conversation</h2>
-              <p className="text-xs text-slate-500 leading-relaxed dark:text-slate-400">
-                Try asking things like:<br />
-                "How much did I spend on dining this month?"<br />
-                "Can I afford a $500 purchase?"<br />
-                "Where can I save money?"
-              </p>
             </div>
+            <h2 className="text-base font-semibold text-slate-900 mb-1 dark:text-slate-100">Start a conversation</h2>
+            <p className="text-sm text-slate-500 max-w-sm mx-auto dark:text-slate-400 leading-relaxed">
+              Try asking things like:<br />
+              "How much did I spend on dining this month?"<br />
+              "Can I afford a $500 purchase?"<br />
+              "Where can I save money?"
+            </p>
           </div>
         ) : (
           messages.map((msg) => (
@@ -136,12 +144,12 @@ export default function ChatPage() {
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask about your finances…"
           disabled={loading}
-          className="input text-sm flex-1"
+          className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 transition-colors dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500"
         />
         <button
           type="submit"
           disabled={!input.trim() || loading}
-          className="btn-primary text-sm py-2.5 px-4 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm disabled:opacity-60"
         >
           Send
         </button>

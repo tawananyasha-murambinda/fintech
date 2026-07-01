@@ -60,51 +60,70 @@ export default function CashflowPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-up">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">Cash Flow Calendar</h1>
-          <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Projected account balances day-by-day based on known bills and income.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-xl bg-cyan-100 dark:bg-cyan-950 flex items-center justify-center">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-cyan-600 dark:text-cyan-400">
+              <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M3 8h18" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M8 12h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M8 16h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Cash Flow Calendar</h1>
+            <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Projected account balances day-by-day based on known bills and income.</p>
+          </div>
         </div>
       </div>
 
       {loading ? (
-        <div className="card p-16 text-center">
-          <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+          <div className="w-10 h-10 border-[3px] border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
         </div>
       ) : !data ? (
-        <div className="card p-16 text-center">
-          <p className="text-sm text-slate-400">Connect a bank account to see projections.</p>
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-cyan-500/20">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+              <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M3 8h18" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M8 12h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M8 16h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <h2 className="text-base font-semibold text-slate-900 mb-1 dark:text-slate-100">No projection data</h2>
+          <p className="text-sm text-slate-500 max-w-sm mx-auto dark:text-slate-400">Connect a bank account to see projections.</p>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-3 gap-3">
-            <div className="card px-4 py-3">
-              <p className="text-2xs text-slate-400 font-medium uppercase mb-1">Monthly income</p>
-              <p className="text-lg font-semibold stat-number text-teal-700 dark:text-teal-400">{fmt(data.income)}</p>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Monthly income</p>
+              <p className="text-lg font-bold text-teal-600 dark:text-teal-400">{fmt(data.income)}</p>
             </div>
-            <div className="card px-4 py-3">
-              <p className="text-2xs text-slate-400 font-medium uppercase mb-1">Monthly bills</p>
-              <p className="text-lg font-semibold stat-number text-red-500">{fmt(data.monthlyBills)}</p>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Monthly bills</p>
+              <p className="text-lg font-bold text-rose-500">{fmt(data.monthlyBills)}</p>
             </div>
-            <div className="card px-4 py-3">
-              <p className="text-2xs text-slate-400 font-medium uppercase mb-1">Projected end balance</p>
-              <p className={`text-lg font-semibold stat-number ${data.projectedBalance >= 0 ? 'text-teal-700 dark:text-teal-400' : 'text-red-500'}`}>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Projected end balance</p>
+              <p className={`text-lg font-bold ${data.projectedBalance >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-500'}`}>
                 {fmt(data.projectedBalance)}
               </p>
             </div>
           </div>
 
-          <div className="card p-5">
-            <h2 className="text-sm font-semibold text-slate-900 mb-4 dark:text-slate-100">Daily projection</h2>
+          <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">Daily projection</h2>
             <div className="space-y-1">
               {data.dailyProjection.map((day) => (
-                <div key={day.day} className={`flex items-center gap-4 p-3 rounded-lg transition-colors ${day.events.length > 0 ? 'bg-amber-50 dark:bg-amber-950' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                <div key={day.day} className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${day.events.length > 0 ? 'bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'}`}>
                   <div className="w-16 shrink-0">
                     <p className="text-xs font-medium text-slate-700 dark:text-slate-300">{day.date}</p>
                   </div>
                   <div className="flex-1">
                     <div className="h-2 bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
-                      <div className={`h-full rounded-full transition-all ${day.balance >= 0 ? 'bg-teal-500' : 'bg-red-400'}`}
+                      <div className={`h-full rounded-full transition-all ${day.balance >= 0 ? 'bg-teal-500' : 'bg-rose-400'}`}
                         style={{ width: `${Math.min(100, ((day.balance + Math.abs(data.projectedBalance)) / (Math.abs(data.income) + Math.abs(data.monthlyBills) + 1)) * 100)}%` }} />
                     </div>
                     {day.events.length > 0 && (
@@ -116,7 +135,7 @@ export default function CashflowPage() {
                     )}
                   </div>
                   <div className="w-24 text-right shrink-0">
-                    <p className={`text-xs font-semibold stat-number ${day.balance >= 0 ? 'text-slate-700 dark:text-slate-300' : 'text-red-500'}`}>
+                    <p className={`text-xs font-bold ${day.balance >= 0 ? 'text-slate-700 dark:text-slate-300' : 'text-rose-500'}`}>
                       {fmt(day.balance)}
                     </p>
                   </div>

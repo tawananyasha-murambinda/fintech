@@ -29,14 +29,22 @@ export default function ReportsPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-up">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">Monthly & Yearly Reports</h1>
-          <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Income, expenses, top categories, and savings rate.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-xl bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-indigo-600 dark:text-indigo-400">
+              <path d="M3 3v18h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M7 16l4-8 4 4 4-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Monthly & Yearly Reports</h1>
+            <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Income, expenses, top categories, and savings rate.</p>
+          </div>
         </div>
       </div>
 
-      <div className="card p-5">
+      <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5 dark:bg-slate-900">
             {(['month', 'quarter', 'year'] as const).map(p => (
@@ -56,48 +64,48 @@ export default function ReportsPage() {
               {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
           )}
-          <button onClick={fetchReport} disabled={loading} className="btn-primary text-sm py-2 px-4">
+          <button onClick={fetchReport} disabled={loading} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">
             {loading ? 'Loading...' : 'Generate report'}
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="card p-16 text-center">
-          <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+          <div className="w-10 h-10 border-[3px] border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
         </div>
       ) : report && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="card p-4">
-              <p className="text-xs text-slate-400 font-medium mb-1">Income</p>
-              <p className="text-xl font-semibold stat-number text-teal-700 dark:text-teal-400">{fmt(report.income)}</p>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Income</p>
+              <p className="text-xl font-bold text-teal-600 dark:text-teal-400">{fmt(report.income)}</p>
             </div>
-            <div className="card p-4">
-              <p className="text-xs text-slate-400 font-medium mb-1">Expenses</p>
-              <p className="text-xl font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(report.expenses)}</p>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Expenses</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{fmt(report.expenses)}</p>
             </div>
-            <div className="card p-4">
-              <p className="text-xs text-slate-400 font-medium mb-1">Net cashflow</p>
-              <p className={`text-xl font-semibold stat-number ${report.netCashflow >= 0 ? 'text-teal-700 dark:text-teal-400' : 'text-red-500'}`}>{fmt(report.netCashflow)}</p>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Net cashflow</p>
+              <p className={`text-xl font-bold ${report.netCashflow >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-500'}`}>{fmt(report.netCashflow)}</p>
             </div>
-            <div className="card p-4">
-              <p className="text-xs text-slate-400 font-medium mb-1">Savings rate</p>
-              <p className={`text-xl font-semibold stat-number ${report.savingsRate >= 20 ? 'text-teal-700' : report.savingsRate >= 10 ? 'text-amber-600' : 'text-red-500'}`}>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Savings rate</p>
+              <p className={`text-xl font-bold ${report.savingsRate >= 20 ? 'text-teal-600' : report.savingsRate >= 10 ? 'text-amber-600' : 'text-rose-500'}`}>
                 {report.savingsRate.toFixed(1)}%
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="card p-5">
-              <h2 className="text-sm font-semibold text-slate-900 mb-4 dark:text-slate-100">Top categories</h2>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">Top categories</h2>
               <div className="space-y-3">
                 {report.topCategories.map((cat: any) => (
                   <div key={cat.category}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm text-slate-700 dark:text-slate-300">{cat.category}</span>
-                      <span className="text-sm font-medium stat-number text-slate-900 dark:text-slate-100">
+                      <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
                         {fmt(cat.total)} ({cat.percentage.toFixed(0)}%)
                       </span>
                     </div>
@@ -113,8 +121,8 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            <div className="card p-5">
-              <h2 className="text-sm font-semibold text-slate-900 mb-4 dark:text-slate-100">Daily activity</h2>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">Daily activity</h2>
               <div className="h-48">
                 <div className="flex items-end gap-0.5 h-40 mb-2">
                   {report.dailyTotals.slice(0, 60).map((day: any) => {
@@ -144,9 +152,9 @@ export default function ReportsPage() {
           </div>
 
           {report.income > 0 && (
-            <div className="card p-5">
-              <h2 className="text-sm font-semibold text-slate-900 mb-4 dark:text-slate-100">Report summary</h2>
-              <div className="bg-slate-50 rounded-xl p-5 dark:bg-slate-800">
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">Report summary</h2>
+              <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 p-5">
                 <p className="text-sm text-slate-700 leading-relaxed dark:text-slate-300">
                   For {report.period}, your total income was <strong className="text-slate-900 dark:text-slate-100">{fmt(report.income)}</strong> and total expenses were <strong className="text-slate-900 dark:text-slate-100">{fmt(report.expenses)}</strong>.
                   Your savings rate was <strong className={report.savingsRate >= 20 ? 'text-teal-700' : report.savingsRate >= 10 ? 'text-amber-600' : 'text-red-500'}>{report.savingsRate.toFixed(1)}%</strong>.

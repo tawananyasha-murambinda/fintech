@@ -299,7 +299,8 @@ function generateLocationSuggestions(
 }
 
 async function buildMerchantAlternatives(
-  byMerchant: Record<string, { total: number; count: number; category: string; city?: string; country?: string }>
+  byMerchant: Record<string, { total: number; count: number; category: string; city?: string; country?: string }>,
+  userLocation?: { city?: string; country?: string },
 ): Promise<MerchantAlternative[]> {
   const topMerchants = Object.entries(byMerchant)
     .sort((a, b) => b[1].total - a[1].total)
@@ -308,17 +309,25 @@ async function buildMerchantAlternatives(
   const results: MerchantAlternative[] = []
   for (const [merchantName, data] of topMerchants) {
     let alternatives: MerchantAlternative['alternatives'] = []
+    let locationContext: string | undefined
+
+    const avgTx = data.count > 0 ? data.total / data.count : 0
 
     if (data.city) {
       try {
-        alternatives = await findLocalAlternatives(data.city, data.country, data.category, merchantName)
+        const result = await findLocalAlternatives(
+          data.city, data.country, data.category, merchantName,
+          avgTx, userLocation?.city, data.count,
+        )
+        alternatives = result.alternatives
+        locationContext = result.locationContext
       } catch {}
     }
 
     if (alternatives.length === 0) {
       alternatives = generateDataDrivenAlternatives(
         merchantName, data.category, data.total, data.count,
-        data.count > 0 ? data.total / data.count : 0,
+        avgTx,
       )
     }
 
@@ -327,7 +336,8 @@ async function buildMerchantAlternatives(
       category: data.category,
       totalSpent: data.total,
       visitCount: data.count,
-      avgTransaction: data.count > 0 ? data.total / data.count : 0,
+      avgTransaction: avgTx,
+      locationContext,
       alternatives,
     })
   }
@@ -344,96 +354,115 @@ function generateDataDrivenAlternatives(
 ): MerchantAlternative['alternatives'] {
   const cat = category.toLowerCase()
   const alt: MerchantAlternative['alternatives'] = []
-  const monthly = totalSpent // assume total is for the analyzed period
+  const monthly = totalSpent
+  const avgTx = avgTransaction || monthly / Math.max(1, visitCount)
+
+  function add(name: string, sv: number, oc: number, ac: number, reason: string, type: 'primary' | 'secondary', detail?: string) {
+    alt.push({ name, estimatedSavings: sv, originalCost: oc, alternativeCost: ac, reason, type, detail })
+  }
 
   if (cat.includes('food') || cat.includes('drink') || cat.includes('dining') || cat.includes('restaurant') || cat.includes('coffee')) {
     const freq = Math.max(1, Math.round(visitCount / 4.3))
-    alt.push({
-      name: 'Meal prep / cook at home',
-      estimatedSavings: Math.round(monthly * 0.5),
-      reason: `You visit ${merchantName} ~${freq}x/week ($${avgTransaction.toFixed(2)}/visit). Home cooking could cut that by ~50%, saving ~$${(monthly * 0.5).toFixed(0)}.`,
-    })
+    add(
+      'Meal prep / cook at home',
+      Math.round(monthly * 0.5), Math.round(avgTx), Math.round(avgTx * 0.3),
+      `You visit ${merchantName} ~${freq}x/week (€${avgTx.toFixed(2)}/visit). Home cooking could cut that by ~50%, saving ~€${(monthly * 0.5).toFixed(0)}.`,
+      'primary',
+      `~€${Math.round(avgTx * 0.3)}/meal at home`,
+    )
     if (monthly > 100) {
-      alt.push({
-        name: 'Set a dining budget',
-        estimatedSavings: Math.round(monthly * 0.25),
-        reason: `Capping ${merchantName} at 75% of current spend ($${(monthly * 0.75).toFixed(0)}) saves $${(monthly * 0.25).toFixed(0)} while still letting you eat out.`,
-      })
+      add(
+        'Set a dining budget',
+        Math.round(monthly * 0.25), Math.round(monthly), Math.round(monthly * 0.75),
+        `Capping ${merchantName} at 75% of current spend (€${(monthly * 0.75).toFixed(0)}) saves €${(monthly * 0.25).toFixed(0)} while still letting you eat out.`,
+        'secondary',
+      )
     }
   }
 
   if (cat.includes('transport') || cat.includes('gas') || cat.includes('fuel') || cat.includes('rideshare')) {
-    alt.push({
-      name: 'Public transit / carpool',
-      estimatedSavings: Math.round(monthly * 0.35),
-      reason: `At $${monthly.toFixed(0)}/mo on ${merchantName}, even 2 days/week on transit saves ~$${(monthly * 0.35).toFixed(0)}.`,
-    })
-    alt.push({
-      name: 'Fuel rewards / gas apps',
-      estimatedSavings: Math.round(monthly * 0.1),
-      reason: `Gas rewards apps and loyalty programs save ~10% — worth ~$${(monthly * 0.1).toFixed(0)}/mo on your current spend.`,
-    })
+    add(
+      'Public transit / carpool',
+      Math.round(monthly * 0.35), Math.round(monthly), Math.round(monthly * 0.65),
+      `At €${monthly.toFixed(0)}/mo on ${merchantName}, even 2 days/week on transit saves ~€${(monthly * 0.35).toFixed(0)}.`,
+      'primary',
+    )
+    add(
+      'Fuel rewards / gas apps',
+      Math.round(monthly * 0.1), Math.round(monthly), Math.round(monthly * 0.9),
+      `Gas rewards apps and loyalty programs save ~10% — worth ~€${(monthly * 0.1).toFixed(0)}/mo on your current spend.`,
+      'secondary',
+    )
   }
 
   if (cat.includes('entertainment') || cat.includes('streaming') || cat.includes('subscription')) {
-    alt.push({
-      name: 'Annual billing',
-      estimatedSavings: Math.round(monthly * 0.15),
-      reason: `${merchantName} likely offers 15–20% off with annual billing — saving ~$${(monthly * 0.15).toFixed(0)}/mo.`,
-    })
-    alt.push({
-      name: 'Ad-supported / family plan',
-      estimatedSavings: Math.round(monthly * 0.25),
-      reason: 'Downgrading to ad-supported tiers or splitting a family plan cuts costs significantly.',
-    })
+    add(
+      'Annual billing',
+      Math.round(monthly * 0.15), Math.round(monthly), Math.round(monthly * 0.85),
+      `${merchantName} likely offers 15–20% off with annual billing — saving ~€${(monthly * 0.15).toFixed(0)}/mo.`,
+      'primary',
+    )
+    add(
+      'Ad-supported / family plan',
+      Math.round(monthly * 0.25), Math.round(monthly), Math.round(monthly * 0.75),
+      'Downgrading to ad-supported tiers or splitting a family plan cuts costs significantly.',
+      'secondary',
+    )
   }
 
   if (cat.includes('shopping') || cat.includes('retail') || cat.includes('merchandise')) {
     const freq = Math.max(1, Math.round(visitCount / 4.3))
-    alt.push({
-      name: '24-hour purchase rule',
-      estimatedSavings: Math.round(monthly * 0.2),
-      reason: `At ~${freq}x/week visits to ${merchantName} averaging $${avgTransaction.toFixed(2)} each, waiting 24h before buying could cut impulse spend by ~20%.`,
-    })
-    alt.push({
-      name: 'Cashback / price tracker',
-      estimatedSavings: Math.round(monthly * 0.12),
-      reason: `Using cashback apps and price tracking on your $${monthly.toFixed(0)}/${merchantName.split(' ')[0] || ''} spend recovers ~$${(monthly * 0.12).toFixed(0)}.`,
-    })
+    add(
+      '24-hour purchase rule',
+      Math.round(monthly * 0.2), Math.round(monthly), Math.round(monthly * 0.8),
+      `At ~${freq}x/week visits to ${merchantName} averaging €${avgTx.toFixed(2)} each, waiting 24h before buying could cut impulse spend by ~20%.`,
+      'primary',
+    )
+    add(
+      'Cashback / price tracker',
+      Math.round(monthly * 0.12), Math.round(monthly), Math.round(monthly * 0.88),
+      `Using cashback apps and price tracking on your €${monthly.toFixed(0)}/${merchantName.split(' ')[0] || ''} spend recovers ~€${(monthly * 0.12).toFixed(0)}.`,
+      'secondary',
+    )
   }
 
   if (cat.includes('health') || cat.includes('pharmacy') || cat.includes('fitness') || cat.includes('gym')) {
     if (cat.includes('fitness') || cat.includes('gym')) {
-      alt.push({
-        name: 'Off-peak / annual membership',
-        estimatedSavings: Math.round(monthly * 0.2),
-        reason: `$${monthly.toFixed(0)} at ${merchantName} — many gyms offer 20% off annual or off-peak plans.`,
-      })
-      alt.push({
-        name: 'Community / employer wellness',
-        estimatedSavings: Math.round(monthly * 0.3),
-        reason: 'Your employer or insurance may subsidize gym memberships or offer free alternatives.',
-      })
+      add(
+        'Off-peak / annual membership',
+        Math.round(monthly * 0.2), Math.round(monthly), Math.round(monthly * 0.8),
+        `€${monthly.toFixed(0)} at ${merchantName} — many gyms offer 20% off annual or off-peak plans.`,
+        'primary',
+      )
+      add(
+        'Community / employer wellness',
+        Math.round(monthly * 0.3), Math.round(monthly), Math.round(monthly * 0.7),
+        'Your employer or insurance may subsidize gym memberships or offer free alternatives.',
+        'secondary',
+      )
     } else {
-      alt.push({
-        name: 'Generic / in-network alternatives',
-        estimatedSavings: Math.round(monthly * 0.3),
-        reason: `Generic brands and in-network pharmacies typically save 30% on your $${monthly.toFixed(0)} health spend.`,
-      })
+      add(
+        'Generic / in-network alternatives',
+        Math.round(monthly * 0.3), Math.round(monthly), Math.round(monthly * 0.7),
+        `Generic brands and in-network pharmacies typically save 30% on your €${monthly.toFixed(0)} health spend.`,
+        'primary',
+      )
     }
   }
 
   if (alt.length === 0) {
-    alt.push({
-      name: 'Loyalty / bulk discounts',
-      estimatedSavings: Math.round(monthly * 0.15),
-      reason: `You spend $${monthly.toFixed(0)} at ${merchantName}. Check if they offer loyalty rewards or bulk pricing.`,
-    })
-    alt.push({
-      name: 'Compare 2-3 alternatives',
-      estimatedSavings: Math.round(monthly * 0.1),
-      reason: `Shopping around for what you buy at ${merchantName} typically saves 10%.`,
-    })
+    add(
+      'Loyalty / bulk discounts',
+      Math.round(monthly * 0.15), Math.round(monthly), Math.round(monthly * 0.85),
+      `You spend €${monthly.toFixed(0)} at ${merchantName}. Check if they offer loyalty rewards or bulk pricing.`,
+      'primary',
+    )
+    add(
+      'Compare 2-3 alternatives',
+      Math.round(monthly * 0.1), Math.round(monthly), Math.round(monthly * 0.9),
+      `Shopping around for what you buy at ${merchantName} typically saves 10%.`,
+      'secondary',
+    )
   }
 
   return alt.slice(0, 3)
@@ -812,7 +841,7 @@ export async function analyzeSpending(input: AnalysisInput): Promise<AiAnalysis>
 
   const categoryBreakdown = buildCategoryBreakdown(byCategory, totalExpenses, prevPeriodCategories)
   const locationInsights = buildLocationInsights(byLocation, transactions, byMerchant, totalExpenses)
-  const merchantAlternatives = await buildMerchantAlternatives(byMerchant)
+  const merchantAlternatives = await buildMerchantAlternatives(byMerchant, userLocation)
   const savingsOpportunities = buildSavingsOpportunities(categoryBreakdown, merchantAlternatives)
   const cashflowHealth = determineCashflowHealth(totalIncome, totalExpenses)
   const monthlyBudgetSuggestion = Math.max(0, Math.round(totalExpenses * 0.95))

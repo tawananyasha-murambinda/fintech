@@ -104,61 +104,72 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-up">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">Subscriptions</h1>
-          <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
-            All detected recurring charges from your transactions.
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-xl bg-purple-100 dark:bg-purple-950 flex items-center justify-center">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-purple-600 dark:text-purple-400">
+              <path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M3.51 9a9 9 0 0114.85 3.36L23 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Subscriptions</h1>
+            <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
+              All detected recurring charges from your transactions.
+            </p>
+          </div>
         </div>
-        <Link href="/dashboard/intelligence" className="text-xs text-teal-700 hover:underline dark:text-teal-400">
-          View intelligence
+        <Link href="/dashboard/intelligence" className="text-xs font-semibold text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300">
+          View intelligence →
         </Link>
       </div>
 
       {loading ? (
-        <div className="card p-16 text-center">
-          <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+          <div className="w-10 h-10 border-[3px] border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
         </div>
       ) : !data || data.subscriptions.length === 0 ? (
-        <div className="card p-16 text-center">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="mx-auto mb-4 text-slate-300">
-            <path d="M12 2v20M2 12h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-          <h2 className="text-sm font-semibold text-slate-900 mb-2 dark:text-slate-100">No subscriptions detected</h2>
-          <p className="text-sm text-slate-500 max-w-xs mx-auto mb-5 dark:text-slate-400">
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/20">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+              <path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M3.51 9a9 9 0 0114.85 3.36L23 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <h2 className="text-base font-semibold text-slate-900 mb-1 dark:text-slate-100">No subscriptions detected</h2>
+          <p className="text-sm text-slate-500 max-w-sm mx-auto mb-6 dark:text-slate-400">
             Sync your bank transactions and run an intelligence analysis to find subscriptions.
           </p>
-          <Link href="/dashboard/intelligence" className="btn-primary text-sm inline-block">
+          <Link href="/dashboard/intelligence" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">
             Run analysis
           </Link>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-3 gap-3">
-            <div className="card px-4 py-3">
-              <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1">Monthly spend</p>
-              <p className="text-lg font-semibold stat-number text-red-600 dark:text-red-400">{fmt(data.totalMonthly)}</p>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Monthly spend</p>
+              <p className="text-lg font-bold text-rose-600 dark:text-rose-400">{fmt(data.totalMonthly)}</p>
             </div>
-            <div className="card px-4 py-3">
-              <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1">Active subs</p>
-              <p className="text-lg font-semibold stat-number text-slate-900 dark:text-slate-100">{data.count}</p>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Active subs</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{data.count}</p>
             </div>
-            <div className="card px-4 py-3">
-              <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1">Yearly cost</p>
-              <p className="text-lg font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(data.totalMonthly * 12)}</p>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider dark:text-slate-500 mb-1">Yearly cost</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{fmt(data.totalMonthly * 12)}</p>
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
             {data.subscriptions.map((sub, i) => {
               const cancelUrl = findCancelUrl(sub.name)
               const color = SUBSCRIPTION_COLORS[i % SUBSCRIPTION_COLORS.length]
               return (
-                <div key={sub.name} className="card p-4">
+                <div key={sub.name} className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-lg ${color} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
+                      <div className={`w-9 h-9 rounded-xl ${color} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
                         {nameToIcon(sub.name)}
                       </div>
                       <div>
@@ -170,12 +181,12 @@ export default function SubscriptionsPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-sm font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(sub.monthlyAmount)}</p>
+                        <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmt(sub.monthlyAmount)}</p>
                         <p className="text-2xs text-slate-400">{fmt(sub.monthlyAmount * 12)}/yr</p>
                       </div>
                       {cancelUrl && (
                         <a href={cancelUrl} target="_blank" rel="noopener noreferrer"
-                          className="text-xs text-red-500 hover:text-red-700 hover:underline shrink-0 dark:text-red-400 dark:hover:text-red-300">
+                          className="text-xs font-semibold text-rose-500 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300">
                           Cancel
                         </a>
                       )}

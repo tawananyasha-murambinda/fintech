@@ -94,8 +94,9 @@ export default function VaultPage() {
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto space-y-4 animate-fade-up">
-        <div className="skeleton h-6 w-32" />
-        <div className="skeleton h-32 w-full" />
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+          <div className="w-8 h-8 border-[3px] border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
       </div>
     )
   }
@@ -103,17 +104,24 @@ export default function VaultPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-up">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Savings Vault</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Set money aside and save automatically</p>
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-xl bg-purple-100 dark:bg-purple-950 flex items-center justify-center">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-purple-600 dark:text-purple-400">
+              <path d="M12 2L3 7v6c0 5.25 9 9 9 9s9-3.75 9-9V7l-9-5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Savings Vault</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Set money aside and save automatically</p>
+          </div>
         </div>
-        <button onClick={() => setShowCreate(!showCreate)} className="btn-primary text-sm">
+        <button onClick={() => setShowCreate(!showCreate)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">
           {showCreate ? 'Cancel' : 'New Vault'}
         </button>
       </div>
 
       {showCreate && (
-        <form onSubmit={createVault} className="card p-4 space-y-3">
+        <form onSubmit={createVault} className="rounded-2xl border dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-4">
           <input type="text" placeholder="Vault name" value={form.name}
             onChange={e => setForm({ ...form, name: e.target.value })}
             className="input text-sm w-full" required />
@@ -126,12 +134,12 @@ export default function VaultPage() {
                 className={`w-7 h-7 rounded-full bg-gradient-to-br ${COLOR_MAP[c]} ${form.color === c ? 'ring-2 ring-offset-2 ring-slate-400 dark:ring-offset-slate-900' : ''}`} />
             ))}
           </div>
-          <button type="submit" className="btn-primary text-sm">Create Vault</button>
+          <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">Create Vault</button>
         </form>
       )}
 
       {/* Round-up toggle */}
-      <div className="card p-4 flex items-center justify-between">
+      <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Auto Round-Ups</p>
           <p className="text-xs text-slate-500 dark:text-slate-400">Round up transactions and save the spare change</p>
@@ -143,21 +151,21 @@ export default function VaultPage() {
       </div>
 
       {vaults.length === 0 ? (
-        <div className="card p-12 text-center">
-          <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center mx-auto mb-4 dark:bg-teal-950">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-teal-600 dark:text-teal-400">
-              <path d="M10 3v14M3 10h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/20">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+              <path d="M12 2L3 7v6c0 5.25 9 9 9 9s9-3.75 9-9V7l-9-5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <h3 className="text-sm font-semibold text-slate-900 mb-1 dark:text-slate-100">No vaults yet</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Create a vault to start saving toward your goals</p>
+          <h3 className="text-base font-semibold text-slate-900 mb-1 dark:text-slate-100">No vaults yet</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Create a vault to start saving toward your goals</p>
         </div>
       ) : (
         <div className="grid gap-4">
           {vaults.map(vault => {
             const pct = vault.targetAmount ? Math.min(100, (vault.currentAmount / vault.targetAmount) * 100) : 0
             return (
-              <div key={vault.id} className="card p-5">
+              <div key={vault.id} className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -174,7 +182,7 @@ export default function VaultPage() {
                     <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
                       ${vault.currentAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </p>
-                    <button onClick={() => deleteVault(vault.id)} className="text-2xs text-red-400 hover:text-red-600">
+                    <button onClick={() => deleteVault(vault.id)} className="text-slate-300 hover:text-rose-400 transition-colors p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950">
                       Delete
                     </button>
                   </div>
@@ -193,7 +201,7 @@ export default function VaultPage() {
                     className="input text-sm flex-1" />
                   <button onClick={() => addFunds(vault.id)}
                     disabled={!adding[vault.id] || parseFloat(adding[vault.id] || '0') <= 0}
-                    className="btn-primary text-sm disabled:opacity-50">
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm disabled:opacity-50">
                     Add
                   </button>
                 </div>

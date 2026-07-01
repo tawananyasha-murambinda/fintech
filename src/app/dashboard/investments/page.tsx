@@ -51,101 +51,117 @@ export default function InvestmentsPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-up">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">Investments & Crypto</h1>
-          <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Track stocks, ETFs, crypto, and other investments.</p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-xl bg-blue-100 dark:bg-blue-950 flex items-center justify-center shrink-0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-blue-600 dark:text-blue-400">
+              <path d="M12 2v20M2 12h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M7 12l3-3 3 3 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Investments & Crypto</h1>
+            <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Track stocks, ETFs, crypto, and other investments.</p>
+          </div>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary text-sm py-2 px-4">
+        <button onClick={() => setShowForm(!showForm)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">
           {showForm ? 'Cancel' : 'Add investment'}
         </button>
       </div>
 
+      {/* Add form */}
       {showForm && (
-        <form onSubmit={createInvestment} className="card p-5 space-y-4">
+        <form onSubmit={createInvestment} className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="label">Name</label>
-              <input type="text" required placeholder="Apple Inc." className="input text-sm"
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Name</label>
+              <input type="text" required placeholder="Apple Inc." className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500"
                 value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
             <div>
-              <label className="label">Type</label>
-              <select className="input text-sm" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Type</label>
+              <select className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
                 {INVESTMENT_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>)}
               </select>
             </div>
             <div>
-              <label className="label">Ticker (optional)</label>
-              <input type="text" placeholder="AAPL" className="input text-sm"
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Ticker (optional)</label>
+              <input type="text" placeholder="AAPL" className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500"
                 value={form.ticker} onChange={e => setForm({ ...form, ticker: e.target.value.toUpperCase() })} />
             </div>
             <div>
-              <label className="label">Shares</label>
-              <input type="number" step="any" min="0" placeholder="10" className="input text-sm"
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Shares</label>
+              <input type="number" step="any" min="0" placeholder="10" className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500"
                 value={form.shares} onChange={e => setForm({ ...form, shares: e.target.value })} />
             </div>
             <div>
-              <label className="label">Cost basis (avg price)</label>
-              <input type="number" step="0.01" min="0" placeholder="150.00" className="input text-sm"
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Cost basis (avg price)</label>
+              <input type="number" step="0.01" min="0" placeholder="150.00" className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500"
                 value={form.costBasis} onChange={e => setForm({ ...form, costBasis: e.target.value })} />
             </div>
             <div>
-              <label className="label">Current price</label>
-              <input type="number" step="0.01" min="0" placeholder="175.00" className="input text-sm"
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400">Current price</label>
+              <input type="number" step="0.01" min="0" placeholder="175.00" className="w-full px-3 py-2 text-sm text-slate-900 bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500"
                 value={form.currentPrice} onChange={e => setForm({ ...form, currentPrice: e.target.value })} />
             </div>
           </div>
-          <button type="submit" className="btn-primary text-sm">Add investment</button>
+          <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">Add investment</button>
         </form>
       )}
 
       {loading ? (
-        <div className="card p-16 text-center">
-          <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+          <div className="w-10 h-10 border-[3px] border-teal-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm font-semibold text-slate-900 mb-1 dark:text-slate-100">Loading investments…</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">Fetching your portfolio data.</p>
         </div>
       ) : investments.length === 0 ? (
-        <div className="card p-16 text-center">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="mx-auto mb-4 text-slate-300">
-            <path d="M12 2v20M2 12h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            <path d="M7 12l3-3 3 3 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <h2 className="text-sm font-semibold text-slate-900 mb-2 dark:text-slate-100">No investments tracked</h2>
-          <p className="text-sm text-slate-500 max-w-xs mx-auto mb-5 dark:text-slate-400">
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/20">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+              <path d="M12 2v20M2 12h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M7 12l3-3 3 3 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <h2 className="text-base font-semibold text-slate-900 mb-1 dark:text-slate-100">No investments tracked</h2>
+          <p className="text-sm text-slate-500 max-w-sm mx-auto mb-6 dark:text-slate-400">
             Add stocks, crypto, ETFs, and other investments to see your complete portfolio.
           </p>
-          <button onClick={() => setShowForm(true)} className="btn-primary text-sm">Add investment</button>
+          <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">Add investment</button>
         </div>
       ) : (
         <>
+          {/* Summary cards */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="card px-4 py-3">
-              <p className="text-2xs text-slate-400 font-medium uppercase mb-1">Total value</p>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <p className="text-2xs text-slate-400 font-medium uppercase tracking-wider mb-1">Total value</p>
               <p className="text-lg font-semibold stat-number text-teal-700 dark:text-teal-400">{fmt(totalValue)}</p>
             </div>
-            <div className="card px-4 py-3">
-              <p className="text-2xs text-slate-400 font-medium uppercase mb-1">Cost basis</p>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <p className="text-2xs text-slate-400 font-medium uppercase tracking-wider mb-1">Cost basis</p>
               <p className="text-lg font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(totalCostBasis)}</p>
             </div>
-            <div className="card px-4 py-3">
-              <p className="text-2xs text-slate-400 font-medium uppercase mb-1">Gain/Loss</p>
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+              <p className="text-2xs text-slate-400 font-medium uppercase tracking-wider mb-1">Gain/Loss</p>
               <p className={`text-lg font-semibold stat-number ${totalGain >= 0 ? 'text-teal-700 dark:text-teal-400' : 'text-red-500'}`}>
                 {totalGain >= 0 ? '+' : ''}{fmt(totalGain)}
               </p>
             </div>
           </div>
 
-          <div className="space-y-2">
+          {/* Investment list */}
+          <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
             {investments.map(inv => {
               const currentValue = inv.shares && inv.currentPrice ? inv.shares * inv.currentPrice : inv.costBasis || 0
               const gain = currentValue - (inv.costBasis || 0)
               const gainPct = inv.costBasis ? ((gain / inv.costBasis) * 100) : 0
 
               return (
-                <div key={inv.id} className="card p-4">
+                <div key={inv.id} className="px-5 py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-bold ${inv.type === 'crypto' ? 'bg-amber-500' : inv.type === 'stock' ? 'bg-blue-500' : inv.type === 'etf' ? 'bg-purple-500' : 'bg-slate-500'}`}>
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${inv.type === 'crypto' ? 'bg-gradient-to-br from-amber-500 to-amber-600' : inv.type === 'stock' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : inv.type === 'etf' ? 'bg-gradient-to-br from-purple-500 to-purple-600' : 'bg-gradient-to-br from-slate-500 to-slate-600'}`}>
                         {inv.ticker || inv.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
@@ -164,7 +180,7 @@ export default function InvestmentsPage() {
                           {gain >= 0 ? '+' : ''}{fmt(gain)} ({gainPct >= 0 ? '+' : ''}{gainPct.toFixed(1)}%)
                         </p>
                       </div>
-                      <button onClick={() => deleteInvestment(inv.id)} className="text-slate-300 hover:text-red-400">
+                      <button onClick={() => deleteInvestment(inv.id)} className="text-slate-300 hover:text-rose-400 transition-colors p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950">
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                       </button>
                     </div>

@@ -24,7 +24,7 @@ function formatDate(d?: string) {
 
 function AccountTypeIcon({ type }: { type: string }) {
   return (
-    <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 dark:bg-slate-800">
+    <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 dark:bg-slate-800">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-slate-500 dark:text-slate-400">
         <rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/>
         <path d="M1 6h14" stroke="currentColor" strokeWidth="1.3"/>
@@ -64,11 +64,19 @@ export default function AccountsPage() {
       {/* Desktop view */}
       <div className="hidden lg:block max-w-3xl mx-auto space-y-6 animate-fade-up">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">Accounts</h1>
-            <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
-              Manage your linked bank accounts.
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-xl bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-blue-600 dark:text-blue-400">
+                <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M2 10h20" stroke="currentColor" strokeWidth="1.5"/>
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Accounts</h1>
+              <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
+                Manage your linked bank accounts.
+              </p>
+            </div>
           </div>
           <div className="flex gap-2">
             <SyncButton />
@@ -77,25 +85,25 @@ export default function AccountsPage() {
         </div>
 
         {loading ? (
-          <div className="card p-12 text-center">
-            <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+            <div className="w-10 h-10 border-[3px] border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
           </div>
         ) : banks.length === 0 ? (
-          <div className="card p-12 text-center">
-            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-slate-400">
-                <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M2 8h16" stroke="currentColor" strokeWidth="1.5"/>
+          <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/20">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+                <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M2 10h20" stroke="currentColor" strokeWidth="1.5"/>
               </svg>
             </div>
-            <h2 className="text-sm font-semibold text-slate-900 mb-2 dark:text-slate-100">No linked accounts</h2>
-            <p className="text-sm text-slate-500 mb-5 dark:text-slate-400">
+            <h2 className="text-base font-semibold text-slate-900 mb-1 dark:text-slate-100">No linked accounts</h2>
+            <p className="text-sm text-slate-500 max-w-sm mx-auto mb-6 dark:text-slate-400">
               Connect a bank account to start tracking your finances.
             </p>
             <LinkBankButton />
           </div>
         ) : (
-          <div className="card overflow-hidden">
+          <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
             <div className="divide-y divide-slate-50 dark:divide-slate-800">
               {banks.map(bank => (
                 <div key={bank.id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors dark:hover:bg-slate-800">
@@ -125,7 +133,7 @@ export default function AccountsPage() {
         )}
 
         {/* Security notice */}
-        <div className="flex gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
+        <div className="flex gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 dark:bg-slate-900 dark:border-slate-800">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-teal-600 shrink-0 mt-0.5">
             <path d="M8 1.5L2 4v4c0 3.31 2.69 6 6 6s6-2.69 6-6V4L8 1.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
             <path d="M5.5 8l1.5 1.5L10.5 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>

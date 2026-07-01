@@ -94,17 +94,25 @@ export default function GoalsPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-up">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">Savings Goals</h1>
-          <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Track your savings targets and progress.</p>
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-xl bg-amber-100 dark:bg-amber-950 flex items-center justify-center">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-amber-600 dark:text-amber-400">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M12 8v4l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Savings Goals</h1>
+            <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Track your savings targets and progress.</p>
+          </div>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary text-sm py-2 px-4">
+        <button onClick={() => setShowForm(!showForm)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">
           {showForm ? 'Cancel' : 'New goal'}
         </button>
       </div>
 
       {showForm && (
-        <form onSubmit={createGoal} className="card p-5 space-y-4">
+        <form onSubmit={createGoal} className="rounded-2xl border dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Goal name</label>
@@ -135,26 +143,27 @@ export default function GoalsPage() {
             </div>
           </div>
           {error && <p className="text-xs text-red-500">{error}</p>}
-          <button type="submit" className="btn-primary text-sm">Create goal</button>
+          <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">Create goal</button>
         </form>
       )}
 
       {loading ? (
-        <div className="card p-16 text-center">
-          <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+          <div className="w-8 h-8 border-[3px] border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
         </div>
       ) : goals.length === 0 ? (
-        <div className="card p-16 text-center">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="mx-auto mb-4 text-slate-300">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-            <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-            <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-          </svg>
-          <h2 className="text-sm font-semibold text-slate-900 mb-2 dark:text-slate-100">No savings goals yet</h2>
-          <p className="text-sm text-slate-500 max-w-xs mx-auto mb-5 dark:text-slate-400">
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/20">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M12 8v4l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <h2 className="text-base font-semibold text-slate-900 mb-1 dark:text-slate-100">No savings goals yet</h2>
+          <p className="text-sm text-slate-500 max-w-xs mx-auto mb-6 dark:text-slate-400">
             Create your first goal — whether it's a vacation, emergency fund, or a big purchase.
           </p>
-          <button onClick={() => setShowForm(true)} className="btn-primary text-sm">Create goal</button>
+          <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">Create goal</button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -174,7 +183,7 @@ export default function GoalsPage() {
               : null
 
             return (
-              <div key={goal.id} className={`card p-5 ${isComplete ? 'ring-2 ring-teal-400' : ''}`}>
+              <div key={goal.id} className={`rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 ${isComplete ? 'ring-2 ring-teal-400' : ''}`}>
                 <div className="flex items-start justify-between mb-4">
                   <div className={`w-12 h-12 rounded-xl ${bg} flex items-center justify-center`}>
                     <svg width="22" height="22" viewBox="0 0 22 22" fill="none"
@@ -183,7 +192,7 @@ export default function GoalsPage() {
                       <path d="M11 12l-3-2M11 12l3-2M11 12v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                     </svg>
                   </div>
-                  <button onClick={() => deleteGoal(goal.id)} className="text-slate-300 hover:text-red-400 transition-colors">
+                  <button onClick={() => deleteGoal(goal.id)} className="text-slate-300 hover:text-rose-400 transition-colors p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                       <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                     </svg>

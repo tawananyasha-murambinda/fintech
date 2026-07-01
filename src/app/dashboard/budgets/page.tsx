@@ -77,17 +77,25 @@ export default function BudgetsPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-up">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">Budgets</h1>
-          <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Set spending limits per category and track progress.</p>
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-xl bg-teal-100 dark:bg-teal-950 flex items-center justify-center">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-teal-600 dark:text-teal-400">
+              <rect x="3" y="6" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M3 10h18" stroke="currentColor" strokeWidth="1.5"/>
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Budgets</h1>
+            <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Set spending limits per category and track progress.</p>
+          </div>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary text-sm py-2 px-4">
+        <button onClick={() => setShowForm(!showForm)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">
           {showForm ? 'Cancel' : 'Add budget'}
         </button>
       </div>
 
       {showForm && (
-        <form onSubmit={createBudget} className="card p-5 space-y-4">
+        <form onSubmit={createBudget} className="rounded-2xl border dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="label">Category</label>
@@ -128,40 +136,42 @@ export default function BudgetsPage() {
             </div>
           </div>
           {error && <p className="text-xs text-red-500">{error}</p>}
-          <button type="submit" className="btn-primary text-sm">Save budget</button>
+          <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">Save budget</button>
         </form>
       )}
 
       {loading ? (
-        <div className="card p-16 text-center">
-          <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+          <div className="w-8 h-8 border-[3px] border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
         </div>
       ) : budgets.length === 0 ? (
-        <div className="card p-16 text-center">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="mx-auto mb-4 text-slate-300">
-            <rect x="3" y="6" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-            <path d="M3 10h18" stroke="currentColor" strokeWidth="1.5"/>
-          </svg>
-          <h2 className="text-sm font-semibold text-slate-900 mb-2 dark:text-slate-100">No budgets set</h2>
-          <p className="text-sm text-slate-500 max-w-xs mx-auto mb-5 dark:text-slate-400">
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-16 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/20">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+              <rect x="3" y="6" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M3 10h18" stroke="currentColor" strokeWidth="1.5"/>
+            </svg>
+          </div>
+          <h2 className="text-base font-semibold text-slate-900 mb-1 dark:text-slate-100">No budgets set</h2>
+          <p className="text-sm text-slate-500 max-w-xs mx-auto mb-6 dark:text-slate-400">
             Create your first budget to start tracking spending limits.
           </p>
-          <button onClick={() => setShowForm(true)} className="btn-primary text-sm">Create budget</button>
+          <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">Create budget</button>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-3 gap-3">
-            <div className="card px-4 py-3">
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
               <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1">Budgeted</p>
-              <p className="text-lg font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(totalBudgeted)}</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{fmt(totalBudgeted)}</p>
             </div>
-            <div className="card px-4 py-3">
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
               <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1">Spent</p>
-              <p className="text-lg font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(totalSpent)}</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{fmt(totalSpent)}</p>
             </div>
-            <div className="card px-4 py-3">
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
               <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1">Remaining</p>
-              <p className={`text-lg font-semibold stat-number ${totalBudgeted - totalSpent >= 0 ? 'text-teal-700 dark:text-teal-400' : 'text-red-500'}`}>
+              <p className={`text-lg font-semibold ${totalBudgeted - totalSpent >= 0 ? 'text-teal-700 dark:text-teal-400' : 'text-red-500'}`}>
                 {fmt(totalBudgeted - totalSpent)}
               </p>
             </div>
@@ -175,7 +185,7 @@ export default function BudgetsPage() {
               const isWarning = pct > 80 && pct <= 100
 
               return (
-                <div key={budget.id} className="card p-5">
+                <div key={budget.id} className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className={`w-3 h-3 rounded-full ${colorClass}`} />
@@ -193,7 +203,7 @@ export default function BudgetsPage() {
                         <p className="text-xs text-slate-500">Budget</p>
                         <p className="text-sm font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(budget.amount)}</p>
                       </div>
-                      <button onClick={() => deleteBudget(budget.id)} className="text-slate-300 hover:text-red-400 transition-colors">
+                      <button onClick={() => deleteBudget(budget.id)} className="text-slate-300 hover:text-rose-400 transition-colors p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950">
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                           <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                         </svg>

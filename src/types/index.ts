@@ -45,11 +45,16 @@ export interface MerchantAlternative {
   totalSpent: number
   visitCount: number
   avgTransaction: number
+  locationContext?: string
   alternatives: {
     name: string
     estimatedSavings: number
+    originalCost: number
+    alternativeCost: number
     reason: string
     distance?: string
+    type: 'primary' | 'secondary'
+    detail?: string
   }[]
 }
 

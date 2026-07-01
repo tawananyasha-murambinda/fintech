@@ -85,9 +85,17 @@ export default function TransactionsPage() {
       <div className="hidden lg:block max-w-4xl mx-auto space-y-5 animate-fade-up">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">Transactions</h1>
-            <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">{total.toLocaleString()} transactions</p>
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-xl bg-teal-100 dark:bg-teal-950 flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-teal-600 dark:text-teal-400">
+                <path d="M3 3v18h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M7 16l4-8 4 4 4-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Transactions</h1>
+              <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">{total.toLocaleString()} transactions</p>
+            </div>
           </div>
           <SyncButton />
         </div>
@@ -95,15 +103,15 @@ export default function TransactionsPage() {
         {/* Summary row */}
         {!loading && (
           <div className="grid grid-cols-3 gap-3">
-            <div className="card px-4 py-3">
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
               <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1 dark:text-slate-500">Income</p>
               <p className="text-lg font-semibold stat-number text-teal-700 dark:text-teal-400">{fmt(totalCredits)}</p>
             </div>
-            <div className="card px-4 py-3">
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
               <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1 dark:text-slate-500">Expenses</p>
               <p className="text-lg font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(totalDebits)}</p>
             </div>
-            <div className="card px-4 py-3">
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
               <p className="text-2xs text-slate-400 uppercase tracking-wide font-medium mb-1 dark:text-slate-500">Net</p>
               <p className={`text-lg font-semibold stat-number ${totalCredits - totalDebits >= 0 ? 'text-teal-700 dark:text-teal-400' : 'text-red-500 dark:text-red-400'}`}>
                 {fmt(totalCredits - totalDebits)}
@@ -165,15 +173,27 @@ export default function TransactionsPage() {
         </div>
 
         {/* Transaction list */}
-        <div className="card overflow-hidden">
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
           {loading ? (
-            <div className="py-16 text-center">
-              <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-sm text-slate-400">Loading transactions…</p>
+            <div className="p-16 text-center">
+              <div className="w-10 h-10 border-[3px] border-teal-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-sm font-semibold text-slate-900 mb-1 dark:text-slate-100">Loading transactions…</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Fetching your latest transactions.</p>
             </div>
           ) : transactions.length === 0 ? (
-            <div className="py-16 text-center">
-              <p className="text-sm text-slate-400 dark:text-slate-500">No transactions found.</p>
+            <div className="p-16 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/20">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M8.5 14.5C9.2 16 10.5 17 12 17s2.8-1 3.5-2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  <circle cx="9.5" cy="10.5" r="1.2" fill="currentColor"/>
+                  <circle cx="14.5" cy="10.5" r="1.2" fill="currentColor"/>
+                </svg>
+              </div>
+              <h2 className="text-base font-semibold text-slate-900 mb-1 dark:text-slate-100">No transactions yet</h2>
+              <p className="text-sm text-slate-500 max-w-sm mx-auto dark:text-slate-400">
+                Sync your accounts to see your transactions here.
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-slate-50 dark:divide-slate-800">
