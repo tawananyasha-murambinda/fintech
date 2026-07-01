@@ -42,7 +42,7 @@ export default function OnboardingPage() {
               {[
                 { label: "Connect your bank via Plaid", note: "Read-only access — we never see your password" },
                 { label: "We sync your transactions", note: "Up to 90 days of history imported automatically" },
-                { label: "Get AI-powered insights", note: "Category breakdowns, savings tips, and local alternatives" },
+                { label: "See your spending clearly", note: "Category breakdowns, budgets, and trends over time" },
               ].map((step, i) => (
                 <div key={i} className="flex items-start gap-3 p-3.5 bg-white rounded-xl border border-slate-100">
                   <div className="w-6 h-6 rounded-full bg-teal-50 text-teal-700 text-xs font-semibold flex items-center justify-center shrink-0 mt-0.5">
@@ -68,8 +68,8 @@ export default function OnboardingPage() {
           </>
         ) : (
           <>
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-teal-600/20">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-white">
+            <div className="w-16 h-16 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-6">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-white dark:text-slate-900">
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="1.5"/>
                 <circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
               </svg>

@@ -120,7 +120,7 @@ export function DashboardClient({
           />
           <QuickAction
             icon={<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.5"/><path d="M6.5 11C7 12 7.8 12.5 9 12.5s2-.5 2.5-1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="7" cy="8" r="1" fill="currentColor"/><circle cx="11" cy="8" r="1" fill="currentColor"/></svg>}
-            label="Ask AI"
+            label="Assistant"
             onClick={() => (document.querySelector('[data-chat-btn]') as HTMLButtonElement)?.click()}
           />
           <QuickAction
@@ -366,7 +366,7 @@ function HealthScoreWidget({ userId: _ }: { userId: string }) {
     <a href="/dashboard/reports" className="card p-4 card-hover block">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide dark:text-slate-500">
+          <p className="text-xs font-medium text-slate-400 dark:text-slate-500">
             Financial health score
           </p>
           <p className={`text-2xl font-bold stat-number ${scoreColor}`}>
@@ -439,7 +439,7 @@ function InsightCard() {
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-teal-600">
           <path d="M7 1.5L9 5l4 .5-3 3 .5 4L7 10.5 3.5 12.5l.5-4-3-3L5 5l2-3.5z" fill="currentColor" opacity="0.9"/>
         </svg>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide dark:text-slate-400">
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
           Insight of the day
         </p>
       </div>
@@ -601,8 +601,7 @@ function EmptyState() {
         No accounts linked
       </h2>
       <p className="text-sm text-slate-500 max-w-xs mx-auto mb-6">
-        Connect your bank account to start tracking your spending and get
-        AI-powered insights.
+        Connect your bank to start tracking spending, balances, and budgets.
       </p>
       <LinkBankButton />
     </div>
@@ -760,8 +759,8 @@ function VaultSummary() {
     return (
       <a href="/dashboard/vault" className="card p-4 card-hover block group">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="text-white">
+          <div className="w-10 h-10 rounded-xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="text-white dark:text-slate-900">
               <path d="M9 1v2M9 15v2M1 9h2M15 9h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               <circle cx="9" cy="9" r="3" stroke="currentColor" strokeWidth="1.5"/>
             </svg>
@@ -778,7 +777,7 @@ function VaultSummary() {
   return (
     <a href="/dashboard/vault" className="card p-4 card-hover block group">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-medium text-slate-400 uppercase tracking-wide dark:text-slate-500">Savings Vault</p>
+        <p className="text-xs font-medium text-slate-400 dark:text-slate-500">Savings Vault</p>
         <span className="text-xs text-teal-600 dark:text-teal-400 font-semibold">{vaults.length} vault{vaults.length > 1 ? 's' : ''}</span>
       </div>
       <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>

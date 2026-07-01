@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
     return (
       <div className="min-h-screen bg-white dark:bg-slate-950 flex items-center justify-center px-4">
         <div className="max-w-sm w-full text-center">
-          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 4L12 14 2 4" /><path d="M2 4h20v16H2z" />
             </svg>

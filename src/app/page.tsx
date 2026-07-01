@@ -23,15 +23,15 @@ export default function HomePage() {
       {/* Hero */}
       <main className="max-w-4xl mx-auto px-6 pt-20 pb-16">
         <div className="text-center mb-16">
-          <p className="text-xs font-medium text-teal-700 uppercase tracking-widest mb-5">
+          <p className="text-xs font-medium text-teal-700st mb-5">
             Intelligent personal finance
           </p>
           <h1 className="text-5xl font-semibold text-slate-900 tracking-tight leading-tight mb-6">
             Your money, fully mapped.
           </h1>
           <p className="text-lg text-slate-500 max-w-2xl mx-auto leading-relaxed mb-10">
-            Link your bank accounts, understand exactly where your money moves, and get AI-powered
-            recommendations on where to spend less — based on your location and habits.
+            Link your bank accounts and see exactly where your money moves. Clear balances,
+            spending, and budgets in one place.
           </p>
           <div className="flex items-center justify-center gap-3">
             <Link href="/auth/register" className="btn-primary px-6 py-3 text-base">
