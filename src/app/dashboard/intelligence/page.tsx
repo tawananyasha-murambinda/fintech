@@ -169,7 +169,7 @@ export default function IntelligencePage() {
     setError('')
     setAnalysis(null)
 
-    const body: any = { period }
+    const body: any = { period, forceRefresh: true }
     if (userLocation?.city) {
       body.location = { city: userLocation.city, country: userLocation.country }
     }

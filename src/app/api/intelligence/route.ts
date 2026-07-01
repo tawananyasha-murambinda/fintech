@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const period = (body.period as 'week' | 'month' | 'quarter') || 'month'
+  const forceRefresh = body.forceRefresh === true
   let userLocation = body.location
 
   // Load location from DB if not provided in request
@@ -25,19 +26,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Check cache (1-hour TTL)
-  const cached = await prisma.aiInsight.findFirst({
-    where: {
-      userId: session.user.id,
-      type: 'full_analysis',
-      period,
-      expiresAt: { gt: new Date() },
-    },
-    orderBy: { createdAt: 'desc' },
-  })
+  // Check cache (1-hour TTL), skip if forceRefresh
+  if (!forceRefresh) {
+    const cached = await prisma.aiInsight.findFirst({
+      where: {
+        userId: session.user.id,
+        type: 'full_analysis',
+        period,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
 
-  if (cached) {
-    return NextResponse.json({ analysis: cached.data, cached: true })
+    if (cached) {
+      return NextResponse.json({ analysis: cached.data, cached: true })
+    }
   }
 
   // Fetch transactions for the period
@@ -61,6 +64,13 @@ export async function POST(req: NextRequest) {
 
   if (rawTxns.length === 0) {
     return NextResponse.json({ error: 'No transaction data available for this period.' }, { status: 404 })
+  }
+
+  // Delete stale cache entries on force refresh
+  if (forceRefresh) {
+    await prisma.aiInsight.deleteMany({
+      where: { userId: session.user.id, type: 'full_analysis', period },
+    })
   }
 
   const transactions = rawTxns.map((t) => ({
