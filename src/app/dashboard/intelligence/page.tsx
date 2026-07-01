@@ -458,6 +458,15 @@ export default function IntelligencePage() {
                       <span className="flex items-center gap-2">
                         <span className="shrink-0 w-6 h-6 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center text-2xs font-bold">{i + 1}</span>
                         <span className="truncate">{opp.title}</span>
+                  <div key={i} className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                    <div className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${
+                      opp.difficulty === 'easy' ? 'bg-slate-900 dark:bg-slate-100' :
+                      opp.difficulty === 'medium' ? 'bg-slate-900 dark:bg-slate-100' :
+                      'bg-slate-900 dark:bg-slate-100'
+                    }`}>{i + 1}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{opp.title}</p>
                         <DifficultyBadge difficulty={opp.difficulty} />
                       </span>
                     }
