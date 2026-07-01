@@ -59,7 +59,7 @@ export default function RewardsPage() {
           </svg>
         </div>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Rewards Optimizer</h1>
+          <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Rewards Optimizer</h1>
           <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
             Find the best credit card for each merchant category to maximize cashback and points.
           </p>

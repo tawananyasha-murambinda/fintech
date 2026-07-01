@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   // Load user location for AI context
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { city: true, country: true },
+    select: { city: true, country: true, currency: true },
   })
   const userLocation = user?.city ? { city: user.city, country: user.country ?? undefined } : null
 
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
     message,
     txData,
     convHistory.slice(0, -1),
-    { budgets: budgetData, goals: goalData, debts: debtData, userLocation: userLocation || undefined }
+    { budgets: budgetData, goals: goalData, debts: debtData, userLocation: userLocation || undefined, currency: user?.currency }
   )
 
   await prisma.chatMessage.create({

@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { detectUserLocation, saveUserLocation, getUserLocation } from '@/lib/location'
+import { GradientHeader } from '@/components/layout/GradientHeader'
+import { Disclosure } from '@/components/ui/Disclosure'
 import type { AiAnalysis } from '@/types'
 
 const PERIODS = [
@@ -203,8 +205,12 @@ export default function IntelligencePage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-up">
+      {/* Mobile gradient header */}
+      <div className="lg:hidden">
+        <GradientHeader title="Insights" subtitle="Spending breakdown" />
+      </div>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="hidden lg:flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Insights</h1>
           <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
@@ -231,6 +237,26 @@ export default function IntelligencePage() {
             ) : analysis ? 'Re-analyse' : 'Run analysis'}
           </button>
         </div>
+      </div>
+
+      {/* Mobile controls */}
+      <div className="lg:hidden flex items-center gap-2 -mt-2">
+        <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5 dark:bg-slate-900 flex-1">
+          {PERIODS.map(p => (
+            <button key={p.value} onClick={() => setPeriod(p.value as any)}
+              className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                period === p.value
+                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100'
+                  : 'text-slate-500 dark:text-slate-400'
+              }`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={runAnalysis} disabled={loading}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white disabled:opacity-60 shadow-sm">
+          {loading ? 'Analysing…' : analysis ? 'Re-analyse' : 'Run analysis'}
+        </button>
       </div>
 
       {/* Loading */}
@@ -424,8 +450,14 @@ export default function IntelligencePage() {
                 <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Savings opportunities</h2>
               </div>
               <p className="text-xs text-slate-400 mb-4 ml-8 dark:text-slate-500">Actionable ways to reduce spending</p>
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {analysis.savingsOpportunities.map((opp, i) => (
+                  <Disclosure
+                    key={i}
+                    title={
+                      <span className="flex items-center gap-2">
+                        <span className="shrink-0 w-6 h-6 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center text-2xs font-bold">{i + 1}</span>
+                        <span className="truncate">{opp.title}</span>
                   <div key={i} className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
                     <div className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${
                       opp.difficulty === 'easy' ? 'bg-slate-900 dark:bg-slate-100' :
@@ -436,14 +468,12 @@ export default function IntelligencePage() {
                       <div className="flex items-center gap-2 mb-0.5">
                         <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{opp.title}</p>
                         <DifficultyBadge difficulty={opp.difficulty} />
-                      </div>
-                      <p className="text-xs text-slate-500 leading-relaxed dark:text-slate-400">{opp.description}</p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-2xs text-slate-400 dark:text-slate-500">Save up to</p>
-                      <p className="text-base font-bold text-teal-600 dark:text-teal-400">{fmt(opp.estimatedMonthlySavings)}<span className="text-xs font-normal text-teal-500 dark:text-teal-500">/mo</span></p>
-                    </div>
-                  </div>
+                      </span>
+                    }
+                    value={<span className="text-teal-600 dark:text-teal-400">{fmt(opp.estimatedMonthlySavings)}/mo</span>}
+                  >
+                    {opp.description}
+                  </Disclosure>
                 ))}
               </div>
             </div>

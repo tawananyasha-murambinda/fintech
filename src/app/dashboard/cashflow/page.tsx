@@ -71,7 +71,7 @@ export default function CashflowPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Cash Flow Calendar</h1>
+            <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Cash Flow Calendar</h1>
             <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Projected account balances day-by-day based on known bills and income.</p>
           </div>
         </div>

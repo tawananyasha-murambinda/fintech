@@ -11,6 +11,7 @@ interface TransactionRowProps {
     merchantName?: string | null
     merchantCategory?: string | null
     status: 'posted' | 'pending'
+    currency?: string | null
   }
 }
 
@@ -38,10 +39,10 @@ function toneFor(name: string) {
 }
 
 export function TransactionRow({ transaction: tx }: TransactionRowProps) {
-  const { format: fmt } = useCurrency()
+  const { convertFormat } = useCurrency()
   const name = tx.merchantName || tx.description
   const isCredit = tx.direction === 'credit'
-  const amountText = isCredit ? `+${fmt(tx.amount)}` : `-${fmt(tx.amount)}`
+  const amountText = isCredit ? `+${convertFormat(tx.amount, tx.currency)}` : `-${convertFormat(tx.amount, tx.currency)}`
   const initial = getInitial(name)
 
   return (

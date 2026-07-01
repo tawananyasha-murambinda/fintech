@@ -38,7 +38,7 @@ export default function ReportsPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Monthly & Yearly Reports</h1>
+            <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Monthly & Yearly Reports</h1>
             <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Income, expenses, top categories, and savings rate.</p>
           </div>
         </div>

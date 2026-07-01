@@ -65,7 +65,7 @@ export default function RulesPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Categorization Rules</h1>
+            <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Categorization Rules</h1>
             <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
               Auto-categorize transactions based on merchant, description, or amount.
             </p>

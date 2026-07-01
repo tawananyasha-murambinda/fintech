@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
 const updateSchema = z.object({
-  name: z.string().min(1).max(100),
+  name: z.string().min(1).max(100).optional(),
+  currency: z.enum(['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY']).optional(),
 })
 
 // GET /api/auth/profile — return current user profile
@@ -18,7 +19,7 @@ export async function GET() {
   try {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { id: true, name: true, email: true, image: true, createdAt: true, password: true },
+      select: { id: true, name: true, email: true, image: true, createdAt: true, password: true, currency: true },
     })
 
     if (!user) {
@@ -33,6 +34,7 @@ export async function GET() {
         image: user.image,
         createdAt: user.createdAt.toISOString(),
         hasPassword: !!user.password,
+        currency: user.currency,
       },
     })
   } catch (err) {
@@ -55,10 +57,17 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
 
+    const data: { name?: string; currency?: string } = {}
+    if (parsed.data.name !== undefined) data.name = parsed.data.name
+    if (parsed.data.currency !== undefined) data.currency = parsed.data.currency
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
+    }
+
     const user = await prisma.user.update({
       where: { id: session.user.id },
-      data: { name: parsed.data.name },
-      select: { id: true, name: true, email: true, image: true },
+      data,
+      select: { id: true, name: true, email: true, image: true, currency: true },
     })
 
     return NextResponse.json({ user })

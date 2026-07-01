@@ -5,6 +5,7 @@ import { format, parseISO, isToday, isYesterday } from 'date-fns'
 import { useCurrency } from '@/hooks/useCurrency'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { useHaptics } from '@/hooks/useHaptics'
+import { GradientHeader } from '@/components/layout/GradientHeader'
 import type { Transaction } from '@/types'
 
 const PERIODS = [
@@ -125,26 +126,22 @@ export function MobileTransactions({
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Transactions</h1>
-          <p className="text-xs text-slate-400">{initialTotal} transactions</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <GradientHeader
+        title="Activity"
+        subtitle={`${initialTotal} transactions`}
+        action={
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-              showFilters || direction || searchInput
-                ? 'bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300'
-                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-            }`}
+            aria-label="Filters"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white press"
+            style={{ background: 'rgba(255,255,255,0.16)' }}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Summary row */}
       <div className="grid grid-cols-2 gap-2 mb-3">

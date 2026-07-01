@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { LinkBankButton } from '@/components/bank/LinkBankButton'
 import { SyncButton } from '@/components/ui/SyncButton'
+import { GradientHeader } from '@/components/layout/GradientHeader'
 
 interface LinkedBank {
   id: string
@@ -54,16 +55,16 @@ export function MobileAccounts({ banks, loading, onUnlink }: MobileAccountsProps
 
   return (
     <div className="flex flex-col min-h-full pb-2">
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Accounts</h1>
-          <p className="text-xs text-slate-400">{banks.length} linked</p>
-        </div>
-        <div className="flex gap-2">
-          <SyncButton />
-          <LinkBankButton />
-        </div>
-      </div>
+      <GradientHeader
+        title="Cards & accounts"
+        subtitle={`${banks.length} linked`}
+        action={
+          <div className="flex gap-2">
+            <SyncButton />
+            <LinkBankButton />
+          </div>
+        }
+      />
 
       {banks.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">

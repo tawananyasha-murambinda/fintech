@@ -93,7 +93,7 @@ export default function NetWorthPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Net Worth</h1>
+            <h1 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Net Worth</h1>
             <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Track assets, liabilities, and total net worth over time.</p>
           </div>
         </div>

@@ -111,7 +111,7 @@ export default function VaultPage() {
             </svg>
           </div>
           <div>
-            <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Savings Vault</h2>
+            <h2 className="hidden lg:block text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Savings Vault</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">Set money aside and save automatically</p>
           </div>
         </div>

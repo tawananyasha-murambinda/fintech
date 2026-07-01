@@ -14,12 +14,33 @@ export function PreferencesSection() {
     setMounted(true)
     setCurrency(localStorage.getItem('currency') || 'USD')
     setCompactMode(localStorage.getItem('compactMode') === 'true')
+    // Sync from the server so the AI assistant and this UI agree.
+    fetch('/api/auth/profile')
+      .then((r) => r.json())
+      .then((d) => {
+        const c = d?.user?.currency
+        if (c) {
+          setCurrency(c)
+          if (localStorage.getItem('currency') !== c) {
+            localStorage.setItem('currency', c)
+            window.dispatchEvent(new Event('currency-change'))
+          }
+        }
+      })
+      .catch(() => {})
   }, [])
 
   function updateCurrency(value: string) {
     setCurrency(value)
     localStorage.setItem('currency', value)
     window.dispatchEvent(new Event('currency-change'))
+    // Persist to the account so server-side features (AI assistant, insights)
+    // use the same currency.
+    fetch('/api/auth/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currency: value }),
+    }).catch(() => {})
   }
 
   function updateCompactMode(value: boolean) {

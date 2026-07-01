@@ -16,15 +16,14 @@ export async function POST(req: NextRequest) {
   let userLocation = body.location
 
   // Load location from DB if not provided in request
-  if (!userLocation) {
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { city: true, country: true },
-    })
-    if (user?.city) {
-      userLocation = { city: user.city, country: user.country }
-    }
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { city: true, country: true, currency: true },
+  })
+  if (!userLocation && dbUser?.city) {
+    userLocation = { city: dbUser.city, country: dbUser.country }
   }
+  const userCurrency = dbUser?.currency || 'USD'
 
   // Check cache (1-hour TTL), skip if forceRefresh
   if (!forceRefresh) {
@@ -94,7 +93,7 @@ export async function POST(req: NextRequest) {
     prevCategories[cat] = (prevCategories[cat] || 0) + Math.abs(t.amount)
   }
 
-  const analysis = await analyzeSpending({ transactions, period, userLocation, prevPeriodCategories: prevCategories })
+  const analysis = await analyzeSpending({ transactions, period, userLocation, prevPeriodCategories: prevCategories, currency: userCurrency })
 
   // Cache the result
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000)

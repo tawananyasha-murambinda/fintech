@@ -11,6 +11,7 @@
     --surface-muted: #f6f7f9;
     --line: #eceef1;
     --accent: #1e5eff;
+    --wash-base: #f6f7f9;
   }
 
   * { box-sizing: border-box; }
@@ -29,6 +30,10 @@
   html.dark body {
     background: #0a0c10;
     color: #e9ebef;
+  }
+
+  html.dark {
+    --wash-base: #0a0c10;
   }
 
   .tabular {
