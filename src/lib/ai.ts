@@ -312,15 +312,19 @@ async function buildMerchantAlternatives(
     let locationContext: string | undefined
 
     const avgTx = data.count > 0 ? data.total / data.count : 0
+    const merchantCity = data.city || userLocation?.city
+    const merchantCountry = data.country || userLocation?.country
 
-    if (data.city) {
+    if (merchantCity) {
       try {
         const result = await findLocalAlternatives(
-          data.city, data.country, data.category, merchantName,
+          merchantCity, merchantCountry, data.category, merchantName,
           avgTx, userLocation?.city, data.count,
         )
         alternatives = result.alternatives
-        locationContext = result.locationContext
+        locationContext = result.locationContext || (userLocation?.city && !data.city
+          ? `Based near ${userLocation.city}. `
+          : undefined)
       } catch {}
     }
 
