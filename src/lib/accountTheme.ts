@@ -1,25 +1,72 @@
-// Per-account color themes — drives the immersive gradient wash on the home
-// screen and can tint accents app-wide. Dark-first, with values that also read
-// well on a light background.
+// Per-account color themes. Drives the immersive header on the home screen and
+// can tint accents app-wide.
+//
+// The palette is built around FinTrack's own brand: a cyan-to-violet signature
+// gradient (matching the FinTrack mark) over deep navy surfaces. Each theme is
+// a distinct FinTrack identity, not an imitation of any other fintech brand.
 
 export interface AccountTheme {
   key: string
   name: string
   // Solid accent used for buttons, active states, highlights.
   accent: string
-  // The two stops of the top-of-screen gradient wash (bright -> deep).
+  // The two stops of the top-of-screen header gradient (bright -> deep).
   wash: [string, string]
-  // A slightly translucent tint for chips/pills sitting on the wash.
+  // Two colours used for the animated aurora glows that sit behind the header.
+  glow: [string, string]
+  // A slightly translucent tint for chips/pills sitting on the header.
   chip: string
 }
 
 export const ACCOUNT_THEMES: AccountTheme[] = [
-  { key: 'violet', name: 'Violet', accent: '#7c5cff', wash: ['#8b5cf6', '#2a1a5e'], chip: 'rgba(255,255,255,0.14)' },
-  { key: 'blue',   name: 'Blue',   accent: '#1e5eff', wash: ['#3b6fff', '#101a44'], chip: 'rgba(255,255,255,0.14)' },
-  { key: 'teal',   name: 'Teal',   accent: '#10b981', wash: ['#14b8a6', '#0c3b34'], chip: 'rgba(255,255,255,0.14)' },
-  { key: 'coral',  name: 'Coral',  accent: '#ff6b57', wash: ['#ff7a66', '#4a1d17'], chip: 'rgba(255,255,255,0.14)' },
-  { key: 'amber',  name: 'Amber',  accent: '#f59e0b', wash: ['#fbbf24', '#4a2f08'], chip: 'rgba(255,255,255,0.14)' },
-  { key: 'slate',  name: 'Graphite', accent: '#64748b', wash: ['#64748b', '#161a22'], chip: 'rgba(255,255,255,0.12)' },
+  {
+    key: 'aurora',
+    name: 'Aurora',
+    accent: '#00c9f2',
+    wash: ['#00d4ff', '#2a1568'],
+    glow: ['#00d4ff', '#7c3aed'],
+    chip: 'rgba(255,255,255,0.16)',
+  },
+  {
+    key: 'indigo',
+    name: 'Indigo',
+    accent: '#8b7cff',
+    wash: ['#8f7bff', '#1c1140'],
+    glow: ['#a78bfa', '#7c3aed'],
+    chip: 'rgba(255,255,255,0.16)',
+  },
+  {
+    key: 'ocean',
+    name: 'Ocean',
+    accent: '#1e5eff',
+    wash: ['#2f6dff', '#0b1d45'],
+    glow: ['#38bdf8', '#1e5eff'],
+    chip: 'rgba(255,255,255,0.16)',
+  },
+  {
+    key: 'forest',
+    name: 'Forest',
+    accent: '#10b981',
+    wash: ['#1fc99a', '#0a3328'],
+    glow: ['#34d399', '#0d9276'],
+    chip: 'rgba(255,255,255,0.16)',
+  },
+  {
+    key: 'ember',
+    name: 'Ember',
+    accent: '#ff6b4a',
+    wash: ['#ff8a5c', '#40140c'],
+    glow: ['#ffb38a', '#ff3d5a'],
+    chip: 'rgba(255,255,255,0.16)',
+  },
+  {
+    key: 'graphite',
+    name: 'Graphite',
+    accent: '#94a3b8',
+    wash: ['#4b5563', '#0f1318'],
+    glow: ['#6b7280', '#1f2937'],
+    chip: 'rgba(255,255,255,0.14)',
+  },
 ]
 
 export const DEFAULT_THEME = ACCOUNT_THEMES[0]

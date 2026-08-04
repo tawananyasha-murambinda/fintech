@@ -145,13 +145,16 @@ export function MobileDashboard({ stats, categories, recentTransactions, hasData
 
   return (
     <div ref={containerRef} className="flex flex-col min-h-full -mx-4 -mt-4">
-      {/* ── Gradient wash header ─────────────────────────── */}
+      {/* ── Brand header ─────────────────────────────────── */}
       <div
-        className="relative px-4 pt-3 pb-6 rounded-b-[32px]"
+        className="relative px-4 pt-3 pb-6 rounded-b-[32px] overflow-hidden"
         style={{
-          background: `radial-gradient(120% 90% at 50% -10%, ${theme.wash[0]} 0%, ${theme.wash[1]} 55%, var(--wash-base) 100%)`,
+          background: `linear-gradient(180deg, ${theme.wash[0]} 0%, ${theme.wash[1]} 62%, var(--wash-base) 100%)`,
         }}
       >
+        <div aria-hidden="true" className="ft-orb ft-orb-a" style={{ background: theme.glow[0] }} />
+        <div aria-hidden="true" className="ft-orb ft-orb-b" style={{ background: theme.glow[1] }} />
+        <div className="relative">
         {pullIndicator && (
           <div className="flex items-center justify-center py-2">
             {refreshing
@@ -210,6 +213,7 @@ export function MobileDashboard({ stats, categories, recentTransactions, hasData
             icon={<><circle cx="11" cy="11" r="7.5" /><path d="M11 10v5M11 7.5v.5" strokeLinecap="round" /></>} />
           <CircleAction label="More" onClick={() => { haptics.light(); setShowTheme(true) }} accent={theme.accent}
             icon={<><circle cx="6" cy="11" r="1.2" fill="currentColor" stroke="none" /><circle cx="11" cy="11" r="1.2" fill="currentColor" stroke="none" /><circle cx="16" cy="11" r="1.2" fill="currentColor" stroke="none" /></>} />
+        </div>
         </div>
       </div>
 
@@ -305,7 +309,7 @@ export function MobileDashboard({ stats, categories, recentTransactions, hasData
                 onClick={() => { haptics.light(); setAccountThemeKey(selectedAccountId, t.key) }}
                 className={`rounded-2xl p-4 flex flex-col items-center gap-2 border-2 press ${selected ? 'border-slate-900 dark:border-white' : 'border-transparent'}`}
               >
-                <span className="w-10 h-10 rounded-full" style={{ background: `linear-gradient(135deg, ${t.wash[0]}, ${t.wash[1]})` }} />
+                <span className="w-10 h-10 rounded-full" style={{ background: `linear-gradient(135deg, ${t.glow[0]}, ${t.glow[1]})` }} />
                 <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t.name}</span>
               </button>
             )

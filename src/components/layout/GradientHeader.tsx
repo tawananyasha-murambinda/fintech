@@ -15,9 +15,10 @@ interface GradientHeaderProps {
   back?: boolean
 }
 
-// Immersive gradient wash header, matching the home screen. Reads the active
-// account theme from the URL (?account=) so the colour stays consistent as the
-// user moves between screens.
+// Immersive brand header, matching the home screen. Reads the active account
+// theme from the URL (?account=) so the colour stays consistent as the user
+// moves between screens. Uses the FinTrack signature gradient with slow
+// drifting aurora glows behind the content.
 export function GradientHeader({ title, subtitle, action, value, back }: GradientHeaderProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -34,28 +35,32 @@ export function GradientHeader({ title, subtitle, action, value, back }: Gradien
 
   return (
     <div
-      className="relative -mx-4 -mt-4 px-4 pt-4 pb-6 rounded-b-[32px] mb-5"
+      className="relative -mx-4 -mt-4 px-4 pt-4 pb-6 rounded-b-[32px] mb-5 overflow-hidden"
       style={{
-        background: `radial-gradient(120% 90% at 50% -10%, ${theme.wash[0]} 0%, ${theme.wash[1]} 55%, var(--wash-base) 100%)`,
+        background: `linear-gradient(180deg, ${theme.wash[0]} 0%, ${theme.wash[1]} 62%, var(--wash-base) 100%)`,
       }}
     >
-      <div className="flex items-center gap-3 min-h-[36px]">
-        {back && (
-          <button onClick={() => router.back()} aria-label="Back"
-            className="w-9 h-9 -ml-1 rounded-full flex items-center justify-center text-white press" style={{ background: theme.chip }}>
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5l-5 5 5 5" /></svg>
-          </button>
-        )}
-        <div className="flex-1 min-w-0">
-          {subtitle && <p className="text-[13px] text-white/70 truncate">{subtitle}</p>}
-          <h1 className="text-xl font-semibold tracking-tight text-white truncate">{title}</h1>
+      <div aria-hidden="true" className="ft-orb ft-orb-a" style={{ background: theme.glow[0] }} />
+      <div aria-hidden="true" className="ft-orb ft-orb-b" style={{ background: theme.glow[1] }} />
+      <div className="relative">
+        <div className="flex items-center gap-3 min-h-[36px]">
+          {back && (
+            <button onClick={() => router.back()} aria-label="Back"
+              className="w-9 h-9 -ml-1 rounded-full flex items-center justify-center text-white press" style={{ background: theme.chip }}>
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5l-5 5 5 5" /></svg>
+            </button>
+          )}
+          <div className="flex-1 min-w-0">
+            {subtitle && <p className="text-[13px] text-white/70 truncate">{subtitle}</p>}
+            <h1 className="text-xl font-semibold tracking-tight text-white truncate">{title}</h1>
+          </div>
+          {action}
         </div>
-        {action}
-      </div>
 
-      {value && (
-        <p className="text-center text-white text-[40px] leading-none font-semibold stat-number mt-6">{value}</p>
-      )}
+        {value && (
+          <p className="text-center text-white text-[40px] leading-none font-semibold stat-number mt-6">{value}</p>
+        )}
+      </div>
     </div>
   )
 }

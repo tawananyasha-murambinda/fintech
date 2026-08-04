@@ -195,6 +195,39 @@ html.dark .skeleton { background: #1e293b; }
   -webkit-overflow-scrolling: touch;
 }
 
+/* FinTrack signature header: animated aurora glows behind the mobile banner.
+   Two soft colour orbs drift and breathe slowly over the brand gradient. */
+.ft-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(52px);
+  opacity: 0.55;
+  pointer-events: none;
+  will-change: transform;
+}
+.ft-orb-a {
+  width: 260px;
+  height: 260px;
+  top: -110px;
+  left: -90px;
+  animation: ftAuroraA 12s ease-in-out infinite alternate;
+}
+.ft-orb-b {
+  width: 240px;
+  height: 240px;
+  top: -80px;
+  right: -90px;
+  animation: ftAuroraB 14s ease-in-out infinite alternate;
+}
+@keyframes ftAuroraA {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(46px, 26px, 0) scale(1.16); }
+}
+@keyframes ftAuroraB {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to   { transform: translate3d(-44px, 22px, 0) scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
