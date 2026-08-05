@@ -45,14 +45,19 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { category, amount, period } = body
 
-  if (!category || !amount) {
+  if (!category || amount === undefined) {
     return NextResponse.json({ error: 'Category and amount are required' }, { status: 400 })
+  }
+
+  const parsedAmount = typeof amount === 'number' ? amount : parseFloat(amount)
+  if (Number.isNaN(parsedAmount) || parsedAmount < 0) {
+    return NextResponse.json({ error: 'Amount must be a non-negative number' }, { status: 400 })
   }
 
   const budget = await prisma.budget.upsert({
     where: { userId_category_period: { userId: session.user.id, category, period: period || 'monthly' } },
-    update: { amount },
-    create: { userId: session.user.id, category, amount, period: period || 'monthly' },
+    update: { amount: parsedAmount },
+    create: { userId: session.user.id, category, amount: parsedAmount, period: period || 'monthly' },
   })
 
   return NextResponse.json(budget)

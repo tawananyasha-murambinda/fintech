@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { parseLimit } from '@/lib/pagination'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const q = searchParams.get('q') || ''
-  const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 50)
+  const limit = parseLimit(searchParams.get('limit'), 10, 50)
 
   if (q.length < 2) return NextResponse.json({ transactions: [] })
 

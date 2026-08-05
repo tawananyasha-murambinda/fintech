@@ -26,13 +26,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'matchType, matchValue, and category are required' }, { status: 400 })
   }
 
+  const priorityNum = Number(priority)
   const rule = await prisma.categorizationRule.create({
     data: {
       userId: session.user.id,
       matchType,
       matchValue,
       category,
-      priority: priority || 0,
+      priority: Number.isFinite(priorityNum) ? priorityNum : 0,
     },
   })
 
@@ -68,7 +69,7 @@ export async function PUT(req: NextRequest) {
       ...(data.matchType !== undefined && { matchType: data.matchType }),
       ...(data.matchValue !== undefined && { matchValue: data.matchValue }),
       ...(data.category !== undefined && { category: data.category }),
-      ...(data.priority !== undefined && { priority: data.priority }),
+      ...(data.priority !== undefined && { priority: Number.isFinite(Number(data.priority)) ? Number(data.priority) : data.priority }),
       ...(data.isActive !== undefined && { isActive: data.isActive }),
     },
   })

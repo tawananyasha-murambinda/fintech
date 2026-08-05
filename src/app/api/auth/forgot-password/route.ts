@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { rateLimit } from '@/lib/rate-limit'
+import { errorResponse } from '@/lib/errors'
 import crypto from 'crypto'
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = rateLimit(req, { limit: 5, windowMs: 15 * 60 * 1000, key: 'forgot-password' })
+    if (limited) return limited
+
     const { email } = await req.json()
 
     const user = await prisma.user.findUnique({ where: { email } })
@@ -32,6 +37,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, message: 'If an account exists, a reset email has been sent.' })
   } catch (err) {
     console.error('Forgot password error:', err)
-    return NextResponse.json({ success: true, message: 'If an account exists, a reset email has been sent.' })
+    const { error, status } = errorResponse(
+      err,
+      'We could not process your request right now. Please try again later.'
+    )
+    return NextResponse.json({ error }, { status })
   }
 }

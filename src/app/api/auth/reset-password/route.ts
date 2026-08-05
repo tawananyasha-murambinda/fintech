@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { rateLimit } from '@/lib/rate-limit'
+import { errorResponse } from '@/lib/errors'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 
@@ -11,6 +13,9 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = rateLimit(req, { limit: 10, windowMs: 15 * 60 * 1000, key: 'reset-password' })
+    if (limited) return limited
+
     const body = await req.json()
     const parsed = schema.safeParse(body)
     if (!parsed.success) {
@@ -45,6 +50,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('Reset password error:', err)
-    return NextResponse.json({ error: 'Failed to reset password' }, { status: 500 })
+    const { error, status } = errorResponse(
+      err,
+      'We could not reset your password right now. Please try again later.'
+    )
+    return NextResponse.json({ error }, { status })
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { errorResponse } from '@/lib/errors'
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,6 +30,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('Confirm email error:', err)
-    return NextResponse.json({ error: 'Failed to verify email' }, { status: 500 })
+    const { error, status } = errorResponse(
+      err,
+      'We could not verify your email right now. Please try again later.'
+    )
+    return NextResponse.json({ error }, { status })
   }
 }

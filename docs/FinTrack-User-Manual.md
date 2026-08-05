@@ -47,7 +47,7 @@ Your account is active only after you verify your email address. If you do not r
 2. Enter your email and password.
 3. Select **Sign in**.
 
-You can also sign in with Google or GitHub if you prefer. The first time you sign in with one of these, your email address is treated as verified.
+You can also sign in with Google if you prefer. The first time you sign in with Google, your email address is treated as verified and you go straight to onboarding.
 
 ### 2.3 Recovering a forgotten password
 

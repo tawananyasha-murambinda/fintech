@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { rateLimit } from '@/lib/rate-limit'
+import { errorResponse } from '@/lib/errors'
 import crypto from 'crypto'
 
 export async function POST(req: NextRequest) {
   try {
-    const { email } = await req.json()
+    const limited = rateLimit(req, { limit: 5, windowMs: 15 * 60 * 1000, key: 'verify-email' })
+    if (limited) return limited
+
+    const { email, callbackUrl } = await req.json()
 
     const user = await prisma.user.findUnique({ where: { email } })
     if (!user) {
@@ -26,13 +31,22 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    const redirectTo =
+      typeof callbackUrl === 'string' && callbackUrl.startsWith('/') && !callbackUrl.startsWith('//')
+        ? callbackUrl
+        : undefined
+
     const { sendVerificationEmail } = await import('@/lib/email')
-    await sendVerificationEmail(email, token)
+    await sendVerificationEmail(email, token, redirectTo)
 
     return NextResponse.json({ success: true, message: 'Verification email sent' })
   } catch (err) {
     console.error('Verify email error:', err)
-    return NextResponse.json({ error: 'Failed to send verification email' }, { status: 500 })
+    const { error, status } = errorResponse(
+      err,
+      'We could not send the verification email right now. Please try again later.'
+    )
+    return NextResponse.json({ error }, { status })
   }
 }
 
@@ -69,6 +83,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('Verify token error:', err)
-    return NextResponse.json({ error: 'Verification failed' }, { status: 500 })
+    const { error, status } = errorResponse(
+      err,
+      'Verification failed. Please try again later.'
+    )
+    return NextResponse.json({ error }, { status })
   }
 }

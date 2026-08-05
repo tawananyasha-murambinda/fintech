@@ -2,7 +2,6 @@ import { NextAuthOptions } from 'next-auth'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
-import GitHubProvider from 'next-auth/providers/github'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
@@ -18,6 +17,7 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/auth/login',
     newUser: '/onboarding',
+    error: '/auth/login',
   },
   providers: [
     CredentialsProvider({
@@ -50,19 +50,11 @@ export const authOptions: NextAuthOptions = {
           }),
         ]
       : []),
-    ...(process.env.GITHUB_CLIENT_ID
-      ? [
-          GitHubProvider({
-            clientId: process.env.GITHUB_CLIENT_ID!,
-            clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-          }),
-        ]
-      : []),
   ],
   callbacks: {
     async signIn({ user, account }) {
-      // OAuth providers (Google, GitHub) have already verified the email,
-      // so mark the account verified on first sign-in if it isn't already.
+      // OAuth providers (Google) have already verified the email, so mark
+      // the account verified on first sign-in if it isn't already.
       if (account && account.provider !== 'credentials' && user?.email) {
         try {
           await prisma.user.updateMany({
@@ -75,18 +67,35 @@ export const authOptions: NextAuthOptions = {
       }
       return true
     },
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id
-        token.emailVerified = typeof user.emailVerified === 'string' ? user.emailVerified : (user.emailVerified as Date | null)?.toISOString() || null
+        if (account && account.provider !== 'credentials') {
+          // OAuth verifies the email on the provider side. The `user` object
+          // here can be stale (captured before the signIn callback persisted
+          // emailVerified), so never gate OAuth sessions behind the verify
+          // page, which cannot email a link for a provider account.
+          token.emailVerified =
+            typeof user.emailVerified === 'string'
+              ? user.emailVerified
+              : (user.emailVerified as Date | null)?.toISOString() || new Date().toISOString()
+        } else {
+          token.emailVerified =
+            typeof user.emailVerified === 'string'
+              ? user.emailVerified
+              : (user.emailVerified as Date | null)?.toISOString() || null
+        }
       } else if (token.id) {
         // Re-read verification status from the DB so it reflects changes
-        // made after login (e.g. the user clicking the verification link).
+        // made after login (e.g. the user clicking the verification link or
+        // changing their email address or name).
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: { emailVerified: true },
+          select: { emailVerified: true, email: true, name: true },
         })
         token.emailVerified = dbUser?.emailVerified?.toISOString() || null
+        if (dbUser?.email) token.email = dbUser.email
+        if (dbUser?.name) token.name = dbUser.name
       }
       return token
     },

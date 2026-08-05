@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { safeDate } from '@/lib/validate'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -30,13 +31,18 @@ export async function POST(req: NextRequest) {
   const liability = await prisma.liability.findFirst({ where: { id: liabilityId, userId: session.user.id } })
   if (!liability) return NextResponse.json({ error: 'Liability not found' }, { status: 404 })
 
+  const target = safeDate(targetDate)
+  if (targetDate && !target) {
+    return NextResponse.json({ error: 'Invalid target date' }, { status: 400 })
+  }
+
   const plan = await prisma.debtPlan.create({
     data: {
       userId: session.user.id,
       liabilityId,
       strategy,
       extraPayment: extraPayment ? parseFloat(extraPayment) : 0,
-      targetDate: targetDate ? new Date(targetDate) : null,
+      targetDate: target,
     },
     include: { liability: true },
   })

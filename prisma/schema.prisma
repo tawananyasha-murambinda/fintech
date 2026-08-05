@@ -86,12 +86,12 @@ model VerificationToken {
 model LinkedBank {
   id              String   @id @default(cuid())
   userId          String
-  tellerAccountId String   @unique
+  plaidAccountId  String   @unique
   institutionName String
   accountType     String
   accountName     String
   currency        String   @default("USD")
-  tellerToken     String   // encrypted Teller access token
+  accessToken     String   // encrypted Plaid access token
   lastSynced      DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -104,7 +104,7 @@ model Transaction {
   id               String   @id @default(cuid())
   userId           String
   linkedBankId     String
-  tellerId         String   @unique
+  plaidTransactionId String   @unique
   date             DateTime
   amount           Float
   direction        String   // "credit" | "debit"

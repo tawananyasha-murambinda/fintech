@@ -24,12 +24,24 @@ export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { name, targetAmount, color } = await req.json()
-  if (!name) return NextResponse.json({ error: 'Name required' }, { status: 400 })
+  try {
+    const { name, targetAmount, color } = await req.json()
+    if (!name) return NextResponse.json({ error: 'Name required' }, { status: 400 })
 
-  const vault = await prisma.vault.create({
-    data: { userId: session.user.id, name, targetAmount, color: color || 'teal' },
-  })
+    const target = targetAmount === undefined || targetAmount === null
+      ? undefined
+      : typeof targetAmount === 'number' ? targetAmount : parseFloat(targetAmount)
+    if (target !== undefined && (Number.isNaN(target) || target < 0)) {
+      return NextResponse.json({ error: 'Target amount must be a non-negative number' }, { status: 400 })
+    }
 
-  return NextResponse.json(vault)
+    const vault = await prisma.vault.create({
+      data: { userId: session.user.id, name, targetAmount: target, color: color || 'teal' },
+    })
+
+    return NextResponse.json(vault)
+  } catch (err) {
+    console.error('Vault create error:', err)
+    return NextResponse.json({ error: 'Failed to create vault' }, { status: 500 })
+  }
 }

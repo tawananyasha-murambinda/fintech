@@ -9,8 +9,15 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const period = searchParams.get('period') || 'month'
-  const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()))
-  const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1))
+
+  const now = new Date()
+  const yearRaw = parseInt(searchParams.get('year') || String(now.getFullYear()), 10)
+  const monthRaw = parseInt(searchParams.get('month') || String(now.getMonth() + 1), 10)
+  if (Number.isNaN(yearRaw) || Number.isNaN(monthRaw)) {
+    return NextResponse.json({ error: 'Invalid year or month' }, { status: 400 })
+  }
+  const year = Math.min(Math.max(yearRaw, 1970), 2100)
+  const month = Math.min(Math.max(monthRaw, 1), 12)
 
   const days = period === 'year' ? 365 : period === 'quarter' ? 90 : 30
   const startDate = new Date(year, period === 'year' ? 0 : month - 1, 1)

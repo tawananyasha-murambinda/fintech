@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { rateLimit } from '@/lib/rate-limit'
 import { analyzeSpending } from '@/lib/ai'
 
 export async function POST(req: NextRequest) {
@@ -9,6 +10,9 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const limited = rateLimit(req, { limit: 20, windowMs: 60 * 60 * 1000, key: `intelligence:${session.user.id}`, scope: 'user' })
+  if (limited) return limited
 
   const body = await req.json()
   const period = (body.period as 'week' | 'month' | 'quarter') || 'month'

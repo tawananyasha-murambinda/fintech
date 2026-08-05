@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { parseLimit, parsePage } from '@/lib/pagination'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -11,8 +12,8 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const period = searchParams.get('period') || 'month'
-  const page = parseInt(searchParams.get('page') || '1', 10)
-  const limit = parseInt(searchParams.get('limit') || '50', 10)
+  const page = parsePage(searchParams.get('page'))
+  const limit = parseLimit(searchParams.get('limit'), 50, 200)
   const category = searchParams.get('category')
   const direction = searchParams.get('direction')
   const search = searchParams.get('search')

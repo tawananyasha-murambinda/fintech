@@ -21,13 +21,26 @@ export async function POST(req: NextRequest) {
 
   const { city, country, latitude, longitude } = await req.json()
 
+  if (latitude !== undefined) {
+    const lat = Number(latitude)
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      return NextResponse.json({ error: 'Latitude must be between -90 and 90' }, { status: 400 })
+    }
+  }
+  if (longitude !== undefined) {
+    const lng = Number(longitude)
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+      return NextResponse.json({ error: 'Longitude must be between -180 and 180' }, { status: 400 })
+    }
+  }
+
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
-      ...(city !== undefined && { city }),
-      ...(country !== undefined && { country }),
-      ...(latitude !== undefined && { latitude }),
-      ...(longitude !== undefined && { longitude }),
+      ...(city !== undefined && typeof city === 'string' && { city }),
+      ...(country !== undefined && typeof country === 'string' && { country }),
+      ...(latitude !== undefined && { latitude: Number(latitude) }),
+      ...(longitude !== undefined && { longitude: Number(longitude) }),
     },
   })
 

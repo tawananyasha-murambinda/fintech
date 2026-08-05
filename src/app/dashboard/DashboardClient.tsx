@@ -467,7 +467,7 @@ function QuickAddWidget() {
       const res = await fetch('/api/manual-transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: form.description, amount: parseFloat(form.amount), direction: form.direction }),
+        body: JSON.stringify({ description: form.description, amount: parseFloat(form.amount), direction: form.direction, date: new Date().toISOString() }),
       })
       if (!res.ok) throw new Error('Failed')
       setShowForm(false)

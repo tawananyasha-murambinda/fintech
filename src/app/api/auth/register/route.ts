@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { rateLimit } from '@/lib/rate-limit'
+import { errorResponse } from '@/lib/errors'
 import crypto from 'crypto'
 
 const schema = z.object({
@@ -12,6 +14,9 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = rateLimit(req, { limit: 10, windowMs: 15 * 60 * 1000, key: 'register' })
+    if (limited) return limited
+
     const body = await req.json()
     const parsed = schema.safeParse(body)
 
@@ -41,7 +46,7 @@ export async function POST(req: NextRequest) {
         data: { identifier: email, token, expires },
       })
       const { sendVerificationEmail } = await import('@/lib/email')
-      await sendVerificationEmail(email, token)
+      await sendVerificationEmail(email, token, '/onboarding')
     } catch (emailErr) {
       console.error('Failed to send verification email:', emailErr)
     }
@@ -49,6 +54,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ user }, { status: 201 })
   } catch (err) {
     console.error('Register error:', err)
-    return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 })
+    const { error, status } = errorResponse(
+      err,
+      'We could not create your account right now. Please try again shortly.'
+    )
+    return NextResponse.json({ error }, { status })
   }
 }

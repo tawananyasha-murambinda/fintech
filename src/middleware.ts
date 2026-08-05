@@ -28,6 +28,7 @@ export async function middleware(req: NextRequest) {
   // Logged in but email not verified → send to the verify-required page.
   if (!token.emailVerified) {
     const verifyUrl = new URL('/auth/verify', req.url)
+    verifyUrl.searchParams.set('callbackUrl', req.nextUrl.pathname)
     return NextResponse.redirect(verifyUrl)
   }
 

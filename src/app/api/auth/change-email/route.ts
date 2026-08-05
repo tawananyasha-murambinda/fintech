@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { rateLimit } from '@/lib/rate-limit'
+import { errorResponse } from '@/lib/errors'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { z } from 'zod'
@@ -19,6 +21,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const limited = rateLimit(req, { limit: 5, windowMs: 15 * 60 * 1000, key: `change-email:${session.user.id}`, scope: 'user' })
+    if (limited) return limited
+
     const body = await req.json()
     const parsed = schema.safeParse(body)
     if (!parsed.success) {
@@ -74,6 +79,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, email: newEmail })
   } catch (err) {
     console.error('Change email error:', err)
-    return NextResponse.json({ error: 'Failed to change email' }, { status: 500 })
+    const { error, status } = errorResponse(
+      err,
+      'We could not change your email right now. Please try again later.'
+    )
+    return NextResponse.json({ error }, { status })
   }
 }

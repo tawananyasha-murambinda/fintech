@@ -36,7 +36,7 @@ Each domain is scored 0 - 5 against what a public fintech product must meet.
 | Domain | Score | Summary |
 |---|---|---|
 | Product and UX completeness | 4 / 5 | Broad feature set; gaps in empty states, error recovery, and help |
-| Core security | 3 / 5 | Good foundations (bcrypt, AES-GCM, JWT). Missing rate limiting, audit log, secret rotation, security headers, DDoS protection |
+| Core security | 4 / 5 | Strong foundations (bcrypt, AES-GCM, JWT) plus rate limiting, CSP/HSTS headers. Missing audit log, secret rotation, DDoS protection |
 | Compliance and legal | 1 / 5 | No privacy policy, terms, data processing agreements, or financial disclosures |
 | Infrastructure and reliability | 2 / 5 | Single region, no backups, no monitoring, no alerting, no SLOs |
 | Data and privacy | 2 / 5 | Retention policy absent, no data export or deletion automation, weak consent flows |
@@ -58,12 +58,13 @@ Each domain is scored 0 - 5 against what a public fintech product must meet.
 
 **Gaps and required work**
 
-1. **Rate limiting on every authentication and AI endpoint.** Login, register, password reset, and the AI chat endpoint are currently unthrottled. This is an account-takeover and cost-abuse risk.
-   - Implementation: Upstash Ratelimit (Vercel-native) or Vercel edge rate limiting middleware.
-   - Effort: 2 - 4 days.
+1. ~~**Rate limiting on every authentication and AI endpoint.**~~ **Done.** An in-memory limiter (`lib/rate-limit.ts`) now throttles register, forgot-password, verify-email, reset-password, change-email, change-password, chat, and intelligence endpoints.
+   - Remaining: scale to an external store (Upstash Ratelimit or Vercel edge rate limiting middleware) for multi-region deployments.
+   - Effort: 2 - 4 days (partially done).
 
-2. **Security headers and DDoS protection.** Add CSP, HSTS, X-Content-Type-Options, Referrer-Policy, and frame-ancestors. Enable Vercel WAF or Cloudflare in front.
-   - Effort: 1 - 3 days.
+2. ~~**Security headers and DDoS protection.**~~ **Headers done.** CSP, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy set in `next.config.js`.
+   - Remaining: enable Vercel WAF or Cloudflare in front.
+   - Effort: 1 - 3 days (partially done).
 
 3. **Secrets management and rotation.** `ENCRYPTION_KEY`, `NEXTAUTH_SECRET`, Plaid secrets, SMTP credentials, and the Anthropic key must be in a vault (Vercel Env / Doppler / AWS Secrets Manager), with a documented rotation runbook. Add a KMS-backed key versioning plan so a rotated encryption key can re-encrypt stored Plaid tokens.
    - Effort: 3 - 5 days.
@@ -154,7 +155,7 @@ Cost: USD 8,000 - 16,000.
 2. **Automated daily sync** for all users via a scheduled job (Vercel Cron) with per-item backoff on Plaid rate limits (3 - 5 days).
 3. **Sync status and error surface.** Show "Last synced" errors and a retry affordance; surface Plaid error codes (ITEM_LOGIN_REQUIRED etc.) with actionable messages (3 - 5 days).
 4. **Reconciliation check.** A nightly job that cross-checks fetched totals so silent sync failures are caught (2 - 4 days).
-5. **Legacy cleanup.** The Prisma schema still stores `tellerToken` / `tellerAccountId`, and the landing page and README reference Teller.io. Rename to Plaid fields and audit for any leftover Teller calls. This is data-integrity hygiene before launch (2 - 3 days).
+5. ~~**Legacy cleanup.** Rename the Teller-era schema fields (`tellerToken` / `tellerAccountId` / `tellerId`) to Plaid names and remove Teller references from the landing page.~~ **Done.** Fields renamed to `accessToken` / `plaidAccountId` / `plaidTransactionId` and the landing page now references Plaid. A final sweep for leftover Teller calls is advised (0 - 1 days).
 
 Cost: USD 6,000 - 11,000.
 
@@ -263,7 +264,7 @@ The following are the highest-leverage items. Everything else in this document c
 
 | Weeks | Focus | Deliverable |
 |---|---|---|
-| 1 - 2 | Legal + security foundations | ToS, Privacy Policy, DPA, disclosures; rate limiting; security headers; secrets vault |
+| 1 - 2 | Legal + security foundations | ToS, Privacy Policy, DPA, disclosures; external rate-limiting store; WAF/DDoS layer; secrets vault |
 | 3 - 4 | Data and privacy engineering | Export, deletion, retention, erasure automation, AI prompt hygiene |
 | 5 - 6 | Infrastructure | Managed DB with PITR, Sentry, logging, alerting, staging, CI guardrails |
 | 7 - 8 | Bank reliability | Plaid webhooks, scheduled sync, error surfacing, reconciliation, schema cleanup |

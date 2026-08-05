@@ -48,21 +48,20 @@ export async function POST(req: NextRequest) {
     const linked: any[] = []
 
     for (const account of accounts) {
-      // tellerAccountId field reused for Plaid account_id
       const existing = await prisma.linkedBank.findUnique({
-        where: { tellerAccountId: account.account_id },
+        where: { plaidAccountId: account.account_id },
       })
       if (existing) continue
 
       const bank = await prisma.linkedBank.create({
         data: {
           userId: session.user.id,
-          tellerAccountId: account.account_id, // stores Plaid account_id
+          plaidAccountId: account.account_id,
           institutionName: instName,
           accountType: account.type,
           accountName: account.name,
           currency: account.balances.iso_currency_code || 'USD',
-          tellerToken: encryptedToken, // stores encrypted Plaid access token
+          accessToken: encryptedToken,
         },
       })
       linked.push(bank)
@@ -71,6 +70,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ linked: linked.length, accounts: accounts.length })
   } catch (err: any) {
     console.error('Plaid exchange error:', err?.response?.data || err)
-    return NextResponse.json({ error: 'Failed to link account' }, { status: 500 })
+    const code = err?.response?.data?.error_code || err?.error_code
+    const plaidMessage = err?.response?.data?.error_message || err?.message
+    const reason =
+      code === 'INVALID_ACCESS_TOKEN'
+        ? 'The bank link expired. Please try linking your bank again.'
+        : code === 'ITEM_LOGIN_REQUIRED'
+          ? 'Your bank requires re-authentication. Please link your bank again.'
+          : code === 'INVALID_PUBLIC_TOKEN'
+            ? 'The bank link was already used or is invalid. Please try again.'
+            : plaidMessage
+              ? `Could not link your bank: ${plaidMessage}`
+              : null
+    return NextResponse.json(
+      { error: reason || 'Failed to link account. Please try again.' },
+      { status: 500 }
+    )
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { safeDate } from '@/lib/validate'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -26,15 +27,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Year, type, description, and amount are required' }, { status: 400 })
   }
 
+  const entryDate = safeDate(date)
+  if (date && !entryDate) {
+    return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
+  }
+
   const entry = await prisma.taxEntry.create({
     data: {
       userId: session.user.id,
-      year: parseInt(year),
+      year: parseInt(year, 10),
       type,
       description,
       amount: parseFloat(amount),
       category: category || null,
-      date: date ? new Date(date) : null,
+      date: entryDate,
     },
   })
 

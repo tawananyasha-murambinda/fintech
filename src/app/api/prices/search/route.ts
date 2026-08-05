@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ingredients array is required' }, { status: 400 })
   }
 
-  const items = ingredients.map((name: string) => {
+  const items = ingredients.filter((name: unknown): name is string => typeof name === 'string' && name.trim().length > 0).map((name: string) => {
     const ref = getReferencePrice(name)
     return { name, price: ref.price, supermarket: ref.supermarket, source: ref.source }
   })

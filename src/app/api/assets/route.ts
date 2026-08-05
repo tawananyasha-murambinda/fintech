@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { toFiniteNumber } from '@/lib/validate'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -26,8 +27,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Name, type, and value are required' }, { status: 400 })
   }
 
+  const parsedValue = toFiniteNumber(value)
+  if (parsedValue === null) {
+    return NextResponse.json({ error: 'Value must be a number' }, { status: 400 })
+  }
+
   const asset = await prisma.asset.create({
-    data: { userId: session.user.id, name, type, value: parseFloat(value), notes },
+    data: { userId: session.user.id, name, type, value: parsedValue, notes },
   })
 
   return NextResponse.json(asset)
@@ -44,12 +50,21 @@ export async function PUT(req: NextRequest) {
   const existing = await prisma.asset.findFirst({ where: { id, userId: session.user.id } })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  let parsedValue: number | undefined
+  if (data.value !== undefined) {
+    const parsed = toFiniteNumber(data.value)
+    if (parsed === null) {
+      return NextResponse.json({ error: 'Value must be a number' }, { status: 400 })
+    }
+    parsedValue = parsed
+  }
+
   const updated = await prisma.asset.update({
     where: { id },
     data: {
       ...(data.name !== undefined && { name: data.name }),
       ...(data.type !== undefined && { type: data.type }),
-      ...(data.value !== undefined && { value: parseFloat(data.value) }),
+      ...(parsedValue !== undefined && { value: parsedValue }),
       ...(data.notes !== undefined && { notes: data.notes }),
     },
   })

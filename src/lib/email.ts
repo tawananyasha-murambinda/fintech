@@ -12,9 +12,10 @@ const transporter = nodemailer.createTransport({
 
 const FROM = process.env.EMAIL_FROM || 'noreply@fintrack.app'
 
-export async function sendVerificationEmail(email: string, token: string) {
+export async function sendVerificationEmail(email: string, token: string, redirectTo?: string) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-  const link = `${baseUrl}/auth/verify?token=${token}&email=${encodeURIComponent(email)}`
+  const redirectParam = redirectTo ? `&callbackUrl=${encodeURIComponent(redirectTo)}` : ''
+  const link = `${baseUrl}/auth/verify?token=${token}&email=${encodeURIComponent(email)}${redirectParam}`
 
   await transporter.sendMail({
     from: FROM,

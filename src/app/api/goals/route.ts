@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { safeDate } from '@/lib/validate'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -26,13 +27,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Name and target amount are required' }, { status: 400 })
   }
 
+  const deadlineDate = safeDate(deadline)
+  if (deadline && !deadlineDate) {
+    return NextResponse.json({ error: 'Invalid deadline date' }, { status: 400 })
+  }
+
   const goal = await prisma.goal.create({
     data: {
       userId: session.user.id,
       name,
       targetAmount,
       currentAmount: currentAmount || 0,
-      deadline: deadline ? new Date(deadline) : null,
+      deadline: deadlineDate,
       color: color || 'teal',
     },
   })

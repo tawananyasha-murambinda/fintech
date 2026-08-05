@@ -18,9 +18,18 @@ export default function VerifyRequiredPage() {
 
 function VerifyContent() {
   const { data: session, update } = useSession();
-  const email = session?.user?.email;
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Prefer the ?email= query param: it is set by the emailed link and stays
+  // correct even when the session email is stale (e.g. right after changing
+  // the account email address).
+  const email = searchParams.get("email") || session?.user?.email || null;
+  // Only trust internal callback URLs (the middleware sets these).
+  const callbackUrl = searchParams.get("callbackUrl");
+  const redirectTo =
+    callbackUrl && callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
+      ? callbackUrl
+      : "/dashboard";
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(true);
@@ -46,8 +55,8 @@ function VerifyContent() {
           setVerified(true);
           // Refresh session so JWT picks up emailVerified
           await update();
-          // Redirect to dashboard after a brief moment for the session to update
-          setTimeout(() => router.push("/dashboard"), 500);
+          // Redirect after a brief moment for the session to update
+          setTimeout(() => router.push(redirectTo), 500);
         } else {
           setError(data.error || "Verification failed");
         }
@@ -58,7 +67,7 @@ function VerifyContent() {
       }
     }
     verify();
-  }, [searchParams, router, update]);
+  }, [searchParams, router, update, redirectTo]);
 
   // Verified state — show success before redirect
   if (verified) {
@@ -106,7 +115,10 @@ function VerifyContent() {
       const res = await fetch("/api/auth/verify-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({
+          email,
+          callbackUrl: redirectTo === "/dashboard" ? undefined : redirectTo,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {

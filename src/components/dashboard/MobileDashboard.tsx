@@ -331,7 +331,7 @@ export function MobileDashboard({ stats, categories, recentTransactions, hasData
               const res = await fetch('/api/manual-transactions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ description: quickAddForm.description, amount: parseFloat(quickAddForm.amount), direction: quickAddForm.direction }),
+                body: JSON.stringify({ description: quickAddForm.description, amount: parseFloat(quickAddForm.amount), direction: quickAddForm.direction, date: new Date().toISOString() }),
               })
               if (!res.ok) throw new Error('Failed')
               haptics.success()

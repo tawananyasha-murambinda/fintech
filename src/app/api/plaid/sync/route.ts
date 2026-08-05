@@ -21,13 +21,14 @@ export async function POST(req: NextRequest) {
   }
 
   let totalImported = 0
+  let failed = 0
 
   const today = new Date().toISOString().split('T')[0]
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
   for (const bank of banks) {
     try {
-      const accessToken = decrypt(bank.tellerToken)
+      const accessToken = decrypt(bank.accessToken)
 
       let hasMore = true
       let cursor: string | undefined = undefined
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
           const direction = tx.amount > 0 ? 'debit' : 'credit'
 
           await prisma.transaction.upsert({
-            where: { tellerId: tx.transaction_id },
+            where: { plaidTransactionId: tx.transaction_id },
             update: {
               status: tx.pending ? 'pending' : 'posted',
               merchantName: tx.merchant_name ?? tx.name,
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
             create: {
               userId: session.user.id,
               linkedBankId: bank.id,
-              tellerId: tx.transaction_id,
+              plaidTransactionId: tx.transaction_id,
               date: new Date(tx.date),
               amount,
               direction,
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
         // Handle modified transactions
         for (const tx of result.modified) {
           await prisma.transaction.updateMany({
-            where: { tellerId: tx.transaction_id },
+            where: { plaidTransactionId: tx.transaction_id },
             data: {
               status: tx.pending ? 'pending' : 'posted',
               merchantName: tx.merchant_name ?? tx.name,
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
         // Handle removed transactions
         for (const tx of result.removed) {
           await prisma.transaction.deleteMany({
-            where: { tellerId: tx.transaction_id },
+            where: { plaidTransactionId: tx.transaction_id },
           })
         }
 
@@ -99,9 +100,17 @@ export async function POST(req: NextRequest) {
         data: { lastSynced: new Date() },
       })
     } catch (err) {
+      failed++
       console.error(`Plaid sync failed for bank ${bank.id}:`, err)
     }
   }
 
-  return NextResponse.json({ synced: banks.length, transactions: totalImported })
+  if (failed === banks.length) {
+    return NextResponse.json(
+      { synced: 0, transactions: 0, failed, error: 'Could not sync your bank accounts. Please try again or re-link your bank.' },
+      { status: 502 }
+    )
+  }
+
+  return NextResponse.json({ synced: banks.length - failed, transactions: totalImported, failed })
 }

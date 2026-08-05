@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { rateLimit } from '@/lib/rate-limit'
+import { errorResponse } from '@/lib/errors'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 
@@ -18,6 +20,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const limited = rateLimit(req, { limit: 10, windowMs: 15 * 60 * 1000, key: `change-password:${session.user.id}`, scope: 'user' })
+    if (limited) return limited
+
     const body = await req.json()
     const parsed = schema.safeParse(body)
     if (!parsed.success) {
@@ -56,6 +61,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('Change password error:', err)
-    return NextResponse.json({ error: 'Failed to change password' }, { status: 500 })
+    const { error, status } = errorResponse(
+      err,
+      'We could not change your password right now. Please try again later.'
+    )
+    return NextResponse.json({ error }, { status })
   }
 }

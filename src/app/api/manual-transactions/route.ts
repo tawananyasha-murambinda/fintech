@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+
+const createSchema = z.object({
+  date: z.string().optional(),
+  amount: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v),
+    z.number({ message: 'Amount must be a number' }).finite().positive()
+  ),
+  direction: z.enum(['credit', 'debit']),
+  description: z.string().min(1).max(500),
+  merchantName: z.string().max(200).optional().nullable(),
+  merchantCategory: z.string().max(100).optional().nullable(),
+})
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -20,26 +33,41 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json()
-  const { date, amount, direction, description, merchantName, merchantCategory } = body
+  try {
+    const body = await req.json()
+    const parsed = createSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.errors[0]?.message || 'Invalid input' }, { status: 400 })
+    }
 
-  if (!date || !amount || !direction || !description) {
-    return NextResponse.json({ error: 'Date, amount, direction, and description are required' }, { status: 400 })
+    const { date, amount, direction, description, merchantName, merchantCategory } = parsed.data
+
+    let txDate = new Date()
+    if (date) {
+      const parsedDate = new Date(date)
+      if (Number.isNaN(parsedDate.getTime())) {
+        return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
+      }
+      txDate = parsedDate
+    }
+
+    const tx = await prisma.manualTransaction.create({
+      data: {
+        userId: session.user.id,
+        date: txDate,
+        amount,
+        direction,
+        description,
+        merchantName: merchantName || null,
+        merchantCategory: merchantCategory || null,
+      },
+    })
+
+    return NextResponse.json(tx)
+  } catch (err) {
+    console.error('Manual transaction create error:', err)
+    return NextResponse.json({ error: 'Failed to save transaction' }, { status: 500 })
   }
-
-  const tx = await prisma.manualTransaction.create({
-    data: {
-      userId: session.user.id,
-      date: new Date(date),
-      amount: parseFloat(amount),
-      direction,
-      description,
-      merchantName: merchantName || null,
-      merchantCategory: merchantCategory || null,
-    },
-  })
-
-  return NextResponse.json(tx)
 }
 
 export async function DELETE(req: NextRequest) {

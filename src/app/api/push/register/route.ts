@@ -21,6 +21,14 @@ export async function POST(req: NextRequest) {
     })
 
     if (existing) {
+      // If the endpoint is already registered to this user, keep it as is.
+      // If it belongs to a different user, rebind it to the current session.
+      if (existing.userId !== session.user.id) {
+        await prisma.pushSubscription.update({
+          where: { id: existing.id },
+          data: { userId: session.user.id },
+        })
+      }
       return NextResponse.json({ success: true, message: 'Already registered' })
     }
 
@@ -53,7 +61,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     await prisma.pushSubscription.deleteMany({
-      where: { endpoint },
+      where: { endpoint, userId: session.user.id },
     })
 
     return NextResponse.json({ success: true })

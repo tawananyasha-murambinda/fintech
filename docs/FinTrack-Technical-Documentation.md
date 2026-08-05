@@ -48,7 +48,7 @@ FinTrack is a server-rendered web application with client-side interactive surfa
 | Component primitives | Radix UI | Dialog, Dropdown, Select, Tooltip |
 | Database | PostgreSQL | Managed via Prisma 5 ORM |
 | ORM | Prisma | 29 models; see section 5 |
-| Auth | NextAuth 4 (JWT strategy) | Credentials + Google + GitHub |
+| Auth | NextAuth 4 (JWT strategy) | Credentials + Google |
 | Bank connectivity | Plaid (`plaid` SDK 42.x) | `transactionsSync` cursor-based import |
 | AI | `@anthropic-ai/sdk` | Claude for analysis and chat; local fallback |
 | Validation | Zod 3 | All API request bodies |
@@ -168,16 +168,16 @@ The Prisma schema defines 29 models. The principal entities:
 | `Notification` / `PushSubscription` | Notifications and push | type, read; endpoint (unique), p256dh, auth |
 | `Vault` / `RoundUpRule` | Savings pots and round-ups | targetAmount, currentAmount, isActive |
 
-### 5.1 Known schema note
+### 5.1 Schema naming
 
-`LinkedBank` still uses `tellerAccountId`, `tellerToken`, and `Transaction.tellerId`, while the integration is now Plaid-based. The schema and code paths are scheduled for a rename and audit (see the production readiness document).
+Plaid-era field names (`plaidAccountId`, `accessToken`, `plaidTransactionId`) are used throughout. The earlier Teller naming was renamed during pre-launch cleanup; no legacy columns remain in the schema or code paths.
 
 ## 6. Authentication and authorisation
 
-- **Providers.** Credentials (email/password with bcrypt, cost factor 12), Google OAuth, and GitHub OAuth. OAuth providers are registered only when their environment variables are present.
-- **Sessions.** JWT strategy with the session stored in a signed, HttpOnly cookie. The `jwt` callback re-reads `emailVerified` from the database on each token refresh so account state stays current.
-- **Email verification.** `middleware.ts` redirects unauthenticated requests to `/auth/login` and unverified sessions to `/auth/verify` for `/dashboard/*` and `/onboarding`.
-- **Verification flow.** Registration creates the user with a verification token; `sendVerificationEmail` mails a 24-hour link. The link handler verifies and sets `emailVerified`.
+- **Providers.** Credentials (email/password with bcrypt, cost factor 12) and Google OAuth. OAuth providers are registered only when their environment variables are present. GitHub was removed as a provider in the auth hardening pass.
+- **Sessions.** JWT strategy with the session stored in a signed, HttpOnly cookie. The `jwt` callback re-reads `emailVerified` from the database on each token refresh so account state stays current. For OAuth sign-ins the `jwt` callback also stamps `emailVerified` on the token at first sign-in, because provider accounts are treated as verified and must never be gated behind the verify page (which would trap them in a redirect loop).
+- **Email verification.** `middleware.ts` redirects unauthenticated requests to `/auth/login` and unverified sessions to `/auth/verify` for `/dashboard/*` and `/onboarding`. The middleware records the intended destination in a `callbackUrl` query param, and verification links for new registrations carry the same destination so a freshly verified user lands on `/onboarding` instead of a generic page.
+- **Verification flow.** Registration creates the user with a verification token; `sendVerificationEmail` mails a 24-hour link. The link handler verifies and sets `emailVerified`. Provider (Google) sign-ins skip the verify page entirely.
 - **Password reset.** A token-based reset link (1-hour expiry) via `sendPasswordResetEmail`.
 - **API protection.** Individual route handlers validate the session with `getServerSession(authOptions)` and scope all queries by `session.user.id`. Multi-tenant data isolation depends on this user-scoping; no cross-user route was found during review.
 
@@ -197,14 +197,14 @@ For each linked bank:
 
 1. Decrypt the access token.
 2. Call `transactionsSync` with the stored cursor, up to 500 transactions per call, following `has_more`.
-3. Upsert `added` and `modified` transactions, delete `removed` ones, keyed by `tellerId` (Plaid transaction id).
+3. Upsert `added` and `modified` transactions, delete `removed` ones, keyed by `plaidTransactionId` (Plaid transaction id).
 4. Persist `next_cursor` and `lastSynced`.
 
 ### 7.3 Security
 
 - Access tokens are encrypted at rest and decrypted only inside server functions at sync time.
 - The encryption key is validated to be 32 bytes at module load (`lib/encryption.ts`).
-- Webhook signatures are verified with an HMAC helper (`verifyWebhookSignature`) for Teller-era webhooks; Plaid webhooks are not yet wired (see production readiness document).
+- Webhook signatures are verified with an HMAC helper (`verifyWebhookSignature`); Plaid webhooks are not yet wired (see production readiness document).
 
 ## 8. API reference
 
@@ -313,8 +313,10 @@ Results are cached in `AiInsight` with a 1-hour expiry keyed by user, type, and 
 - **In transit.** All traffic HTTPS (Capacitor `cleartext: false`); production behind Vercel.
 - **Sessions.** Signed JWT in HttpOnly cookie; CSRF protection via NextAuth; email-verification gate in middleware.
 - **Input.** Zod schemas on API bodies; no raw SQL.
+- **Rate limiting.** In-memory limiter (`lib/rate-limit.ts`) on registration, password reset, email verification/change, password change, and the AI chat and intelligence endpoints. Back with an external store for multi-region deployments.
+- **Headers.** CSP, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy set in `next.config.js`.
 - **Bank access.** Read-only via Plaid; tokens never serialised to the client; no write/transfer capability exists in the integration.
-- **Gaps tracked.** Rate limiting, security headers, audit log, secrets rotation, and session revocation are outstanding (see `PRODUCTION_READINESS.md`).
+- **Gaps tracked.** Audit log, secrets rotation, and session revocation are outstanding (see `PRODUCTION_READINESS.md`).
 
 ## 11. Mobile builds (Capacitor)
 
@@ -376,10 +378,9 @@ There is no automated test suite yet; the production readiness document schedule
 ## 15. Known limitations
 
 1. No automated test suite or CI test stage.
-2. `LinkedBank`/`Transaction` retain Teller-era column names and helpers.
+2. Plaid webhooks (sync, bill reminders, alerts) run on request paths rather than scheduled jobs.
 3. Credit score and investment values are manually entered; no live market or bureau feeds.
-4. Webhooks (Plaid sync, bill reminders, alerts) run on request paths rather than scheduled jobs.
-5. AI is uncapped per user, relying on a 1-hour cache to control cost.
-6. No rate limiting, audit log, or security-header configuration.
-7. Mobile release builds are unsigned in the default configuration.
-8. Receipts are stored as database blobs rather than object storage.
+4. AI is uncapped per user, relying on a 1-hour cache to control cost.
+5. In-memory rate limiting (single-instance) rather than an external store; no audit log.
+6. Mobile release builds are unsigned in the default configuration.
+7. Receipts are stored as database blobs rather than object storage.

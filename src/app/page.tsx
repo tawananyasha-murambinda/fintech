@@ -23,7 +23,7 @@ export default function HomePage() {
       {/* Hero */}
       <main className="max-w-4xl mx-auto px-6 pt-20 pb-16">
         <div className="text-center mb-16">
-          <p className="text-xs font-medium text-teal-700st mb-5">
+          <p className="text-xs font-medium text-teal-700 mb-5">
             Intelligent personal finance
           </p>
           <h1 className="text-5xl font-semibold text-slate-900 tracking-tight leading-tight mb-6">
@@ -69,7 +69,7 @@ export default function HomePage() {
           {[
             {
               title: 'Bank-grade security',
-              body: 'Teller.io open banking with mTLS certificate authentication. Your credentials never touch our servers.',
+              body: 'Plaid open banking with encrypted token authentication. Your credentials never touch our servers.',
             },
             {
               title: 'AI spending analysis',
@@ -92,7 +92,7 @@ export default function HomePage() {
       <footer className="border-t border-slate-100 py-8 px-6">
         <div className="max-w-6xl mx-auto flex items-center justify-between text-xs text-slate-400">
           <span>FinTrack — Intelligent personal finance</span>
-          <span>Bank connections via Teller.io · AI by Anthropic Claude</span>
+          <span>Bank connections via Plaid · AI by Anthropic Claude</span>
         </div>
       </footer>
     </div>
