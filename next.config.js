@@ -20,11 +20,12 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value:             [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.plaid.com https://js.stripe.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https:",
               "font-src 'self' data:",
               "connect-src 'self' https:",
+              "frame-src https://cdn.plaid.com https://js.stripe.com https://www.youtube.com",
               "manifest-src 'self'",
               "frame-ancestors 'none'",
               "base-uri 'self'",

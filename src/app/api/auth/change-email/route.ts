@@ -7,6 +7,7 @@ import { errorResponse } from '@/lib/errors'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { z } from 'zod'
+import { logAudit, requestMeta } from '@/lib/audit'
 
 const schema = z.object({
   newEmail: z.string().email(),
@@ -61,6 +62,11 @@ export async function POST(req: NextRequest) {
     await prisma.user.update({
       where: { id: session.user.id },
       data: { email: newEmail, emailVerified: null },
+    })
+
+    await logAudit(session.user.id, 'auth.email_changed', {
+      ...requestMeta(req),
+      metadata: { from: user.email, to: newEmail },
     })
 
     // Send verification email for new address

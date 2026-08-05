@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { logAudit, requestMeta } from '@/lib/audit'
 
 export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -11,6 +12,8 @@ export async function DELETE(req: NextRequest) {
 
   // Cascade deletes handle all related records
   await prisma.user.delete({ where: { id: session.user.id } })
+
+  await logAudit(session.user.id, 'account.delete', requestMeta(req))
 
   return NextResponse.json({ success: true })
 }

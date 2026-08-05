@@ -80,7 +80,10 @@ export function PrivacySection() {
       <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
         <p className="text-xs text-slate-500 leading-relaxed dark:text-slate-400">
           We do not sell your data. Your financial information is stored securely and only used
-          to provide FinTrack services. Read our Privacy Policy for more details.
+          to provide FinTrack services. Read our{" "}
+          <a href="/legal/privacy" className="text-teal-700 underline dark:text-teal-400">Privacy Policy</a>,{" "}
+          <a href="/legal/terms" className="text-teal-700 underline dark:text-teal-400">Terms</a>, and{" "}
+          <a href="/legal/cookies" className="text-teal-700 underline dark:text-teal-400">Cookie Policy</a>.
         </p>
       </div>
     </SettingsCard>

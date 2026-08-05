@@ -21,7 +21,7 @@ export default function HomePage() {
       </nav>
 
       {/* Hero */}
-      <main className="max-w-4xl mx-auto px-6 pt-20 pb-16">
+      <main id="main" className="max-w-4xl mx-auto px-6 pt-20 pb-16">
         <div className="text-center mb-16">
           <p className="text-xs font-medium text-teal-700 mb-5">
             Intelligent personal finance

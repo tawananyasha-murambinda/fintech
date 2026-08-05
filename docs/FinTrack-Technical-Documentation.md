@@ -47,7 +47,7 @@ FinTrack is a server-rendered web application with client-side interactive surfa
 | Charts | Recharts 2.12 | Area and pie charts for cashflow and categories |
 | Component primitives | Radix UI | Dialog, Dropdown, Select, Tooltip |
 | Database | PostgreSQL | Managed via Prisma 5 ORM |
-| ORM | Prisma | 29 models; see section 5 |
+| ORM | Prisma | 34 models; see section 5 |
 | Auth | NextAuth 4 (JWT strategy) | Credentials + Google |
 | Bank connectivity | Plaid (`plaid` SDK 42.x) | `transactionsSync` cursor-based import |
 | AI | `@anthropic-ai/sdk` | Claude for analysis and chat; local fallback |
@@ -69,6 +69,9 @@ src/
 │   ├── middleware.ts          Auth and email-verification gate
 │   ├── auth/                  Login, register, verify, reset, forgot
 │   ├── onboarding/            Post-registration bank linking
+│   ├── help/                  Public help/FAQ page
+│   ├── status/                Public service status page
+│   ├── legal/                 Privacy, terms, cookies, disclosures, accessibility
 │   ├── dashboard/             Page.tsx (server) for every feature screen
 │   └── api/                   Route handlers; see section 8
 ├── components/
@@ -78,11 +81,12 @@ src/
 │   ├── chat/                  ChatWidget (floating assistant)
 │   ├── dashboard/             MobileDashboard, AccountSwitcher
 │   ├── layout/                DashboardShell, Sidebar, TopBar, MobileNav, GradientHeader
+│   ├── legal/                 LegalLayout shared shell
 │   ├── notifications/         NotificationDropdown
 │   ├── providers/             ThemeProvider
-│   ├── settings/              Profile, Security, Privacy, Preferences, etc.
+│   ├── settings/              Profile, Security, Privacy, Data, Support, Preferences, etc.
 │   ├── transactions/          MobileTransactions
-│   └── ui/                    BottomSheet, StatCard, SyncButton, TransactionRow, Disclosure
+│   └── ui/                    BottomSheet, StatCard, SyncButton, TransactionRow, Disclosure, EmptyState
 ├── hooks/                     useCurrency, useHaptics, usePullToRefresh, usePushNotifications, useProfile
 ├── lib/
 │   ├── ai.ts                  Claude analysis engine + chat system
@@ -98,6 +102,14 @@ src/
 │   ├── capacitor-push.ts      Capacitor push setup
 │   ├── categorize.ts          AI categorisation + rule engine
 │   ├── geocode.ts / location.ts / prices.ts / haversine.ts   Location and merchant data
+│   ├── logger.ts              Rotating file logger
+│   ├── audit.ts               Audit log helper (non-blocking)
+│   ├── pii.ts                 PII redaction for AI inputs
+│   ├── ai-budget.ts           Per-user daily AI usage budget
+│   ├── export.ts              GDPR data export builder
+│   ├── bank-sync.ts           Shared Plaid sync (manual + webhook)
+│   ├── secrets.ts             Comma-separated NEXTAUTH_SECRET rotation
+│   └── rate-limit.ts          In-memory sliding-window limiter
 ├── types/
 │   ├── index.ts               Shared interfaces
 │   └── next-auth.d.ts         Session type augmentation
@@ -105,6 +117,8 @@ prisma/
 └── schema.prisma              Database schema
 android/                       Capacitor Android project
 docs/                          Documentation
+scripts/                       backup.sh, load-test.js, android-sign.sh
+.github/workflows/ci.yml       Typecheck + tests + build
 .github/workflows/build.yml    APK and IPA CI builds
 ```
 
@@ -144,19 +158,20 @@ Data flows into the dashboard server-first, then interactively through API route
 
 ## 5. Data model
 
-The Prisma schema defines 29 models. The principal entities:
+The Prisma schema defines 34 models. The principal entities:
 
 | Model | Purpose | Key fields |
 |---|---|---|
 | `User` | Account | email (unique), password hash, emailVerified, currency, location |
 | `Account` / `Session` / `VerificationToken` | NextAuth provider accounts and sessions | provider, tokens |
-| `LinkedBank` | Plaid connection | institution, account type/name, encrypted token, lastSynced |
+| `LinkedBank` | Plaid connection | institution, account type/name, encrypted token, plaidItemId, lastSynced |
 | `Transaction` | Imported transactions | amount, direction, description, merchant, category, status, runningBalance; index on [userId, date] |
 | `ManualTransaction` | User-entered transactions | amount, direction, description, optional receipt |
 | `Receipt` | Receipt blobs | filename, data (Bytes), mimeType |
 | `Budget` | Category limits | category, amount, period; unique [userId, category, period] |
 | `Goal` | Savings goals | name, targetAmount, currentAmount, deadline, color |
 | `Bill` | Recurring bills | amount, dueDate (day), frequency, reminderDays |
+| `Consent` | GDPR consent records | type, granted, version; unique [userId, type] |
 | `DebtPlan` / `Liability` | Debt strategies and debts | strategy, interestRate, minPayment |
 | `ChatMessage` | Assistant history | role, content |
 | `Alert` | System alerts | type, severity, read, data (JSON) |
@@ -167,6 +182,10 @@ The Prisma schema defines 29 models. The principal entities:
 | `Household` / `HouseholdMember` | Shared households | role, joinedAt |
 | `Notification` / `PushSubscription` | Notifications and push | type, read; endpoint (unique), p256dh, auth |
 | `Vault` / `RoundUpRule` | Savings pots and round-ups | targetAmount, currentAmount, isActive |
+| `AuditLog` | Security-relevant events | action, ip, userAgent, meta (JSON) |
+| `ErrorLog` | Client/server error reporting | source, message, stack, url, userAgent |
+| `Feedback` | In-app support/feedback | category, message, rating, userAgent |
+| `AiUsage` | Daily per-user AI budget | date, count; unique [userId, date] |
 
 ### 5.1 Schema naming
 
@@ -203,8 +222,13 @@ For each linked bank:
 ### 7.3 Security
 
 - Access tokens are encrypted at rest and decrypted only inside server functions at sync time.
-- The encryption key is validated to be 32 bytes at module load (`lib/encryption.ts`).
-- Webhook signatures are verified with an HMAC helper (`verifyWebhookSignature`); Plaid webhooks are not yet wired (see production readiness document).
+- The encryption key is resolved lazily (`lib/encryption.ts`) so a missing or malformed `ENCRYPTION_KEY` fails only the specific encrypt/decrypt call (with a clear message) instead of crashing the module or the build.
+
+### 7.4 Webhooks and reconciliation
+
+- `POST /api/plaid/webhook` receives Plaid webhooks. Signatures are verified with an HMAC-SHA256 of the first 43 bytes of the raw body using `PLAID_WEBHOOK_SECRET` (verification is skipped, with a warning, only when that secret is unset). `SYNC_UPDATES_AVAILABLE` triggers a sync via the shared `syncAllForUser` helper; `LOGIN_REQUIRED` and `PENDING_EXPIRATION` create an in-app notification prompting re-authentication.
+- `POST /api/plaid/reconcile` flags stale connections, uncategorized transaction counts, and pending transaction volumes so sync problems surface in-app.
+- `lib/bank-sync.ts` is the single sync implementation shared by the manual sync endpoint and the webhook handler.
 
 ## 8. API reference
 
@@ -230,11 +254,13 @@ All routes live under `/api`. Unless noted, every route requires a session and s
 | Method | Route | Description |
 |---|---|---|
 | GET | `/api/plaid/link-token` | Create a Plaid Link token |
-| POST | `/api/plaid/exchange` | Exchange public token, store encrypted access token |
+| POST | `/api/plaid/exchange` | Exchange public token, store encrypted access token and item id |
 | GET | `/api/plaid/accounts` | List linked banks with balances |
 | GET | `/api/plaid/accounts/[id]` | Single linked bank |
 | DELETE | `/api/plaid/accounts/[id]` | Unlink account (calls Plaid `item/remove`) |
 | POST | `/api/plaid/sync` | Import transactions for all linked banks |
+| POST | `/api/plaid/webhook` | Plaid webhook handler (HMAC-verified; sync + re-auth alerts) |
+| POST | `/api/plaid/reconcile` | Report stale connections, uncategorized and pending transactions |
 
 ### 8.3 Transactions
 
@@ -284,7 +310,7 @@ All routes live under `/api`. Unless noted, every route requires a session and s
 | GET | `/api/prices/search` | Local price comparison |
 | GET | `/api/alerts/generate` | Generate alerts from current data |
 
-### 8.7 Notifications and reporting
+### 8.7 Notifications, reporting, and platform
 
 | Method | Route | Description |
 |---|---|---|
@@ -292,6 +318,17 @@ All routes live under `/api`. Unless noted, every route requires a session and s
 | GET | `/api/push/public-key` | VAPID public key for web push |
 | POST | `/api/push/register` | Register a push subscription |
 | GET | `/api/reports` | Monthly report data |
+
+### 8.8 Account, consent, and monitoring
+
+| Method | Route | Description |
+|---|---|---|
+| GET | `/api/health` | Public health check (`SELECT 1`); no-store |
+| GET | `/api/account/export` | GDPR export: full user data as a JSON attachment (credentials excluded) |
+| POST | `/api/account/delete` | Permanent account deletion (requires typing `DELETE` + password) |
+| POST | `/api/consent` | Upsert consent records (cookies/analytics/marketing) for signed-in users |
+| POST | `/api/feedback` | In-app feedback/support (bug, feature, feedback, support; min 10 chars) |
+| POST | `/api/monitoring/error` | Client-side error reporter used by error boundaries |
 
 ## 9. AI engine
 
@@ -303,20 +340,28 @@ Results are cached in `AiInsight` with a 1-hour expiry keyed by user, type, and 
 
 ### 9.2 Chat (`lib/ai.ts`, `chatWithData`)
 
-- **Primary path.** Claude with function-calling tools: `search_transactions`, `get_category_totals`, `get_merchant_info`.
+- **Primary path.** Claude with function-calling tools: `search_transactions`, `get_category_totals`, `get_merchant_info`. The Anthropic client is created lazily (`getClient()`) so the module loads cleanly even when `ANTHROPIC_API_KEY` is unset.
 - **Fallback path.** A deterministic local engine that computes aggregates and matches intent through pattern matching, supporting 15+ question types and time-range filtering. This path requires no API key and keeps the assistant operational during provider outages.
 - **Context.** `/api/chat` loads the last 20 messages and up to 500 recent transactions plus budgets, goals, and debts before calling the engine.
 
+### 9.3 Privacy and cost controls
+
+- **PII redaction** (`lib/pii.ts`): emails, phones, card numbers, IBANs, BICs, and SSNs are replaced before any data reaches the AI provider. Redaction runs both in `chatWithData` (on the system message and history) and in the `/api/chat` and `/api/intelligence` routes.
+- **Daily budget** (`lib/ai-budget.ts`): per-user daily AI call allowance tracked in `AiUsage`, default 60/day. Exceeding it returns 429; chat falls back to the local engine with a disclosure line appended.
+- **Guardrails** in the system prompt: claims must be grounded in the provided data, no invented figures, no tax/legal/investment advice, and users are told to verify in-app.
+
 ## 10. Security
 
-- **At rest.** Passwords bcrypt cost 12; bank tokens AES-256-GCM with per-message random IV and authentication tag; encryption key length enforced.
+- **At rest.** Passwords bcrypt cost 12; bank tokens AES-256-GCM with per-message random IV and authentication tag; encryption key length enforced at call time.
 - **In transit.** All traffic HTTPS (Capacitor `cleartext: false`); production behind Vercel.
-- **Sessions.** Signed JWT in HttpOnly cookie; CSRF protection via NextAuth; email-verification gate in middleware.
+- **Sessions.** Signed JWT in HttpOnly cookie; CSRF protection via NextAuth; email-verification gate in middleware. `NEXTAUTH_SECRET` may be a comma-separated list; the middleware and JWT verification try every secret so keys can be rotated without logging users out (`lib/secrets.ts`).
 - **Input.** Zod schemas on API bodies; no raw SQL.
 - **Rate limiting.** In-memory limiter (`lib/rate-limit.ts`) on registration, password reset, email verification/change, password change, and the AI chat and intelligence endpoints. Back with an external store for multi-region deployments.
-- **Headers.** CSP, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy set in `next.config.js`.
+- **Headers.** CSP, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and Permissions-Policy set in `next.config.js`. CSP allows `cdn.plaid.com` and `js.stripe.com` scripts and frames for bank link and checkout.
+- **Audit log.** `lib/audit.ts` records security-relevant events (login, OAuth login, password/email change, password reset, data export, account deletion, bank link) to the `AuditLog` table, best-effort and non-blocking.
+- **Error reporting.** `POST /api/monitoring/error` captures client-side crashes from the dashboard error boundary into `ErrorLog`. A rotating file logger (`lib/logger.ts`) writes server-side diagnostics (5 MB rotation, 5 files).
 - **Bank access.** Read-only via Plaid; tokens never serialised to the client; no write/transfer capability exists in the integration.
-- **Gaps tracked.** Audit log, secrets rotation, and session revocation are outstanding (see `PRODUCTION_READINESS.md`).
+- **Gaps tracked.** External DDoS protection and a third-party penetration test remain outstanding (see `PRODUCTION_READINESS.md`).
 
 ## 11. Mobile builds (Capacitor)
 
@@ -338,7 +383,9 @@ Build scripts in `package.json`:
 | `npm run ipa` | Build and export iOS archive (macOS + Xcode) |
 | `npm run vapid:generate` | Generate web-push VAPID keys |
 
-The CI workflow `.github/workflows/build.yml` builds the Next.js app, syncs Capacitor, and produces a debug APK on Ubuntu and an unsigned iOS build on macOS.
+`scripts/android-sign.sh` prepares a signed release build: it writes a gitignored `android/fintrack-release.properties` (consumed by `android/app/build.gradle`), syncs Capacitor, and runs `assembleRelease`. Configure via env (`FINTRACK_KEYSTORE_PATH`, `FINTRACK_KEYSTORE_PASSWORD`, `FINTRACK_KEY_ALIAS`, `FINTRACK_KEY_PASSWORD`) or interactively.
+
+The CI workflow `.github/workflows/build.yml` builds the Next.js app, syncs Capacitor, and produces a debug APK on Ubuntu and an unsigned iOS build on macOS. `.github/workflows/ci.yml` runs typecheck, unit tests, and the production build on every push/PR.
 
 ## 12. Deployment
 
@@ -349,10 +396,12 @@ The CI workflow `.github/workflows/build.yml` builds the Next.js app, syncs Capa
 
 ## 13. Observability (current state)
 
-- **Errors:** Unhandled errors surface in Next.js error boundaries; no third-party error tracking is connected.
-- **Logs:** `console` output is available in Vercel function logs.
-- **Alerting:** None configured. Availability, sync health, and AI fallback usage are not instrumented.
-- **Required additions** (costed in `PRODUCTION_READINESS.md`): Sentry, uptime checks, structured logs, SLOs, and scheduled-job infrastructure.
+- **Health.** `GET /api/health` runs a `SELECT 1` and reports `ok`/`degraded`; the public `/status` page polls it every 30 seconds.
+- **Errors.** Client crashes are reported by the dashboard error boundary to `POST /api/monitoring/error` (`ErrorLog` table). Server errors are written by `lib/logger.ts` to `.logs/app.log` with 5 MB rotation. No third-party error tracking is connected yet.
+- **Backups.** `scripts/backup.sh` dumps the database (`pg_dump` + globals) to dated gzip files with retention pruning.
+- **Load testing.** `scripts/load-test.js` exercises any path with configurable concurrency/duration and reports rate, latency percentiles, and errors.
+- **Alerting.** None configured. Availability, sync health, and AI fallback usage are not instrumented.
+- **Required additions** (costed in `PRODUCTION_READINESS.md`): Sentry, uptime checks, structured log shipping, SLOs, and scheduled-job infrastructure.
 
 ## 14. Local development
 
@@ -369,18 +418,20 @@ npm run dev
 Validation:
 
 ```bash
-npx tsc --noEmit   # type checking
-npm run build      # production build
+npm run typecheck            # tsc --noEmit
+npm test                     # vitest unit tests
+npm run build                # production build
 ```
 
-There is no automated test suite yet; the production readiness document schedules one before launch.
+The unit test suite (`vitest`) covers pagination parsing, date/bill helpers, validation helpers, PII redaction, and the rate limiter. `.github/workflows/ci.yml` runs typecheck, tests, and the build in CI.
 
 ## 15. Known limitations
 
-1. No automated test suite or CI test stage.
-2. Plaid webhooks (sync, bill reminders, alerts) run on request paths rather than scheduled jobs.
+1. No API integration or E2E test suite yet (unit tests + CI are in place).
+2. Bill reminders, alerts, and scheduled daily sync run on request paths rather than scheduled jobs.
 3. Credit score and investment values are manually entered; no live market or bureau feeds.
-4. AI is uncapped per user, relying on a 1-hour cache to control cost.
-5. In-memory rate limiting (single-instance) rather than an external store; no audit log.
-6. Mobile release builds are unsigned in the default configuration.
+4. AI is capped per user per day (default 60 calls) and falls back to the local engine; rely on the budget + 1-hour insight cache to control cost.
+5. In-memory rate limiting (single-instance) rather than an external store.
+6. Mobile release builds are unsigned in the default configuration; `scripts/android-sign.sh` prepares a signed build.
+7. Privacy/Terms/Cookie pages are ready but should be reviewed by legal counsel before public launch.
 7. Receipts are stored as database blobs rather than object storage.

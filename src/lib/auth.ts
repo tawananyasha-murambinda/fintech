@@ -4,6 +4,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { logAudit } from '@/lib/audit'
 import { z } from 'zod'
 
 const loginSchema = z.object({
@@ -53,6 +54,13 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account }) {
+      // Audit successful sign-ins (best-effort).
+      try {
+        await logAudit(user?.id, account?.provider === 'credentials' ? 'auth.login' : 'auth.oauth_login', {
+          metadata: { provider: account?.provider || 'unknown' },
+        })
+      } catch {}
+
       // OAuth providers (Google) have already verified the email, so mark
       // the account verified on first sign-in if it isn't already.
       if (account && account.provider !== 'credentials' && user?.email) {

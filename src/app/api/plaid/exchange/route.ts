@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
         data: {
           userId: session.user.id,
           plaidAccountId: account.account_id,
+          plaidItemId: itemId,
           institutionName: instName,
           accountType: account.type,
           accountName: account.name,

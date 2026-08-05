@@ -1,6 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+let _client: Anthropic | null = null
+function getClient(): Anthropic | null {
+  if (!process.env.ANTHROPIC_API_KEY) return null
+  if (!_client) _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  return _client
+}
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022'
 
 const CATEGORIES = [
@@ -18,6 +23,9 @@ Merchant: ${merchantName}
 Description: ${description}
 
 Return ONLY the category name, nothing else. If unsure, return "Uncategorized".`
+
+    const client = getClient()
+    if (!client) return null
 
     const response = await client.messages.create({
       model: MODEL,

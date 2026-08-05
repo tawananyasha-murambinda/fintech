@@ -10,10 +10,12 @@ FinTrack is an intelligent personal finance application. It links to your bank a
 
 | Document | Purpose |
 |---|---|
-| `docs/PRODUCTION_READINESS.md` | Gap analysis and cost estimate for a public launch |
-| `docs/FinTrack-User-Manual.pdf` | End-user guide to every screen and feature |
-| `docs/FinTrack-Technical-Documentation.pdf` | Architecture, API, data model, and operations reference |
+| `docs/PRODUCTION_READINESS.md` | Gap analysis and cost estimate for a public launch (updated with completed work) |
+| `docs/FinTrack-User-Manual.md` | End-user guide to every screen and feature |
+| `docs/FinTrack-Technical-Documentation.md` | Architecture, API, data model, and operations reference |
 | `README.md` (this file) | Quick orientation for contributors |
+
+DOCX and PDF copies of the manuals live in `docs/`; the Markdown files are the source of truth.
 
 ## Product overview
 
@@ -42,10 +44,10 @@ FinTrack is an intelligent personal finance application. It links to your bank a
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 14 (App Router) with TypeScript |
+| Framework | Next.js 15 (App Router) with TypeScript |
 | UI | Tailwind CSS, Radix UI, Recharts |
 | Database | PostgreSQL via Prisma ORM |
-| Authentication | NextAuth.js (email/password, Google, GitHub) |
+| Authentication | NextAuth.js (email/password, Google) |
 | Bank connectivity | Plaid (US and EU open banking) |
 | AI | Anthropic Claude, with a deterministic local fallback engine |
 | Mobile | Capacitor 6 (Android and iOS) |
@@ -92,11 +94,11 @@ Complete `.env.local` using the table below.
 | Variable | Description | How to obtain |
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL connection string | Your database provider |
-| `NEXTAUTH_SECRET` | Session signing secret | `openssl rand -base64 32` |
+| `NEXTAUTH_SECRET` | Session signing secret (comma-separated for rotation) | `openssl rand -base64 32` |
 | `NEXTAUTH_URL` | Canonical app URL | `http://localhost:3000` in development |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth credentials | Google Cloud Console |
-| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth credentials | GitHub developer settings |
 | `PLAID_CLIENT_ID` / `PLAID_SECRET` / `PLAID_ENV` | Plaid credentials | Plaid dashboard |
+| `PLAID_WEBHOOK_SECRET` | Plaid webhook HMAC secret | Plaid dashboard (webhooks) |
 | `ENCRYPTION_KEY` | Key for bank-token encryption | `openssl rand -hex 32` |
 | `ANTHROPIC_API_KEY` | Claude API key | Anthropic Console |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `EMAIL_FROM` | Outbound email | Your email provider |
@@ -119,8 +121,17 @@ Open http://localhost:3000.
 ### Validation
 
 ```bash
-npx tsc --noEmit    # Type checking
+npm run typecheck   # tsc --noEmit
+npm test            # vitest unit tests
 npm run build       # Production build
+```
+
+### Ops scripts
+
+```bash
+scripts/backup.sh         # pg_dump database + globals with retention pruning
+scripts/load-test.js      # concurrency/duration load test against any path
+scripts/android-sign.sh   # write signing config and build a signed release APK
 ```
 
 ## Mobile builds
@@ -142,7 +153,7 @@ npm run ipa           # Build and export an iOS archive (macOS and Xcode require
 
 ## Deployment
 
-The project is configured for Vercel (`vercel.json`). Connect the repository to a Vercel project, set the environment variables from `.env.example`, and deploy. A CI workflow in `.github/workflows/` builds the Android APK and iOS app on push to `main`.
+The project is configured for Vercel (`vercel.json`). Connect the repository to a Vercel project, set the environment variables from `.env.example`, and deploy. CI workflows in `.github/workflows/` run typecheck, unit tests, and the production build on every push/PR (`ci.yml`) and build the Android APK and iOS app (`build.yml`).
 
 ## Licence
 

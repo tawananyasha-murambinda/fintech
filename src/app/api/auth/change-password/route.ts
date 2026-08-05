@@ -6,6 +6,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { errorResponse } from '@/lib/errors'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
+import { logAudit, requestMeta } from '@/lib/audit'
 
 const schema = z.object({
   currentPassword: z.string().min(1),
@@ -57,6 +58,8 @@ export async function POST(req: NextRequest) {
       where: { id: session.user.id },
       data: { password: hashedPassword },
     })
+
+    await logAudit(session.user.id, 'auth.password_changed', requestMeta(req))
 
     return NextResponse.json({ success: true })
   } catch (err) {

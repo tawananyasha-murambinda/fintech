@@ -41,3 +41,8 @@ Thumbs.db
 *.pem
 .vercel
 .env*
+.logs
+coverage
+fintrack-release.properties
+*.keystore
+*.jks

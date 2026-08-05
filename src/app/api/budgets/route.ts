@@ -35,7 +35,7 @@ export async function GET() {
     remaining: b.amount - (categoryTotals[b.category.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())] || 0),
   }))
 
-  return NextResponse.json(budgetsWithSpent)
+  return NextResponse.json(budgetsWithSpent, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 export async function POST(req: NextRequest) {

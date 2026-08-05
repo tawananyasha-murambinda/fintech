@@ -4,6 +4,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { errorResponse } from '@/lib/errors'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
+import { logAudit, requestMeta } from '@/lib/audit'
 
 const schema = z.object({
   token: z.string().min(1),
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12)
 
+    const user = await prisma.user.findUnique({ where: { email }, select: { id: true } })
     await prisma.user.update({
       where: { email },
       data: { password: hashedPassword },
@@ -46,6 +48,10 @@ export async function POST(req: NextRequest) {
     await prisma.verificationToken.delete({
       where: { identifier_token: { identifier: `reset:${email}`, token } },
     })
+
+    if (user) {
+      await logAudit(user.id, 'auth.password_reset', requestMeta(req))
+    }
 
     return NextResponse.json({ success: true })
   } catch (err) {

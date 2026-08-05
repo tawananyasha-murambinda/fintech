@@ -6,6 +6,8 @@ import { PreferencesSection } from "@/components/settings/PreferencesSection";
 import { PrivacySection } from "@/components/settings/PrivacySection";
 import { NotificationPreferencesSection } from "@/components/settings/NotificationPreferences";
 import { LocationSection } from "@/components/settings/LocationSection";
+import { DataSection } from "@/components/settings/DataSection";
+import { SupportSection } from "@/components/settings/SupportSection";
 
 export default function SettingsPage() {
   return (
@@ -30,7 +32,9 @@ export default function SettingsPage() {
       <LocationSection />
       <NotificationPreferencesSection />
       <PrivacySection />
+      <DataSection />
       <PreferencesSection />
+      <SupportSection />
     </div>
   );
 }

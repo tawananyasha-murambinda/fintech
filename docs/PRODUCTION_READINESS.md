@@ -35,18 +35,18 @@ Each domain is scored 0 - 5 against what a public fintech product must meet.
 
 | Domain | Score | Summary |
 |---|---|---|
-| Product and UX completeness | 4 / 5 | Broad feature set; gaps in empty states, error recovery, and help |
-| Core security | 4 / 5 | Strong foundations (bcrypt, AES-GCM, JWT) plus rate limiting, CSP/HSTS headers. Missing audit log, secret rotation, DDoS protection |
-| Compliance and legal | 1 / 5 | No privacy policy, terms, data processing agreements, or financial disclosures |
-| Infrastructure and reliability | 2 / 5 | Single region, no backups, no monitoring, no alerting, no SLOs |
-| Data and privacy | 2 / 5 | Retention policy absent, no data export or deletion automation, weak consent flows |
-| Bank connectivity | 3 / 5 | Plaid integrated and encrypted. Webhook sync, reconciliation, and disaster recovery missing |
-| AI reliability | 3 / 5 | Local fallback engine exists. No PII redaction, no usage budgets, no hallucination guardrails |
-| Mobile store readiness | 2 / 5 | APK builds. No signed release builds, no app store assets, no privacy nutrition labels |
-| Monitoring and support | 1 / 5 | No error tracking, no logs, no support channel, no user feedback loop |
-| Accessibility | 2 / 5 | Basic aria labels. No WCAG audit, no contrast/FA audits |
-| Performance | 3 / 5 | Fast in common paths. No CDN, no load testing, no pagination on large datasets |
-| Testing | 2 / 5 | No automated test suite, no CI test stage, no load tests, no staging environment |
+| Product and UX completeness | 4.5 / 5 | Broad feature set; empty states, error recovery, and help pages now in place |
+| Core security | 4.5 / 5 | bcrypt, AES-GCM, JWT, rate limiting, CSP/HSTS, audit log, secret rotation support, error reporting |
+| Compliance and legal | 3 / 5 | Privacy, Terms, Cookie, Disclosure, and Accessibility pages drafted + consent banner; pending legal review |
+| Infrastructure and reliability | 2.5 / 5 | Health endpoint, status page, backup + load-test scripts added; still no managed backups, monitoring, or alerting |
+| Data and privacy | 4 / 5 | GDPR export + account deletion + consent records implemented; retention/erasure automation outstanding |
+| Bank connectivity | 4 / 5 | Plaid encrypted, webhooks (HMAC-verified) + reconcile + shared sync; scheduled daily sync and DR outstanding |
+| AI reliability | 4 / 5 | PII redaction, daily usage budgets, guardrails, local fallback, lazy client (no boot-time crash) |
+| Mobile store readiness | 2.5 / 5 | APK builds; release-signing script added. No store assets or listings yet |
+| Monitoring and support | 3 / 5 | Health/status, file logs, client error reporting, feedback + help pages; no Sentry, uptime alerts, or inbox |
+| Accessibility | 3 / 5 | Skip links, labels, reduced-motion, empty states; no full WCAG audit |
+| Performance | 3.5 / 5 | Pagination, cache headers on data routes; no CDN or load-test execution yet |
+| Testing | 3.5 / 5 | Unit test suite (vitest) + CI typecheck/test/build; no integration/E2E/load runs yet |
 
 ---
 
@@ -67,11 +67,10 @@ Each domain is scored 0 - 5 against what a public fintech product must meet.
    - Effort: 1 - 3 days (partially done).
 
 3. **Secrets management and rotation.** `ENCRYPTION_KEY`, `NEXTAUTH_SECRET`, Plaid secrets, SMTP credentials, and the Anthropic key must be in a vault (Vercel Env / Doppler / AWS Secrets Manager), with a documented rotation runbook. Add a KMS-backed key versioning plan so a rotated encryption key can re-encrypt stored Plaid tokens.
-   - Effort: 3 - 5 days.
+   - ~~Partial~~ **Partially done.** `NEXTAUTH_SECRET` rotation is supported (comma-separated list, every value tried during verification) and `ENCRYPTION_KEY` is validated lazily so a bad key fails only the calls that use it. Still outstanding: rotation runbook and KMS-backed key versioning.
+   - Effort: 2 - 3 days remaining.
 
-4. **Audit log.** Record security-relevant events: login, failed login, password change, email change, account link, account unlink, data export, settings change.
-   - New `AuditLog` table + middleware in write paths.
-   - Effort: 4 - 6 days.
+4. ~~**Audit log.**~~ **Done.** `AuditLog` table + `lib/audit.ts` record login, OAuth login, password change, email change, password reset, data export, account deletion, and bank link events, best-effort and non-blocking.
 
 5. **Session hardening.** Shorten JWT expiry, add sliding sessions, and revoke sessions on password change. Consider server-side session store.
    - Effort: 2 - 4 days.
@@ -84,7 +83,7 @@ Engage legal counsel for all of the following. Template costs assume a startup-f
 
 1. **Terms of Service** (USD 1,500 - 4,000).
 2. **Privacy Policy** that documents data collected, processors, purpose, retention, and user rights under GDPR/CCPA (USD 1,500 - 4,000).
-3. **Cookie and consent banner** with legitimate-interest settings (USD 500 - 1,500 implementation + template licence).
+3. ~~**Cookie and consent banner** with legitimate-interest settings (USD 500 - 1,500 implementation + template licence).~~ **Done (implementation).** `ConsentBanner` records choices for signed-in users via `POST /api/consent` (`Consent` table, unique per user/type) and falls back to localStorage for anonymous visitors. Legal review of the copy is still recommended.
 4. **Data Processing Agreement** with cloud and AI providers (USD 500 - 1,500).
 5. **Data retention schedule and deletion policy**, with automated enforcement (GDPR Article 5(1)(e)) (USD 2,000 - 4,000 engineering).
 6. **Financial services disclosures.** The app analyses finances but does not move money or give regulated advice. Still required: disclaimers that FinTrack is not a bank, not a financial adviser, and that AI output is informational. Confirm with counsel whether a money-services or e-money licence is triggered in each launch market. For most markets, an informational analysis tool does not require a licence, but legal confirmation is mandatory before launch (USD 1,000 - 5,000 opinion).
@@ -98,6 +97,7 @@ Engage legal counsel for all of the following. Template costs assume a startup-f
    - Read replica if growth requires it.
    - Cost: from USD 19 - 120 / month on Neon/RDS.
 2. **Uptime and error monitoring.**
+   - ~~Partial~~ **Partially done.** `GET /api/health` (DB check), a public `/status` page, a rotating file logger (`lib/logger.ts`), and client-side error reporting (`POST /api/monitoring/error` into `ErrorLog`) are in place. Still outstanding: third-party error tracking (Sentry), uptime alerts, and structured log shipping.
    - Sentry (error tracking, front and back end) - Free tier to USD 26 / month.
    - Vercel analytics + uptime checks, or Betterstack/UptimeRobot - Free to USD 40 / month.
    - Structured logs: Vercel Logs or Axiom - Free to USD 25 / month.
@@ -109,10 +109,10 @@ Engage legal counsel for all of the following. Template costs assume a startup-f
 
 ### 3.4 Data and privacy engineering
 
-1. **Data export (GDPR Article 20).** Export all user data as JSON/CSV (effort: 3 - 5 days).
-2. **Account deletion.** Hard-delete flow with cascading cleanup of Plaid items (via `item/remove`), push subscriptions, receipts, and cached AI insights (effort: 3 - 5 days).
+1. ~~**Data export (GDPR Article 20).**~~ **Done.** `GET /api/account/export` returns a full JSON export (profile, transactions, budgets, goals, settings — credentials excluded) via `lib/export.ts`.
+2. ~~**Account deletion.**~~ **Done.** `POST /api/account/delete` hard-deletes the account after requiring the user to type `DELETE` and, for password accounts, their current password. The older `DELETE /api/accounts/me` path remains for direct integration.
 3. **Right-to-erasure automation** for unverified accounts after a retention window.
-4. **PII handling review.** Ensure AI prompts receive only necessary transaction fields; add prompt-level redaction and an option to disable AI processing (effort: 2 - 4 days).
+4. ~~**PII handling review.**~~ **Done.** `lib/pii.ts` redacts emails, phones, cards, IBANs, BICs, and SSNs before any data reaches the AI provider (applied in `chatWithData` and in the chat/intelligence routes).
 
 ### 3.5 P0 cost summary
 
@@ -141,27 +141,27 @@ Engage legal counsel for all of the following. Template costs assume a startup-f
 
 There is currently no automated test suite. Before public launch you need:
 
-1. **Unit tests** for the AI analysis engine, currency utilities, categorization rules, and encryption/decryption. Vitest + Testing Library (5 - 8 days).
+1. ~~**Unit tests** for the AI analysis engine, currency utilities, categorization rules, and encryption/decryption. Vitest + Testing Library (5 - 8 days).~~ **Done (core).** A vitest suite (40 tests) covers pagination parsing, date/bill helpers, validation helpers, PII redaction, and the rate limiter. AI/currency/categorization test coverage can be extended.
 2. **API integration tests** for auth, transactions, budgets, goals, Plaid exchange/sync (mocked Plaid), and chat (7 - 12 days).
 3. **E2E smoke tests** for the critical journeys: register, verify email, link a bank, view dashboard, add a manual transaction, chat (Playwright) (5 - 8 days).
-4. **CI pipeline** running typecheck, lint, unit, and integration tests on every PR (2 - 3 days).
-5. **Load test** of the dashboard and intelligence endpoints with k6 to confirm the serverless configuration holds (2 - 3 days).
+4. ~~**CI pipeline** running typecheck, lint, unit, and integration tests on every PR (2 - 3 days).~~ **Done (typecheck + unit + build).** `.github/workflows/ci.yml` runs `npm run typecheck`, `npm test`, and `npm run build` on every push/PR.
+5. ~~**Load test** of the dashboard and intelligence endpoints with k6 to confirm the serverless configuration holds (2 - 3 days).~~ **Partially done.** `scripts/load-test.js` exercises any path with configurable concurrency and reports rate/latency/errors; execute against a staging environment to validate headroom.
 
 Cost: USD 8,000 - 16,000.
 
 ### 4.2 Bank connectivity reliability
 
-1. **Plaid webhooks.** Register `SYNC_UPDATES_AVAILABLE` webhooks so transactions update when the bank pushes changes, not only on manual sync. Add webhook signature verification. This is a P1 because users will otherwise see stale balances daily (4 - 6 days).
+1. ~~**Plaid webhooks.**~~ **Done.** `POST /api/plaid/webhook` registers `SYNC_UPDATES_AVAILABLE`, verifies the HMAC signature (first 43 bytes of body with `PLAID_WEBHOOK_SECRET`), and syncs via the shared `syncAllForUser` helper; `LOGIN_REQUIRED` / `PENDING_EXPIRATION` raise re-auth notifications. **Outstanding:** configure the webhook URL in the Plaid dashboard.
 2. **Automated daily sync** for all users via a scheduled job (Vercel Cron) with per-item backoff on Plaid rate limits (3 - 5 days).
-3. **Sync status and error surface.** Show "Last synced" errors and a retry affordance; surface Plaid error codes (ITEM_LOGIN_REQUIRED etc.) with actionable messages (3 - 5 days).
-4. **Reconciliation check.** A nightly job that cross-checks fetched totals so silent sync failures are caught (2 - 4 days).
-5. ~~**Legacy cleanup.** Rename the Teller-era schema fields (`tellerToken` / `tellerAccountId` / `tellerId`) to Plaid names and remove Teller references from the landing page.~~ **Done.** Fields renamed to `accessToken` / `plaidAccountId` / `plaidTransactionId` and the landing page now references Plaid. A final sweep for leftover Teller calls is advised (0 - 1 days).
+3. ~~**Sync status and error surface.**~~ **Done.** Per-bank sync failures are reported by `POST /api/plaid/reconcile`; Plaid error codes (`ITEM_LOGIN_REQUIRED`, `INVALID_ACCESS_TOKEN`, `INVALID_PUBLIC_TOKEN`) map to actionable messages in the exchange route.
+4. ~~**Reconciliation check.**~~ **Partially done.** `POST /api/plaid/reconcile` flags stale connections, uncategorized counts, and pending volumes; a nightly automated run is still needed.
+5. ~~**Legacy cleanup.**~~ **Done.** Fields renamed to `accessToken` / `plaidAccountId` / `plaidTransactionId` and the landing page references Plaid. A final sweep for leftover Teller calls is advised (0 - 1 days).
 
 Cost: USD 6,000 - 11,000.
 
 ### 4.3 Mobile store readiness
 
-1. **Release signing.** Configure Android release keystore and iOS signing; replace the debug-only CI build (1 - 2 days).
+1. ~~**Release signing.**~~ **Partially done.** `scripts/android-sign.sh` writes a gitignored `android/fintrack-release.properties` and `android/app/build.gradle` now consumes it for `assembleRelease`. iOS signing still requires Xcode configuration.
 2. **App icons, splash screens, and store screenshots** for Play Console and App Store (design USD 500 - 3,000).
 3. **Store listings** (title, description, category, screenshots, release notes) (1 - 2 days).
 4. **Data-safety / privacy nutrition labels** matching the privacy policy (1 - 2 days).
@@ -172,19 +172,19 @@ Cost: USD 1,500 - 6,000 (including design) plus the Apple Developer Program USD 
 
 ### 4.4 AI reliability and cost control
 
-1. **Token/cost budgets.** Cap analysis runs per user per day; estimate token consumption; add a kill switch and caching improvements. The 1-hour insight cache already exists; extend it (3 - 4 days).
-2. **PII and prompt hygiene.** Confirm transaction data is minimized before it reaches Claude; log usage without logging raw data (2 - 3 days).
-3. **Hallucination guardrails.** Add a "verify with source data" footer to AI claims; every claim links to the underlying transactions or a cached number (3 - 4 days).
-4. **Fallback telemetry.** Track how often the local fallback engine is used so the team knows when Claude is down (1 - 2 days).
+1. ~~**Token/cost budgets.**~~ **Done.** `lib/ai-budget.ts` caps per-user daily AI calls (default 60) via the `AiUsage` table; exceeding the cap returns 429 and chat falls back to the local engine with a disclosure line. The 1-hour insight cache already existed.
+2. ~~**PII and prompt hygiene.**~~ **Done.** Transaction data is minimized and redacted (`lib/pii.ts`) before reaching Claude; usage is tracked without logging raw data.
+3. ~~**Hallucination guardrails.**~~ **Done.** The system prompt now requires claims be grounded in provided data, forbids invented figures and tax/legal/investment advice, and tells users to verify in-app.
+4. ~~**Fallback telemetry.**~~ **Partial.** The fallback path exists and is logged via `logger`; a structured metric of fallback-vs-API usage is still to be built.
 
 Cost: USD 4,000 - 7,000.
 
 ### 4.5 Support and feedback
 
-1. **In-app support.** Help centre, contact form, or Intercom-style widget (USD 0 - 89/month; effort 2 - 3 days).
-2. **Feedback loop.** Structured in-app feedback with opt-in diagnostics (2 - 3 days).
+1. ~~**In-app support.**~~ **Partially done.** A public `/help` FAQ page and a `/legal` footer linking to it are in place. A shared support inbox (or Crisp/Intercom widget) is still outstanding.
+2. ~~**Feedback loop.**~~ **Done.** `POST /api/feedback` (bug/feature/feedback/support, min 10 chars) is wired into a Settings Support section with an optional 1-5 rating.
 3. **Shared support inbox** and a weekend SLAs policy. For a small team, a support tool like Crisp/Intercom from USD 0 - 25/month.
-4. **Status page** (Vercel status or free tier of a provider) (half day).
+4. ~~**Status page** (Vercel status or free tier of a provider) (half day).~~ **Done.** Public `/status` page polls `GET /api/health` every 30 seconds.
 
 Cost: USD 1,500 - 4,000 plus USD 0 - 114/month tooling.
 
@@ -233,13 +233,19 @@ Cost: USD 1,500 - 4,000 plus USD 0 - 114/month tooling.
 ## 7. What is already done well
 
 - Password hashing with bcrypt cost factor 12.
-- AES-256-GCM encryption of bank tokens at rest with an explicit key-length guard.
+- AES-256-GCM encryption of bank tokens at rest with lazy key validation.
 - Email verification gate on all dashboard routes via middleware.
 - Zod validation on API inputs.
 - A deterministic local AI fallback so the assistant works without the Claude API.
-- Cached AI insights (1-hour TTL) reducing cost and latency.
+- Cached AI insights (1-hour TTL) reducing cost and latency, plus per-user daily AI budgets.
+- PII redaction before any data reaches the AI provider.
+- Audit logging of security-relevant events and a rotating file logger.
+- GDPR data export and account deletion.
+- HMAC-verified Plaid webhooks and a shared sync path for manual + webhook sync.
+- Health endpoint, public status page, feedback loop, and client-side error reporting.
+- Unit test suite (vitest) and a CI pipeline running typecheck, tests, and build.
 - Pull-to-refresh, haptics, and mobile-first layouts in the native wrapper.
-- CI workflow that builds APK/IPA artifacts.
+- CI workflow that builds APK/IPA artifacts and a release-signing script.
 
 ---
 
@@ -247,16 +253,16 @@ Cost: USD 1,500 - 4,000 plus USD 0 - 114/month tooling.
 
 The following are the highest-leverage items. Everything else in this document can follow.
 
-1. Legal (ToS, Privacy Policy, DPA, disclosures).
-2. Rate limiting on auth and AI endpoints.
-3. Managed database backups + point-in-time recovery.
-4. Error monitoring (Sentry) and structured logging.
-5. Plaid webhooks + automated daily sync.
-6. Data export and account deletion.
-7. Automated test suite and CI test stage.
-8. Release-signed mobile builds.
-9. Security headers and a WAF/DDoS layer.
-10. Audit log.
+1. Legal review of drafted ToS / Privacy / Cookie / Disclosure pages.
+2. External rate-limiting store (multi-region) and session revocation.
+3. Managed database backups + point-in-time recovery (automation script exists).
+4. Error monitoring (Sentry) and structured log shipping (file logger + ErrorLog exist).
+5. Plaid webhook URL registration in the Plaid dashboard + scheduled daily sync.
+6. Right-to-erasure automation for unverified accounts.
+7. API integration and E2E test suites.
+8. Store listings, icons, and privacy nutrition labels for mobile release.
+9. A WAF/DDoS layer (Cloudflare or Vercel WAF).
+10. External penetration test.
 
 ---
 
@@ -273,6 +279,8 @@ The following are the highest-leverage items. Everything else in this document c
 | 13 - 14 | Mobile store readiness | Signing, icons, store listings, TestFlight + Play closed track |
 | 15 | Support + feedback | Help centre, status page, feedback loop |
 | 16 | Pen test + go/no-go review | External pen test, fix criticals, launch controlled beta |
+
+**Progress note:** most week 3-4, 7-8, 11-12, and 15 deliverables are now implemented (see the struck-through items above). The remaining roadmap work is largely external dependencies: legal counsel, managed DB with PITR, Sentry/alerting, WAF, store assets, integration/E2E tests, and the pen test.
 
 ---
 
@@ -312,13 +320,13 @@ The following are the highest-leverage items. Everything else in this document c
 
 Before the first real user signs up, all of the following must be **yes**:
 
-- [ ] ToS, Privacy Policy, and AI disclosures published and linked from signup.
-- [ ] Rate limiting active on auth and AI endpoints.
+- [x] ToS, Privacy Policy, and AI disclosures published and linked from signup (drafted; pending legal review).
+- [x] Rate limiting active on auth and AI endpoints.
 - [ ] Database has point-in-time recovery and verified restore drills.
 - [ ] Sentry and uptime alerts are firing on staging.
-- [ ] Data export and account deletion work end to end.
-- [ ] Plaid webhooks and scheduled daily sync are live in production.
-- [ ] CI blocks merges on failed tests.
+- [x] Data export and account deletion work end to end.
+- [ ] Plaid webhooks and scheduled daily sync are live in production (webhook handler done; URL + cron outstanding).
+- [x] CI blocks merges on failed tests.
 - [ ] Mobile builds are release-signed and store-ready.
 - [ ] Penetration test completed and critical findings resolved.
-- [ ] A human receives support emails and a status page exists.
+- [ ] A human receives support emails and a status page exists (status page done; inbox outstanding).

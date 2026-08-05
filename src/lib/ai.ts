@@ -12,6 +12,7 @@ import type {
   SpendingPattern,
 } from '@/types'
 import { findLocalAlternatives } from './geocode'
+import { redactPII, redactTransactions, redactHistory } from './pii'
 
 // ── Currency formatting for AI output ──────────────────────────────
 // The assistant runs on the server, so it must be told the user's currency
@@ -72,7 +73,16 @@ const CATEGORY_SYNONYMS: Record<string, string[]> = {
   travel: ['Travel', 'Flights', 'Hotels'],
 } as const
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+// Lazily-created Anthropic client. Creating the SDK client at module load
+// throws when ANTHROPIC_API_KEY is missing, which turned every route that
+// imports this module into a hard 500 in production. With a lazy client,
+// missing keys degrade to the local fallback engine instead.
+let _client: Anthropic | null = null
+function getClient(): Anthropic | null {
+  if (!process.env.ANTHROPIC_API_KEY) return null
+  if (!_client) _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  return _client
+}
 
 interface AnalysisInput {
   transactions: Transaction[]
@@ -952,6 +962,8 @@ Return ONLY a JSON object with this exact shape and no other text:
   let savingsSuggestions: string[] = []
 
   try {
+    const client = getClient()
+    if (!client) throw new Error('ANTHROPIC_API_KEY not configured')
     const message = await client.messages.create({
       model: MODEL,
       max_tokens: 1024,
@@ -1006,7 +1018,7 @@ Return ONLY a JSON object with this exact shape and no other text:
   }
 }
 
-function chatLocalFallback(userMessage: string, transactions: Transaction[], conversationHistory: { role: string; content: string }[]): string {
+export function chatLocalFallback(userMessage: string, transactions: Transaction[], conversationHistory: { role: string; content: string }[]): string {
   const msg = userMessage.toLowerCase().trim()
 
   // ── BUILD COMPREHENSIVE DATA PROFILE ──────────────────────────
@@ -1460,6 +1472,11 @@ export async function chatWithData(
   }
 ): Promise<string> {
   setAiCurrency(context?.currency)
+  // PII redaction before anything reaches the provider (defense in depth).
+  userMessage = redactPII(userMessage)
+  transactions = redactTransactions(transactions)
+  conversationHistory = redactHistory(conversationHistory)
+
   const totalExpenses = transactions.filter((t) => t.direction === 'debit').reduce((s, t) => s + Math.abs(t.amount), 0)
   const totalIncome = transactions.filter((t) => t.direction === 'credit').reduce((s, t) => s + Math.abs(t.amount), 0)
 
@@ -1494,7 +1511,9 @@ Transaction summary: ${transactions.length} transactions, ${money(totalIncome)} 
 Top categories: ${topCategories.map(([c, v]) => `${c} (${money(v)})`).join(', ')}${contextStr}
 ${locationStr}
 
-When you need more specific data, use the available tools to search transactions, get category breakdowns, or find merchant information.`
+When you need more specific data, use the available tools to search transactions, get category breakdowns, or find merchant information.
+
+Guardrails: Only state figures that are supported by the data provided or fetched via tools. If the data does not support a claim, say so instead of guessing. Never invent merchants, amounts, or dates. Do not provide tax, legal, or investment advice; refer the user to a qualified professional where relevant. Encourage the user to verify important figures in their own account.`
 
   const tools: any[] = [
     {
@@ -1597,6 +1616,8 @@ When you need more specific data, use the available tools to search transactions
   ]
 
   try {
+    const client = getClient()
+    if (!client) throw new Error('ANTHROPIC_API_KEY not configured')
     let response = await client.messages.create({
       model: MODEL,
       max_tokens: 2048,
@@ -1638,15 +1659,18 @@ When you need more specific data, use the available tools to search transactions
           }],
         })
 
-        const followUp = await client.messages.create({
-          model: MODEL,
-          max_tokens: 2048,
-          system: systemPrompt,
-          messages,
-        })
+        const client = getClient()
+        if (client) {
+          const followUp = await client.messages.create({
+            model: MODEL,
+            max_tokens: 2048,
+            system: systemPrompt,
+            messages,
+          })
 
-        for (const fb of followUp.content) {
-          if (fb.type === 'text') finalContent += fb.text
+          for (const fb of followUp.content) {
+            if (fb.type === 'text') finalContent += fb.text
+          }
         }
       }
     }

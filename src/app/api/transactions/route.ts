@@ -75,17 +75,20 @@ export async function GET(req: NextRequest) {
       prisma.transaction.count({ where }),
     ])
 
-    return NextResponse.json({
-      transactions: transactions.map((t) => ({
-        ...t,
-        date: t.date.toISOString(),
-      })),
-      total,
-      page,
-      pages: Math.ceil(total / limit),
-    })
+    return NextResponse.json(
+      {
+        transactions: transactions.map((t) => ({
+          ...t,
+          date: t.date.toISOString(),
+        })),
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (err) {
     console.error('Transactions API error:', err)
-    return NextResponse.json({ error: 'Failed to load transactions' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to load transactions' }, { status: 500, headers: { 'Cache-Control': 'no-store' } })
   }
 }
