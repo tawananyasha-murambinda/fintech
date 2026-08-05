@@ -11,17 +11,29 @@ export function todayKey(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+// All three helpers fail open on database errors (e.g. the AiUsage table not
+// being migrated yet) so the AI features degrade to working state instead of
+// 500ing. Once the schema is present, the daily cap is enforced normally.
 export async function getAiUsage(userId: string, date = todayKey()): Promise<number> {
-  const row = await prisma.aiUsage.findUnique({ where: { userId_date: { userId, date } } })
-  return row?.count ?? 0
+  try {
+    const row = await prisma.aiUsage.findUnique({ where: { userId_date: { userId, date } } })
+    return row?.count ?? 0
+  } catch (err) {
+    console.error(`AI usage read failed (${userId}):`, err)
+    return 0
+  }
 }
 
 export async function recordAiUsage(userId: string, date = todayKey()): Promise<void> {
-  await prisma.aiUsage.upsert({
-    where: { userId_date: { userId, date } },
-    update: { count: { increment: 1 } },
-    create: { userId, date, count: 1 },
-  })
+  try {
+    await prisma.aiUsage.upsert({
+      where: { userId_date: { userId, date } },
+      update: { count: { increment: 1 } },
+      create: { userId, date, count: 1 },
+    })
+  } catch (err) {
+    console.error(`AI usage record failed (${userId}):`, err)
+  }
 }
 
 // Returns true when the user still has budget for this request.

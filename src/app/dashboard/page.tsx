@@ -12,7 +12,7 @@ async function getDashboardData(userId: string, accountId?: string | null) {
   const accountFilter = accountId ? { linkedBankId: accountId } : {}
 
   const [banks, txThisMonth, txLastMonth, recentTx] = await Promise.all([
-    prisma.linkedBank.findMany({ where: { userId } }),
+    prisma.linkedBank.findMany({ where: { userId }, select: { id: true } }),
     prisma.transaction.findMany({
       where: { userId, date: { gte: monthAgo }, ...accountFilter },
       select: { amount: true, direction: true, date: true, merchantCategory: true },
@@ -83,6 +83,36 @@ interface DashboardPageProps {
   searchParams?: Promise<{ account?: string }>
 }
 
+interface DashboardData {
+  stats: {
+    monthlyIncome: number
+    monthlyExpenses: number
+    netCashflow: number
+    savingsRate: number
+    expenseChange: number
+    linkedAccounts: number
+  }
+  cashflow: { date: string; income: number; expenses: number; net: number }[]
+  categories: { category: string; total: number; percentage: number }[]
+  recentTransactions: any[]
+  hasData: boolean
+}
+
+const EMPTY_DASHBOARD: DashboardData = {
+  stats: {
+    monthlyIncome: 0,
+    monthlyExpenses: 0,
+    netCashflow: 0,
+    savingsRate: 0,
+    expenseChange: 0,
+    linkedAccounts: 0,
+  },
+  cashflow: [],
+  categories: [],
+  recentTransactions: [],
+  hasData: false,
+}
+
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) redirect('/auth/login')
@@ -90,11 +120,20 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const sp = await searchParams
   const accountId = sp?.account || null
 
-  const data = await getDashboardData(session.user.id, accountId)
+  let data: DashboardData
+  let dataError: string | undefined
+  try {
+    data = await getDashboardData(session.user.id, accountId)
+  } catch (err) {
+    console.error('Dashboard data load failed:', err)
+    data = EMPTY_DASHBOARD
+    dataError = 'We could not load your dashboard right now. Please try again in a moment.'
+  }
 
   return (
     <DashboardClient
       data={data}
+      dataError={dataError}
       userName={session.user.name || 'there'}
       userId={session.user.id}
       selectedAccountId={accountId}

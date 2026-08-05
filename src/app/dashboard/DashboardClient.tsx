@@ -32,6 +32,7 @@ interface DashboardClientProps {
   userName: string;
   userId: string;
   selectedAccountId: string | null;
+  dataError?: string;
 }
 
 export function DashboardClient({
@@ -39,6 +40,7 @@ export function DashboardClient({
   userName,
   userId,
   selectedAccountId,
+  dataError,
 }: DashboardClientProps) {
   const { stats, cashflow, categories, recentTransactions, hasData } = data;
   const hasAccounts = stats.linkedAccounts > 0;
@@ -64,6 +66,16 @@ export function DashboardClient({
 
   return (
     <>
+      {/* Dashboard data load error */}
+      {dataError && (
+        <div
+          role="alert"
+          className="border rounded-xl px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/50 dark:border-amber-900/40 dark:text-amber-300"
+        >
+          {dataError}
+        </div>
+      )}
+
       {/* Mobile view */}
       <div className="block lg:hidden">
         <MobileDashboard
