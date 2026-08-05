@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useCurrency } from '@/hooks/useCurrency'
+import { Disclosure } from '@/components/ui/Disclosure'
 import type { TaxEntry } from '@/types'
 
 const TAX_TYPES = ['deduction', 'income', 'donation', 'business_expense', 'medical', 'education', 'other']
@@ -125,7 +126,7 @@ export default function TaxPage() {
           <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">Add entry</button>
         </div>
       ) : (
-        Object.entries(byYear).sort(([a], [b]) => Number(b) - Number(a)).map(([year, yearEntries]) => {
+        Object.entries(byYear).sort(([a], [b]) => Number(b) - Number(a)).map(([year, yearEntries], i) => {
           const totals = yearEntries.reduce((acc, e) => {
             acc[e.type] = (acc[e.type] || 0) + e.amount
             acc.total += e.amount
@@ -133,12 +134,7 @@ export default function TaxPage() {
           }, { total: 0 } as Record<string, number>)
 
           return (
-            <div key={year} className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{year} entries</h2>
-                <p className="text-sm font-semibold text-teal-700 dark:text-teal-400">{fmt(totals.total)} total</p>
-              </div>
-
+            <Disclosure key={year} title={`${year} entries`} value={`${fmt(totals.total)} total`} defaultOpen={i === 0}>
               <div className="flex flex-wrap gap-2 mb-4">
                 {Object.entries(totals).filter(([k]) => k !== 'total').map(([type, total]) => (
                   <div key={type} className="bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2">
@@ -168,7 +164,7 @@ export default function TaxPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </Disclosure>
           )
         })
       )}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useCurrency } from '@/hooks/useCurrency'
+import { Disclosure } from '@/components/ui/Disclosure'
 import type { Liability, DebtPlan } from '@/types'
 
 export default function DebtPage() {
@@ -216,8 +217,7 @@ export default function DebtPage() {
 
           {/* Strategy comparison */}
           {liabilities.filter(l => l.interestRate && l.minPayment).length >= 2 && (
-            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
-              <h2 className="text-sm font-semibold text-slate-900 mb-3 dark:text-slate-100">Strategy comparison</h2>
+            <Disclosure title="Strategy comparison">
               <p className="text-xs text-slate-400 mb-4">How snowball vs avalanche compares on your current debts.</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
@@ -254,46 +254,48 @@ export default function DebtPage() {
                   The best strategy depends on whether you need momentum or math on your side.
                 </p>
               </div>
-            </div>
+            </Disclosure>
           )}
 
           {/* Strategy order lists */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
-              <h2 className="text-sm font-semibold text-slate-900 mb-3 dark:text-slate-100">Snowball order (by balance)</h2>
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                {sortedByBalance.map((l, i) => (
-                  <div key={l.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-700 text-xs font-semibold flex items-center justify-center dark:bg-teal-950 dark:text-teal-300">{i + 1}</span>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{l.name}</p>
-                        <p className="text-2xs text-slate-400">{l.interestRate ? `${l.interestRate}% APR` : 'No rate'}</p>
+          <Disclosure title="Payoff order breakdown">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-xs font-semibold text-slate-500 mb-2 dark:text-slate-400">Snowball order (by balance)</h3>
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {sortedByBalance.map((l, i) => (
+                    <div key={l.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-center gap-3">
+                        <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-700 text-xs font-semibold flex items-center justify-center dark:bg-teal-950 dark:text-teal-300">{i + 1}</span>
+                        <div>
+                          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{l.name}</p>
+                          <p className="text-2xs text-slate-400">{l.interestRate ? `${l.interestRate}% APR` : 'No rate'}</p>
+                        </div>
                       </div>
+                      <p className="text-sm font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(l.balance)}</p>
                     </div>
-                    <p className="text-sm font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(l.balance)}</p>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold text-slate-500 mb-2 dark:text-slate-400">Avalanche order (by rate)</h3>
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {sortedByRate.map((l, i) => (
+                    <div key={l.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-center gap-3">
+                        <span className="w-6 h-6 rounded-full bg-red-100 text-red-700 text-xs font-semibold flex items-center justify-center dark:bg-red-950 dark:text-red-300">{i + 1}</span>
+                        <div>
+                          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{l.name}</p>
+                          <p className="text-2xs text-slate-400">{l.interestRate ? `${l.interestRate}% APR` : 'No rate'}</p>
+                        </div>
+                      </div>
+                      <p className="text-sm font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(l.balance)}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
-              <h2 className="text-sm font-semibold text-slate-900 mb-3 dark:text-slate-100">Avalanche order (by rate)</h2>
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                {sortedByRate.map((l, i) => (
-                  <div key={l.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full bg-red-100 text-red-700 text-xs font-semibold flex items-center justify-center dark:bg-red-950 dark:text-red-300">{i + 1}</span>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{l.name}</p>
-                        <p className="text-2xs text-slate-400">{l.interestRate ? `${l.interestRate}% APR` : 'No rate'}</p>
-                      </div>
-                    </div>
-                    <p className="text-sm font-semibold stat-number text-slate-900 dark:text-slate-100">{fmt(l.balance)}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          </Disclosure>
         </>
       )}
     </div>

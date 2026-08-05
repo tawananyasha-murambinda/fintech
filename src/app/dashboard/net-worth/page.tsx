@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useCurrency } from '@/hooks/useCurrency'
+import { Disclosure } from '@/components/ui/Disclosure'
 import type { Asset, Liability } from '@/types'
 
 const ASSET_TYPES = ['checking', 'savings', 'investment', 'crypto', 'property', 'vehicle', 'other']
@@ -174,8 +175,7 @@ export default function NetWorthPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">Assets</h2>
+            <Disclosure title="Assets" value={fmt(totalAssets)} defaultOpen>
               {assets.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-6">No assets added yet.</p>
               ) : (
@@ -199,10 +199,9 @@ export default function NetWorthPage() {
                   ))}
                 </div>
               )}
-            </div>
+            </Disclosure>
 
-            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">Liabilities</h2>
+            <Disclosure title="Liabilities" value={fmt(totalLiabilities)} defaultOpen>
               {liabilities.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-6">No liabilities added yet.</p>
               ) : (
@@ -232,7 +231,7 @@ export default function NetWorthPage() {
                   ))}
                 </div>
               )}
-            </div>
+            </Disclosure>
           </div>
         </>
       )}

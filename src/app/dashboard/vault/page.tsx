@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useCurrency } from '@/hooks/useCurrency'
 
 interface Vault {
   id: string
@@ -37,6 +38,7 @@ export default function VaultPage() {
   const [adding, setAdding] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const { format: fmt } = useCurrency()
 
   async function loadVaults() {
     const res = await fetch('/api/vault')
@@ -174,13 +176,13 @@ export default function VaultPage() {
                     </div>
                     {vault.targetAmount && (
                       <p className="text-xs text-slate-400 mt-1 dark:text-slate-500">
-                        {pct.toFixed(0)}% of ${vault.targetAmount.toLocaleString()}
+                        {pct.toFixed(0)}% of {fmt(vault.targetAmount)}
                       </p>
                     )}
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                      ${vault.currentAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {fmt(vault.currentAmount)}
                     </p>
                     <button onClick={() => deleteVault(vault.id)} className="text-slate-300 hover:text-rose-400 transition-colors p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950">
                       Delete

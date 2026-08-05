@@ -113,35 +113,6 @@ export function DashboardClient({
         {/* Natural language transaction search */}
         <TransactionSearch />
 
-        {/* Quick Actions */}
-        <div className="flex gap-3">
-          <QuickAction
-            icon={<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 3v12M3 9h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>}
-            label="Add Expense"
-            onClick={() => (document.getElementById('quick-add-trigger') as HTMLButtonElement)?.click()}
-          />
-          <QuickAction
-            icon={<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 5v4l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5"/></svg>}
-            label="Sync Accounts"
-            onClick={() => (document.querySelector('[data-sync-btn]') as HTMLButtonElement)?.click()}
-          />
-          <QuickAction
-            icon={<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="3" width="14" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><path d="M5 9h8M5 12h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>}
-            label="Budgets"
-            href="/dashboard/budgets"
-          />
-          <QuickAction
-            icon={<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.5"/><path d="M6.5 11C7 12 7.8 12.5 9 12.5s2-.5 2.5-1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="7" cy="8" r="1" fill="currentColor"/><circle cx="11" cy="8" r="1" fill="currentColor"/></svg>}
-            label="Assistant"
-            onClick={() => (document.querySelector('[data-chat-btn]') as HTMLButtonElement)?.click()}
-          />
-          <QuickAction
-            icon={<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1v2M9 15v2M1 9h2M15 9h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="9" cy="9" r="3" stroke="currentColor" strokeWidth="1.5"/></svg>}
-            label="Vault"
-            href="/dashboard/vault"
-          />
-        </div>
-
         {/* Account Switcher */}
         <AccountSwitcher
           selectedAccountId={selectedAccountId}
@@ -186,55 +157,75 @@ export function DashboardClient({
             </div>
 
             {/* Quick access */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <QuickCard
-                href="/dashboard/budgets"
-                label="Budgets"
-                color="teal"
-                desc="Set category limits"
-              />
-              <QuickCard
-                href="/dashboard/goals"
-                label="Savings Goals"
-                color="purple"
-                desc="Track your targets"
-              />
-              <QuickCard
-                href="/dashboard/bills"
-                label="Bills"
-                color="amber"
-                desc="Upcoming due dates"
-              />
-              <QuickCard
-                href="/dashboard/subscriptions"
-                label="Subscriptions"
-                color="pink"
-                desc="Manage recurring"
-              />
-              <QuickCard
-                href="/dashboard/net-worth"
-                label="Net Worth"
-                color="green"
-                desc="Assets & liabilities"
-              />
-              <QuickCard
-                href="/dashboard/debt"
-                label="Debt Planner"
-                color="red"
-                desc="Payoff strategies"
-              />
-              <QuickCard
-                href="/dashboard/investments"
-                label="Investments"
-                color="blue"
-                desc="Stocks & crypto"
-              />
-              <QuickCard
-                href="/dashboard/reports"
-                label="Reports"
-                color="indigo"
-                desc="Monthly summaries"
-              />
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900 mb-3 dark:text-slate-100">
+                Quick access
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <QuickCard
+                  href="/dashboard/budgets"
+                  label="Budgets"
+                  color="teal"
+                  desc="Set category limits"
+                  icon={<><rect x="3" y="6" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 10h18" stroke="currentColor" strokeWidth="1.5"/></>}
+                />
+                <QuickCard
+                  href="/dashboard/goals"
+                  label="Savings Goals"
+                  color="amber"
+                  desc="Track your targets"
+                  icon={<><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5"/><path d="M12 8v4l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></>}
+                />
+                <QuickCard
+                  href="/dashboard/bills"
+                  label="Bills"
+                  color="rose"
+                  desc="Upcoming due dates"
+                  icon={<><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 8h18" stroke="currentColor" strokeWidth="1.5"/><path d="M8 13h8M8 16.5h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></>}
+                />
+                <QuickCard
+                  href="/dashboard/subscriptions"
+                  label="Subscriptions"
+                  color="purple"
+                  desc="Manage recurring"
+                  icon={<><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M3.51 9a9 9 0 0114.85 3.36L23 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></>}
+                />
+                <QuickCard
+                  href="/dashboard/net-worth"
+                  label="Net Worth"
+                  color="green"
+                  desc="Assets & liabilities"
+                  icon={<><path d="M3 12h18M12 3v18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M8 8l4-4 4 4M8 16l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>}
+                />
+                <QuickCard
+                  href="/dashboard/debt"
+                  label="Debt Planner"
+                  color="red"
+                  desc="Payoff strategies"
+                  icon={<><path d="M12 2v20M2 12h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M7 8l3 3 3-3 4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>}
+                />
+                <QuickCard
+                  href="/dashboard/investments"
+                  label="Investments"
+                  color="blue"
+                  desc="Stocks & crypto"
+                  icon={<><path d="M12 2v20M2 12h20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M7 12l3-3 3 3 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>}
+                />
+                <QuickCard
+                  href="/dashboard/reports"
+                  label="Reports"
+                  color="indigo"
+                  desc="Monthly summaries"
+                  icon={<><path d="M3 3v18h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M7 16l4-8 4 4 4-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></>}
+                />
+                <QuickCard
+                  href="/dashboard/vault"
+                  label="Savings Vault"
+                  color="pink"
+                  desc="Auto round-ups"
+                  icon={<><path d="M12 2L3 7v6c0 5.25 9 9 9 9s9-3.75 9-9V7l-9-5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>}
+                />
+              </div>
             </div>
 
             {/* Vault summary + Quick-add + Insight row */}
@@ -323,26 +314,36 @@ function QuickCard({
   label,
   desc,
   color,
+  icon,
 }: {
   href: string;
   label: string;
   desc: string;
   color: string;
+  icon: React.ReactNode;
 }) {
-  const colors: Record<string, string> = {
-    teal: "bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300",
+  const chipColors: Record<string, string> = {
+    teal: "bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-400",
     purple:
-      "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
-    amber: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-    pink: "bg-pink-50 text-pink-700 dark:bg-pink-950 dark:text-pink-300",
-    green: "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300",
-    red: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
-    blue: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+      "bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400",
+    amber: "bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400",
+    pink: "bg-pink-50 text-pink-600 dark:bg-pink-950 dark:text-pink-400",
+    rose: "bg-rose-50 text-rose-600 dark:bg-rose-950 dark:text-rose-400",
+    green: "bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400",
+    red: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400",
+    blue: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
     indigo:
-      "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+      "bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400",
   };
   return (
     <a href={href} className="card p-4 card-hover block group">
+      <div
+        className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2.5 ${chipColors[color] || chipColors.teal}`}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+          {icon}
+        </svg>
+      </div>
       <p
         className={`text-xs font-semibold text-slate-900 group-hover:text-teal-700 transition-colors dark:text-slate-100 dark:group-hover:text-teal-400`}
       >
@@ -491,7 +492,7 @@ function QuickAddWidget() {
 
   if (!showForm) {
     return (
-      <button id="quick-add-trigger" onClick={() => setShowForm(true)} className="card p-4 card-hover block w-full text-left group">
+      <button onClick={() => setShowForm(true)} className="card p-4 card-hover block w-full text-left group">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center dark:bg-teal-950">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="text-teal-700 dark:text-teal-300">
@@ -625,6 +626,7 @@ function TransactionSearch() {
   const [results, setResults] = useState<any[]>([])
   const [showResults, setShowResults] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const { convertFormat } = useCurrency()
 
   useEffect(() => {
     if (query.length < 2) { setResults([]); return }
@@ -683,7 +685,7 @@ function TransactionSearch() {
                 </p>
               </div>
               <p className={`text-sm font-semibold ml-4 ${tx.direction === 'credit' ? 'text-teal-600 dark:text-teal-400' : 'text-slate-900 dark:text-slate-100'}`}>
-                {tx.direction === 'credit' ? '+' : '-'}${Math.abs(tx.amount).toFixed(2)}
+                {tx.direction === 'credit' ? '+' : '-'}{convertFormat(Math.abs(tx.amount), tx.currency)}
               </p>
             </div>
           ))}
@@ -738,21 +740,10 @@ function AlertBanner() {
   )
 }
 
-function QuickAction({ icon, label, onClick, href }: { icon: React.ReactNode; label: string; onClick?: () => void; href?: string }) {
-  const content = (
-    <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-teal-200 dark:hover:border-teal-800 hover:shadow-sm transition-all cursor-pointer press-spring group">
-      <span className="text-teal-600 dark:text-teal-400">{icon}</span>
-      <span className="text-xs font-medium text-slate-700 dark:text-slate-300 group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors">{label}</span>
-    </div>
-  )
-
-  if (href) return <a href={href}>{content}</a>
-  return <button onClick={onClick} type="button">{content}</button>
-}
-
 function VaultSummary() {
   const [vaults, setVaults] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const { format: fmt } = useCurrency()
 
   useEffect(() => {
     fetch('/api/vault').then(r => r.json()).then(d => {
@@ -792,7 +783,7 @@ function VaultSummary() {
         <p className="text-xs font-medium text-slate-400 dark:text-slate-500">Savings Vault</p>
         <span className="text-xs text-teal-600 dark:text-teal-400 font-semibold">{vaults.length} vault{vaults.length > 1 ? 's' : ''}</span>
       </div>
-      <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+      <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{fmt(total)}</p>
       <div className="flex gap-2 mt-2">
         {vaults.slice(0, 4).map((v: any) => (
           <div key={v.id} className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">

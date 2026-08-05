@@ -474,13 +474,17 @@ export default function IntelligencePage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {/* Spending patterns */}
             {analysis.spendingPatterns.length > 0 && (
-              <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-indigo-600 dark:text-indigo-400"><path d="M3 3v18h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M7 16l4-8 4 4 4-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                  </div>
-                  <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Spending patterns</h2>
-                </div>
+              <Disclosure
+                defaultOpen
+                title={
+                  <span className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center shrink-0">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-indigo-600 dark:text-indigo-400"><path d="M3 3v18h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M7 16l4-8 4 4 4-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                    </span>
+                    Spending patterns
+                  </span>
+                }
+              >
                 <div className="space-y-2.5">
                   {analysis.spendingPatterns.map((pattern, i) => (
                     <div key={i} className="rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 p-3.5">
@@ -493,19 +497,23 @@ export default function IntelligencePage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </Disclosure>
             )}
 
             {/* What-if scenarios */}
             {analysis.whatIfScenarios.length > 0 && (
-              <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-950 flex items-center justify-center">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-amber-600 dark:text-amber-400"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5"/><path d="M12 8v4l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                  </div>
-                  <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">What-if simulator</h2>
-                </div>
-                <p className="text-xs text-slate-400 mb-4 ml-8 dark:text-slate-500">Small changes, big impact over time</p>
+              <Disclosure
+                defaultOpen
+                title={
+                  <span className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-950 flex items-center justify-center shrink-0">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-amber-600 dark:text-amber-400"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5"/><path d="M12 8v4l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                    </span>
+                    What-if simulator
+                  </span>
+                }
+              >
+                <p className="text-xs text-slate-400 mb-4 dark:text-slate-500">Small changes, big impact over time</p>
                 <div className="space-y-2.5">
                   {analysis.whatIfScenarios.map((scenario, i) => (
                     <div key={i} className="flex items-center justify-between rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 p-3.5">
@@ -523,7 +531,7 @@ export default function IntelligencePage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </Disclosure>
             )}
           </div>
 
@@ -626,6 +634,17 @@ export default function IntelligencePage() {
           )}
 
           {/* ─── THREE-COLUMN MINI CARDS: Subscriptions, Recurring, Hidden ─── */}
+          <Disclosure
+            defaultOpen
+            title={
+              <span className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-rose-100 dark:bg-rose-950 flex items-center justify-center shrink-0">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-rose-600 dark:text-rose-400"><path d="M20 12H4M12 4v16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                </span>
+                Subscriptions, price changes &amp; risk
+              </span>
+            }
+          >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Subscription overlaps */}
             {analysis.subscriptionOverlaps.length > 0 && (
@@ -734,17 +753,22 @@ export default function IntelligencePage() {
               )}
             </div>
           </div>
+          </Disclosure>
 
           {/* ─── LOCATION INSIGHTS ─── */}
           {analysis.locationInsights.length > 0 && (
-            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-emerald-600 dark:text-emerald-400"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="1.5"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.5"/></svg>
-                </div>
-                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Location insights</h2>
-              </div>
-              <p className="text-xs text-slate-400 mb-4 ml-8 dark:text-slate-500">Where your money goes</p>
+            <Disclosure
+              defaultOpen
+              title={
+                <span className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center shrink-0">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-emerald-600 dark:text-emerald-400"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="1.5"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.5"/></svg>
+                  </span>
+                  Location insights
+                </span>
+              }
+            >
+              <p className="text-xs text-slate-400 mb-4 dark:text-slate-500">Where your money goes</p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {analysis.locationInsights.map((loc) => (
                   <div key={loc.city} className="rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 p-4">
@@ -770,18 +794,22 @@ export default function IntelligencePage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </Disclosure>
           )}
 
           {/* ─── CASHFLOW FORECAST ─── */}
           {analysis.cashflowForecast.length > 0 && (
-            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-6 h-6 rounded-lg bg-cyan-100 dark:bg-cyan-950 flex items-center justify-center">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-cyan-600 dark:text-cyan-400"><path d="M3 3v18h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M7 20l4-8 4 4 4-8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                </div>
-                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">14-day cashflow forecast</h2>
-              </div>
+            <Disclosure
+              defaultOpen
+              title={
+                <span className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-cyan-100 dark:bg-cyan-950 flex items-center justify-center shrink-0">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-cyan-600 dark:text-cyan-400"><path d="M3 3v18h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M7 20l4-8 4 4 4-8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                  </span>
+                  14-day cashflow forecast
+                </span>
+              }
+            >
               <div className="relative">
                 <div className="flex items-end gap-[3px] h-36 mb-2">
                   {(() => {
@@ -828,7 +856,7 @@ export default function IntelligencePage() {
                   <span>{new Date(analysis.cashflowForecast[analysis.cashflowForecast.length - 1].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
                 </div>
               </div>
-            </div>
+            </Disclosure>
           )}
         </>
       )}

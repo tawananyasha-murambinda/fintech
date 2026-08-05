@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useCurrency } from '@/hooks/useCurrency'
+import { Disclosure } from '@/components/ui/Disclosure'
 
 export default function ReportsPage() {
   const { format: fmt } = useCurrency()
@@ -152,8 +153,7 @@ export default function ReportsPage() {
           </div>
 
           {report.income > 0 && (
-            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">Report summary</h2>
+            <Disclosure title="Report summary" defaultOpen>
               <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 p-5">
                 <p className="text-sm text-slate-700 leading-relaxed dark:text-slate-300">
                   For {report.period}, your total income was <strong className="text-slate-900 dark:text-slate-100">{fmt(report.income)}</strong> and total expenses were <strong className="text-slate-900 dark:text-slate-100">{fmt(report.expenses)}</strong>.
@@ -163,7 +163,7 @@ export default function ReportsPage() {
                   )}
                 </p>
               </div>
-            </div>
+            </Disclosure>
           )}
         </>
       )}
