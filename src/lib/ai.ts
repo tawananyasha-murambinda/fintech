@@ -1018,6 +1018,113 @@ Return ONLY a JSON object with this exact shape and no other text:
   }
 }
 
+export interface AiTip {
+  tip: string
+  source: 'ai' | 'local'
+}
+
+// A single, fresh, personalised money tip. Prefers the Anthropic model so each
+// tip is original and unique; when the API key is missing, exhausted, or the
+// call fails, it degrades to a tip computed from the user's own numbers (never
+// static filler copy).
+export async function generateAiTip(
+  transactions: Transaction[],
+  currency?: string | null,
+  opts?: { allowAi?: boolean }
+): Promise<AiTip> {
+  setAiCurrency(currency)
+
+  const buildLocal = (): AiTip => {
+    const { totalExpenses, totalIncome, byCategory, byMerchant } = aggregateDebits(transactions)
+    if (totalExpenses <= 0) {
+      return {
+        tip: 'There is no spending to work with yet — once you link an account or add a transaction, your personalised tips will appear here.',
+        source: 'local',
+      }
+    }
+
+    const cats = buildCategoryBreakdown(byCategory, totalExpenses)
+    const topCat = cats[0]
+    const merchants = Object.entries(byMerchant).sort((a, b) => b[1].total - a[1].total)
+    const topMerchant = merchants[0]
+    const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : null
+
+    const candidates: string[] = []
+    if (topCat && topCat.percentage >= 25) {
+      const tenPct = Math.round(topCat.total * 0.1)
+      candidates.push(`Your largest category is ${topCat.category} at ${money(topCat.total)} (${topCat.percentage.toFixed(0)}% of spending). Shaving 10% off it would free up about ${money(tenPct)} a month.`)
+    }
+    if (topMerchant && topMerchant[1].count >= 3) {
+      const avgVisit = Math.round(topMerchant[1].total / topMerchant[1].count)
+      candidates.push(`You have spent ${money(topMerchant[1].total)} across ${topMerchant[1].count} visits at ${topMerchant[0]}. Skipping one visit a week saves roughly ${money(Math.round(avgVisit * 4))} a month.`)
+    }
+    if (savingsRate !== null) {
+      if (savingsRate < 15) {
+        candidates.push(`Your savings rate is ${savingsRate.toFixed(0)}%. Raising it by 5 points means setting aside about ${money(Math.round(totalIncome * 0.05))} more each month.`)
+      } else {
+        candidates.push(`Your savings rate of ${savingsRate.toFixed(0)}% is solid — bumping it by just 2 points adds ${money(Math.round(totalIncome * 0.02))} a month toward your goals.`)
+      }
+    }
+    if (topCat && /subscription|streaming/i.test(topCat.category)) {
+      candidates.push(`${topCat.category} is your biggest spend at ${money(topCat.total)}. Review which of those services you actually used this month and cancel the rest.`)
+    }
+    if (candidates.length === 0) {
+      const debits = transactions.filter((t) => t.direction === 'debit')
+      const avg = Math.round(totalExpenses / Math.max(1, debits.length))
+      candidates.push(`You average ${money(avg)} per purchase. Pausing on anything above ${money(Math.round(avg * 2))} before buying could meaningfully change your month-end balance.`)
+    }
+
+    // Rotate the angle each day so the fallback still feels fresh.
+    const seed = (new Date().getDate() + candidates.length * 7) % candidates.length
+    return { tip: candidates[seed], source: 'local' }
+  }
+
+  if (opts?.allowAi === false || transactions.length === 0) return buildLocal()
+
+  const { totalExpenses, totalIncome, byCategory, byMerchant } = aggregateDebits(transactions)
+  const topCats = buildCategoryBreakdown(byCategory, totalExpenses).slice(0, 5)
+  const topMerchants = Object.entries(byMerchant)
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 5)
+  const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : null
+
+  const prompt = `You are a personal finance coach. Based ONLY on the user's real spending below, write ONE specific, actionable money tip (2-3 sentences).
+- It MUST reference real merchants, categories or amounts from the data.
+- It must NOT be generic filler like "create a budget" or "save more".
+- Change your focus and phrasing every time you answer so a repeat user never sees the same tip twice.
+- Prefer the single highest-impact observation (biggest category, rising merchant, subscription stack, weak savings rate).
+
+Savings rate: ${savingsRate === null ? 'N/A' : savingsRate.toFixed(0) + '%'}
+Total income: ${money(totalIncome)}
+Total expenses: ${money(totalExpenses)}
+Transaction count: ${transactions.length}
+
+Top categories:
+${topCats.map((c) => `- ${c.category}: ${money(c.total)} (${c.percentage.toFixed(0)}%)`).join('\n')}
+
+Top merchants:
+${topMerchants.map(([name, d]) => `- ${name}: ${money(d.total)} (${d.count} visits)`).join('\n')}
+
+Return ONLY the tip as plain text — no quotation marks, no label, no prefix.`
+
+  try {
+    const client = getClient()
+    if (!client) throw new Error('ANTHROPIC_API_KEY not configured')
+    const message = await client.messages.create({
+      model: MODEL,
+      max_tokens: 220,
+      messages: [{ role: 'user', content: prompt }],
+    })
+    const text = message.content[0].type === 'text' ? message.content[0].text : ''
+    const tip = text.trim().replace(/^["'`]+|["'`]+$/g, '')
+    if (tip.length >= 20) return { tip, source: 'ai' }
+    return buildLocal()
+  } catch (err) {
+    console.error('AI tip failed, using local:', err)
+    return buildLocal()
+  }
+}
+
 export function chatLocalFallback(userMessage: string, transactions: Transaction[], conversationHistory: { role: string; content: string }[]): string {
   const msg = userMessage.toLowerCase().trim()
 

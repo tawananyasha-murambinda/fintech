@@ -11,31 +11,10 @@ import {
 } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { useCurrency } from '@/hooks/useCurrency'
+import { buildDemoCashflow } from '@/lib/demo-data'
 import type { CashflowPoint } from '@/types'
 
-// A believable 30-day pattern for the marketing page's "Live cashflow" preview:
-// biweekly paycheck deposits, a weekly grocery run, a couple of recurring bills,
-// small daily food/transport spend that ticks up on weekends.
-const DEMO_DATA: CashflowPoint[] = Array.from({ length: 30 }, (_, i) => {
-  const d = new Date(Date.now() - (29 - i) * 86400000)
-  const dayOfMonth = d.getDate()
-  const isWeekend = d.getDay() === 0 || d.getDay() === 6
-
-  const isPayday = dayOfMonth === 1 || dayOfMonth === 15
-  const income = isPayday ? 2450 + Math.random() * 120 : 0
-
-  let expenses = isWeekend ? 55 + Math.random() * 45 : 22 + Math.random() * 28
-  if (dayOfMonth % 7 === 3) expenses += 90 + Math.random() * 40 // weekly groceries
-  if (dayOfMonth === 5) expenses += 140 + Math.random() * 30 // rent/utilities
-  if (dayOfMonth === 20) expenses += 60 + Math.random() * 20 // subscriptions/phone bill
-
-  return {
-    date: d.toISOString().split('T')[0],
-    income: Math.round(income),
-    expenses: Math.round(expenses),
-    net: 0,
-  }
-}).map((d) => ({ ...d, net: d.income - d.expenses }))
+const DEMO_DATA: CashflowPoint[] = buildDemoCashflow()
 
 interface CashflowRibbonProps {
   data?: CashflowPoint[]

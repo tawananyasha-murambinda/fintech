@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { CashflowRibbon } from '@/components/charts/CashflowRibbon'
+import { CategoryChart } from '@/components/charts/CategoryChart'
+import { DEMO_CATEGORIES } from '@/lib/demo-data'
 
 export default function HomePage() {
   return (
@@ -43,25 +45,33 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Cashflow ribbon demo */}
-        <div className="card p-6 mb-12">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-900">Live cashflow</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Real-time income vs. outflow</p>
+        {/* Demo dashboards */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
+          <div className="card p-6 lg:col-span-2">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">Live cashflow</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Real-time income vs. outflow</p>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-teal-600 inline-block" />
+                  Income
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-slate-300 inline-block" />
+                  Expenses
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-4 text-xs text-slate-500">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-teal-600 inline-block" />
-                Income
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-slate-300 inline-block" />
-                Expenses
-              </span>
-            </div>
+            <CashflowRibbon demo />
           </div>
-          <CashflowRibbon demo />
+
+          <div className="card p-6">
+            <h2 className="text-sm font-semibold text-slate-900 mb-1">Where your money goes</h2>
+            <p className="text-xs text-slate-400 mt-0.5 mb-4">Spending by category, last 30 days</p>
+            <CategoryChart data={DEMO_CATEGORIES} />
+          </div>
         </div>
 
         {/* Features */}

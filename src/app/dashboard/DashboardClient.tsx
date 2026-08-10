@@ -10,6 +10,7 @@ import { SyncButton } from "@/components/ui/SyncButton";
 import { LinkBankButton } from "@/components/bank/LinkBankButton";
 import { AccountSwitcher } from "@/components/dashboard/AccountSwitcher";
 import { MobileDashboard } from "@/components/dashboard/MobileDashboard";
+import { DailyTipCard } from "@/components/dashboard/DailyTipCard";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { useCurrency } from "@/hooks/useCurrency";
 import type { CashflowPoint, SpendingCategory } from "@/types";
@@ -234,7 +235,7 @@ export function DashboardClient({
                 <VaultSummary />
               </div>
               <div className="md:col-span-3 space-y-4">
-                <InsightCard />
+                <DailyTipCard />
                 <QuickAddWidget />
               </div>
             </div>
@@ -411,56 +412,6 @@ function HealthScoreWidget({ userId: _ }: { userId: string }) {
       </div>
     </a>
   );
-}
-
-// ─── Insight of the day ────────────────────────────────────────────
-function InsightCard() {
-  const [insight, setInsight] = useState<{ summary: string; topInsight: string } | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetch('/api/intelligence', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ period: 'month' }),
-    })
-      .then(r => r.json())
-      .then(d => {
-        if (d.analysis) {
-          setInsight({ summary: d.analysis.summary, topInsight: d.analysis.topInsight })
-        }
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="card p-4">
-        <div className="skeleton h-3 w-24 mb-3" />
-        <div className="skeleton h-3 w-full mb-2" />
-        <div className="skeleton h-3 w-3/4" />
-      </div>
-    )
-  }
-
-  if (!insight) return null
-
-  return (
-    <a href="/dashboard/intelligence" className="card p-4 card-hover block group">
-      <div className="flex items-center gap-2 mb-2">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-teal-600">
-          <path d="M7 1.5L9 5l4 .5-3 3 .5 4L7 10.5 3.5 12.5l.5-4-3-3L5 5l2-3.5z" fill="currentColor" opacity="0.9"/>
-        </svg>
-        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-          Insight of the day
-        </p>
-      </div>
-      <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed line-clamp-2 group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors">
-        {insight.topInsight}
-      </p>
-    </a>
-  )
 }
 
 // ─── Quick-add widget ──────────────────────────────────────────────
