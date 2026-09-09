@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import { Logo } from '@/components/brand/Logo'
 
 interface SidebarProps {
   user: { name?: string | null; email?: string | null; image?: string | null }
@@ -104,8 +105,7 @@ export function Sidebar({ user }: SidebarProps) {
     <aside className="hidden lg:flex w-56 bg-white border-r border-slate-100 flex-col h-full shrink-0 dark:bg-slate-900 dark:border-slate-800">
       {/* Logo */}
       <div className="px-5 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
-        <img src="/icon-192.png" alt="" width={28} height={28} className="rounded-md shrink-0" />
-        <span className="font-semibold text-slate-900 tracking-tight text-sm dark:text-slate-100">FinTrack</span>
+        <Logo size={24} className="shrink-0" />
       </div>
 
       {/* Nav */}

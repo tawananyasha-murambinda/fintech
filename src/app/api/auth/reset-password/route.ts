@@ -14,7 +14,7 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const limited = rateLimit(req, { limit: 10, windowMs: 15 * 60 * 1000, key: 'reset-password' })
+    const limited = await rateLimit(req, { limit: 10, windowMs: 15 * 60 * 1000, key: 'reset-password' })
     if (limited) return limited
 
     const body = await req.json()
@@ -42,7 +42,9 @@ export async function POST(req: NextRequest) {
     const user = await prisma.user.findUnique({ where: { email }, select: { id: true } })
     await prisma.user.update({
       where: { email },
-      data: { password: hashedPassword },
+      // A reset is the flow someone uses when they think they are compromised,
+      // so every existing session for the account is invalidated.
+      data: { password: hashedPassword, sessionsValidFrom: new Date() },
     })
 
     await prisma.verificationToken.delete({

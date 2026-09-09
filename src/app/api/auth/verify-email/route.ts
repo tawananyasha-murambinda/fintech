@@ -6,7 +6,7 @@ import crypto from 'crypto'
 
 export async function POST(req: NextRequest) {
   try {
-    const limited = rateLimit(req, { limit: 5, windowMs: 15 * 60 * 1000, key: 'verify-email' })
+    const limited = await rateLimit(req, { limit: 5, windowMs: 15 * 60 * 1000, key: 'verify-email' })
     if (limited) return limited
 
     const { email, callbackUrl } = await req.json()

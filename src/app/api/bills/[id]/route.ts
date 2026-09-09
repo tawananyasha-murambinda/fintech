@@ -19,6 +19,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       ...(body.amount !== undefined && { amount: body.amount }),
       ...(body.dueDate !== undefined && { dueDate: body.dueDate }),
       ...(body.frequency !== undefined && { frequency: body.frequency }),
+      // Changing frequency without re-anchoring would leave a quarterly bill
+      // projecting from whatever month it was first created in.
+      ...(body.anchorDate !== undefined && {
+        anchorDate: body.anchorDate ? new Date(body.anchorDate) : null,
+      }),
       ...(body.category !== undefined && { category: body.category }),
       ...(body.reminderDays !== undefined && { reminderDays: body.reminderDays }),
       ...(body.isActive !== undefined && { isActive: body.isActive }),

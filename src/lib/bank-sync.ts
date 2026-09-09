@@ -2,6 +2,8 @@ import { prisma } from './prisma'
 import { decrypt } from './encryption'
 import { getTransactions } from './plaid'
 import { logger } from './logger'
+import { applyRules, type CategorizationRule } from './categorize'
+import { canonicalCategory } from './categories'
 
 type LinkedBankWithToken = {
   id: string
@@ -18,6 +20,15 @@ export async function syncLinkedBank(bank: LinkedBankWithToken): Promise<{ impor
 
   try {
     const accessToken = decrypt(bank.accessToken as string)
+
+    // A user's categorisation rules were only ever applied through an explicit
+    // call to /api/categorize, so rules had no effect on the transactions that
+    // actually arrive — which is the entire point of a rule. They are loaded
+    // once per sync and applied as rows are created.
+    const rules: CategorizationRule[] = await prisma.categorizationRule.findMany({
+      where: { userId: bank.userId },
+      select: { matchType: true, matchValue: true, category: true, priority: true },
+    })
 
     let hasMore = true
     let cursor: string | undefined = undefined
@@ -49,9 +60,19 @@ export async function syncLinkedBank(bank: LinkedBankWithToken): Promise<{ impor
             direction,
             description: tx.name,
             merchantName: tx.merchant_name ?? tx.name,
-            merchantCategory: tx.personal_finance_category?.primary
-              ?? tx.category?.[0]
-              ?? undefined,
+            // A user rule beats Plaid's guess; otherwise Plaid's category is
+            // normalised into the app's own vocabulary so budgets, alerts and
+            // reports all agree on what "Food & Dining" means.
+            merchantCategory:
+              applyRules(
+                tx.merchant_name ?? tx.name ?? '',
+                tx.name ?? '',
+                rules,
+                amount
+              ) ??
+              canonicalCategory(
+                tx.personal_finance_category?.primary ?? tx.category?.[0] ?? null
+              ),
             merchantCity: tx.location?.city ?? undefined,
             merchantState: tx.location?.region ?? undefined,
             merchantCountry: tx.location?.country ?? undefined,

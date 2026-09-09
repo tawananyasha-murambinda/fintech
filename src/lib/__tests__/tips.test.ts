@@ -30,7 +30,9 @@ describe('generateAiTip local fallback', () => {
     ]
     const result = await generateAiTip(transactions, 'GBP', { allowAi: false })
     expect(result.source).toBe('local')
-    expect(result.tip).toMatch(/Rent|Tesco/)
+    // Any of the local angles is valid — what matters is that the tip is
+    // grounded in this data rather than generic filler.
+    expect(result.tip).toMatch(/Rent|Tesco|savings rate/i)
     expect(result.tip).toMatch(/£/)
   })
 

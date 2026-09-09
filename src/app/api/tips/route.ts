@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const limited = rateLimit(req, { limit: 30, windowMs: 60 * 60 * 1000, key: `tips:${session.user.id}`, scope: 'user' })
+  const limited = await rateLimit(req, { limit: 30, windowMs: 60 * 60 * 1000, key: `tips:${session.user.id}`, scope: 'user' })
   if (limited) return limited
 
   try {

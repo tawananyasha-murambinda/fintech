@@ -8,6 +8,8 @@ import { NotificationPreferencesSection } from "@/components/settings/Notificati
 import { LocationSection } from "@/components/settings/LocationSection";
 import { DataSection } from "@/components/settings/DataSection";
 import { SupportSection } from "@/components/settings/SupportSection";
+import { BillingSection } from "@/components/settings/BillingSection";
+import { TwoFactorSection } from "@/components/settings/TwoFactorSection";
 
 export default function SettingsPage() {
   return (
@@ -28,7 +30,9 @@ export default function SettingsPage() {
       </div>
 
       <ProfileSection />
+      <BillingSection />
       <SecuritySection />
+      <TwoFactorSection />
       <LocationSection />
       <NotificationPreferencesSection />
       <PrivacySection />

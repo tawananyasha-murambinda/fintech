@@ -1,55 +1,89 @@
-import fs from 'fs'
-import path from 'path'
+import * as Sentry from '@sentry/nextjs'
 
 type Level = 'debug' | 'info' | 'warn' | 'error'
 
-const LOG_DIR = path.join(process.cwd(), '.logs')
-const LOG_FILE = path.join(LOG_DIR, 'app.log')
-const MAX_BYTES = 5 * 1024 * 1024 // rotate at 5MB
-const MAX_FILES = 5
+// Structured JSON logging to stdout/stderr.
+//
+// Serverless filesystems are read-only and ephemeral, so writing log files
+// gets you nothing: the write fails, or the container disappears with the
+// file inside it. Every hosting platform worth using (Vercel, Fly, Render,
+// Cloud Run, plain Docker) collects stdout/stderr instead, and one JSON
+// object per line is what log shippers (Axiom, Datadog, Vercel Logs) parse
+// without extra configuration.
+const SERVICE = process.env.LOG_SERVICE_NAME || 'fintrack'
+const MIN_LEVEL: Level = (process.env.LOG_LEVEL as Level) || 'info'
 
-// File logging is fire-and-forget: never block a request or crash a route
-// when the filesystem is unavailable (e.g. read-only serverless function).
-function rotateIfNeeded() {
+const RANK: Record<Level, number> = { debug: 10, info: 20, warn: 30, error: 40 }
+
+function serialise(value: unknown): unknown {
+  if (value instanceof Error) {
+    return { name: value.name, message: value.message, stack: value.stack }
+  }
+  return value
+}
+
+function emit(level: Level, message: string, meta?: unknown) {
+  if (process.env.NODE_ENV === 'test' && !process.env.LOG_IN_TESTS) return
+  if (RANK[level] < RANK[MIN_LEVEL]) return
+
+  const entry: Record<string, unknown> = {
+    ts: new Date().toISOString(),
+    level,
+    service: SERVICE,
+    msg: message,
+  }
+  if (meta !== undefined) entry.meta = serialise(meta)
+
+  let line: string
   try {
-    if (!fs.existsSync(LOG_FILE)) return
-    const { size } = fs.statSync(LOG_FILE)
-    if (size < MAX_BYTES) return
-    for (let i = MAX_FILES - 1; i >= 1; i--) {
-      const from = `${LOG_FILE}.${i}`
-      const to = `${LOG_FILE}.${i + 1}`
-      if (fs.existsSync(from)) fs.renameSync(from, to)
+    line = JSON.stringify(entry)
+  } catch {
+    // Circular or otherwise unserialisable meta must not lose the message.
+    line = JSON.stringify({ ...entry, meta: String(meta) })
+  }
+
+  // warn/error to stderr so platform log levels classify them correctly.
+  // The edge runtime (middleware) has no process.stdout/stderr, so fall back
+  // to console, which every runtime provides.
+  const stream = level === 'error' || level === 'warn' ? 'stderr' : 'stdout'
+  const target = typeof process !== 'undefined' ? (process as any)[stream] : undefined
+
+  if (target?.write) target.write(line + '\n')
+  else if (stream === 'stderr') console.error(line)
+  else console.log(line)
+
+  // Errors also go to Sentry so someone is actually paged. Sentry is a no-op
+  // without a DSN, and its beforeSend hook scrubs the payload — but never let
+  // a reporting failure take down the code path that was logging.
+  if (level === 'error') {
+    try {
+      const error = meta instanceof Error ? meta : errorFrom(meta)
+      if (error) {
+        Sentry.captureException(error, { extra: { message } })
+      } else {
+        Sentry.captureMessage(message, { level: 'error', extra: { meta } })
+      }
+    } catch {
+      // ignore
     }
-    fs.renameSync(LOG_FILE, `${LOG_FILE}.1`)
-  } catch {
-    // ignore
   }
 }
 
-function append(level: Level, message: string, meta?: unknown) {
-  const line = `${new Date().toISOString()} [${level}] ${message}${meta !== undefined ? ' ' + safeStringify(meta) : ''}\n`
-  if (process.env.NODE_ENV === 'test') return
-  rotateIfNeeded()
-  fs.appendFile(LOG_FILE, line, (err) => {
-    if (err && level === 'error') console.error('Logger write failed:', err)
-  })
-  if (level === 'error') console.error(message, meta ?? '')
-  else if (level === 'warn') console.warn(message, meta ?? '')
-  else if (level === 'debug' && process.env.DEBUG_LOGGING) console.debug(message, meta ?? '')
-  else if (level === 'info') console.log(message, meta ?? '')
-}
-
-function safeStringify(value: unknown): string {
-  try {
-    return JSON.stringify(value)
-  } catch {
-    return String(value)
+// logger.error is called both as (msg, err) and as (msg, {userId, error}).
+// Pull the Error out of either shape so Sentry groups by stack trace rather
+// than lumping every call site under one message.
+function errorFrom(meta: unknown): Error | null {
+  if (meta instanceof Error) return meta
+  if (meta && typeof meta === 'object' && 'error' in meta) {
+    const inner = (meta as { error: unknown }).error
+    if (inner instanceof Error) return inner
   }
+  return null
 }
 
 export const logger = {
-  debug: (message: string, meta?: unknown) => append('debug', message, meta),
-  info: (message: string, meta?: unknown) => append('info', message, meta),
-  warn: (message: string, meta?: unknown) => append('warn', message, meta),
-  error: (message: string, meta?: unknown) => append('error', message, meta),
+  debug: (message: string, meta?: unknown) => emit('debug', message, meta),
+  info: (message: string, meta?: unknown) => emit('info', message, meta),
+  warn: (message: string, meta?: unknown) => emit('warn', message, meta),
+  error: (message: string, meta?: unknown) => emit('error', message, meta),
 }

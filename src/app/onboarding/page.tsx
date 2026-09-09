@@ -34,7 +34,7 @@ export default function OnboardingPage() {
               Welcome to FinTrack
             </h1>
             <p className="text-sm text-slate-500 mb-10 leading-relaxed">
-              Connect your bank account to get started. We'll pull your transactions
+              Connect your bank account to get started. We&apos;ll pull your transactions
               and analyse your spending with AI.
             </p>
 
@@ -62,7 +62,7 @@ export default function OnboardingPage() {
                 onClick={() => setStep("location")}
                 className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
               >
-                Skip for now — I'll connect later
+                Skip for now — I&apos;ll connect later
               </button>
             </div>
           </>
@@ -95,7 +95,7 @@ export default function OnboardingPage() {
                 onClick={() => router.push("/dashboard")}
                 className="w-full py-2.5 text-sm font-medium text-slate-600 rounded-xl hover:bg-slate-100 active:scale-[0.98] transition-all"
               >
-                Skip — I'll set it later in Settings
+                Skip — I&apos;ll set it later in Settings
               </button>
             </div>
 

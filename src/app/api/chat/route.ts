@@ -4,8 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { rateLimit } from '@/lib/rate-limit'
 import { errorResponse } from '@/lib/errors'
-import { chatWithData, chatLocalFallback } from '@/lib/ai'
-import { consumeAiBudget } from '@/lib/ai-budget'
+import { askAssistant } from '@/lib/assistant'
+import { consumeAiBudget, dailyAiLimitFor } from '@/lib/ai-budget'
 import { logger } from '@/lib/logger'
 
 export async function GET() {
@@ -21,17 +21,30 @@ export async function GET() {
 
     return NextResponse.json(messages)
   } catch (err) {
-    logger.error('Chat history load failed', { userId: session.user.id })
+    logger.error('Chat history load failed', { userId: session.user.id, error: err })
     const { error, status } = errorResponse(err, 'Could not load your chat history.')
     return NextResponse.json({ error }, { status })
   }
+}
+
+export async function DELETE() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  await prisma.chatMessage.deleteMany({ where: { userId: session.user.id } })
+  return NextResponse.json({ cleared: true })
 }
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const limited = rateLimit(req, { limit: 30, windowMs: 60 * 60 * 1000, key: `chat:${session.user.id}`, scope: 'user' })
+  const limited = await rateLimit(req, {
+    limit: 30,
+    windowMs: 60 * 60 * 1000,
+    key: `chat:${session.user.id}`,
+    scope: 'user',
+  })
   if (limited) return limited
 
   let message: string
@@ -41,107 +54,72 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
-  if (!message.trim()) return NextResponse.json({ error: 'Message is required' }, { status: 400 })
+
+  const trimmed = message.trim()
+  if (!trimmed) return NextResponse.json({ error: 'Message is required' }, { status: 400 })
+  if (trimmed.length > 2000) {
+    return NextResponse.json({ error: 'That message is too long — try a shorter question.' }, { status: 400 })
+  }
 
   try {
-    // Load user location for AI context
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { city: true, country: true, currency: true },
-    })
-    const userLocation = user?.city ? { city: user.city, country: user.country ?? undefined } : null
-
-    await prisma.chatMessage.create({
-      data: { userId: session.user.id, role: 'user', content: message },
+      select: { currency: true },
     })
 
-    const history = await prisma.chatMessage.findMany({
-      where: { userId: session.user.id },
-      orderBy: { createdAt: 'asc' },
-      take: 20,
-    })
-
-    const [transactions, budgets, goals, debts] = await Promise.all([
-      prisma.transaction.findMany({
-        where: { userId: session.user.id },
-        orderBy: { date: 'desc' },
-        take: 500,
-      }),
-      prisma.budget.findMany({
-        where: { userId: session.user.id },
-      }),
-      prisma.goal.findMany({
-        where: { userId: session.user.id },
-      }),
-      prisma.debtPlan.findMany({
-        where: { userId: session.user.id },
-        include: { liability: true },
-      }),
-    ])
-
-    const txData = transactions.map((t) => ({
-      id: t.id,
-      date: t.date.toISOString(),
-      amount: t.amount,
-      direction: t.direction as 'credit' | 'debit',
-      description: t.description,
-      merchantName: t.merchantName ?? undefined,
-      merchantCategory: t.merchantCategory ?? undefined,
-      merchantCity: t.merchantCity ?? undefined,
-      status: t.status as 'posted' | 'pending',
-    }))
-
-    const budgetData = budgets.map((b) => ({
-      category: b.category,
-      amount: b.amount,
-      period: b.period,
-      spent: 0,
-      remaining: b.amount,
-    }))
-
-    const goalData = goals.map((g) => ({
-      name: g.name,
-      targetAmount: g.targetAmount,
-      currentAmount: g.currentAmount,
-      deadline: g.deadline?.toISOString() ?? null,
-    }))
-
-    const debtData = debts.map((d) => ({
-      strategy: d.strategy,
-      extraPayment: d.extraPayment,
-      liability: d.liability
-        ? { name: d.liability.name, balance: d.liability.balance, interestRate: d.liability.interestRate }
-        : null,
-    }))
-
-    const convHistory = history
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
-
-    let reply: string
-    // Enforce the daily AI budget. When exhausted, use the local engine so
-    // the user still gets an answer without burning provider spend.
-    const hasBudget = await consumeAiBudget(session.user.id)
-    if (!hasBudget) {
-      logger.info('AI budget exhausted, using local fallback', { userId: session.user.id })
-      reply = chatLocalFallback(message, txData as any, convHistory.slice(0, -1))
-      reply += '\n\n(This answer was generated by the on-device engine because the daily AI usage limit was reached.)'
-    } else {
-      reply = await chatWithData(
-        message,
-        txData as any,
-        convHistory.slice(0, -1),
-        { budgets: budgetData, goals: goalData, debts: debtData, userLocation: userLocation || undefined, currency: user?.currency }
+    // The daily cap is checked before the question is stored, so a refused
+    // request does not leave a dangling user message with no reply.
+    if (!(await consumeAiBudget(session.user.id))) {
+      const limit = await dailyAiLimitFor(session.user.id)
+      logger.info('AI budget exhausted', { userId: session.user.id })
+      return NextResponse.json(
+        {
+          error: `You've used all ${limit} assistant questions for today. The limit resets at midnight UTC.`,
+          code: 'AI_LIMIT_REACHED',
+        },
+        { status: 429 }
       )
     }
 
-    await prisma.chatMessage.create({
-      data: { userId: session.user.id, role: 'assistant', content: reply },
+    // History is read before the new message is written so the assistant sees
+    // prior turns, not its own prompt echoed back as context.
+    const history = await prisma.chatMessage.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+      select: { role: true, content: true },
     })
 
-    return NextResponse.json({ reply })
+    await prisma.chatMessage.create({
+      data: { userId: session.user.id, role: 'user', content: trimmed },
+    })
+
+    const result = await askAssistant(
+      trimmed,
+      history
+        .reverse()
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      {
+        userId: session.user.id,
+        currency: user?.currency || 'USD',
+        now: new Date(),
+      }
+    )
+
+    await prisma.chatMessage.create({
+      data: { userId: session.user.id, role: 'assistant', content: result.reply },
+    })
+
+    return NextResponse.json({
+      reply: result.reply,
+      // Surfaced so the UI can show what the answer was actually based on,
+      // which is the difference between a grounded answer and a plausible one.
+      sources: [...new Set(result.toolsUsed)],
+      degraded: result.degraded,
+    })
   } catch (err) {
-    logger.error('Chat failed', { userId: session.user.id })
+    logger.error('Chat failed', { userId: session.user.id, error: err })
     const { error, status } = errorResponse(err, 'Could not process your message right now. Please try again.')
     return NextResponse.json({ error }, { status })
   }

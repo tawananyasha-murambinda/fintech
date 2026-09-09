@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { Disclosure } from '@/components/ui/Disclosure'
 import type { Liability, DebtPlan } from '@/types'
+import { buildPayoffPlan, compareStrategies, type DebtInput } from '@/lib/debt'
 
 export default function DebtPage() {
   const { format: fmt } = useCurrency()
@@ -45,25 +46,30 @@ export default function DebtPage() {
     fetchData()
   }
 
-  function calculatePayoff(balance: number, rate: number, minPayment: number, extra: number, strategy: string): { months: number; interestPaid: number; totalPaid: number } {
-    const monthlyRate = rate / 100 / 12
-    const payment = minPayment + extra
-    let remaining = balance
-    let interestPaid = 0
-    let months = 0
-
-    while (remaining > 0 && months < 600) {
-      const interest = remaining * monthlyRate
-      interestPaid += interest
-      const principal = Math.min(payment - interest, remaining)
-      remaining -= principal
-      months++
-    }
-
-    return { months, interestPaid, totalPaid: balance + interestPaid }
-  }
-
   const totalDebt = liabilities.reduce((s, l) => s + l.balance, 0)
+
+  // A payoff strategy is a property of the whole portfolio, not of one debt:
+  // its defining behaviour is rolling a cleared debt's payment into the next.
+  // Plans are stored per liability, so the active plans are read as one
+  // portfolio — their extra payments pooled, the most recent strategy applied.
+  const debtInputs: DebtInput[] = liabilities.map((l) => ({
+    id: l.id,
+    name: l.name,
+    balance: l.balance,
+    interestRate: l.interestRate ?? null,
+    minPayment: l.minPayment ?? null,
+  }))
+  const totalExtra = plans.reduce((s, p) => s + (p.extraPayment || 0), 0)
+  const portfolioStrategy = (plans[0]?.strategy as 'snowball' | 'avalanche') || strategy
+  const portfolio = debtInputs.length > 0 ? buildPayoffPlan(debtInputs, totalExtra, portfolioStrategy) : null
+  const minimumsOnly = debtInputs.length > 0 ? buildPayoffPlan(debtInputs, 0, portfolioStrategy) : null
+  const strategyComparison = debtInputs.length > 0 ? compareStrategies(debtInputs, totalExtra) : null
+  const interestSaved =
+    portfolio?.feasible && minimumsOnly?.feasible
+      ? minimumsOnly.totalInterest - portfolio.totalInterest
+      : null
+  const monthsSaved =
+    portfolio?.feasible && minimumsOnly?.feasible ? minimumsOnly.months - portfolio.months : null
   const sortedByBalance = [...liabilities].sort((a, b) => a.balance - b.balance)
   const sortedByRate = [...liabilities].sort((a, b) => (b.interestRate || 0) - (a.interestRate || 0))
 
@@ -165,60 +171,138 @@ export default function DebtPage() {
             </form>
           </div>
 
-          {/* Active payoff plans */}
-          {plans.length > 0 && (
+          {/* Portfolio payoff projection */}
+          {plans.length > 0 && portfolio && (
             <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Active payoff plans</h2>
-              {plans.map(plan => {
-                const liability = liabilities.find(l => l.id === plan.liabilityId)
-                if (!liability || !liability.interestRate || !liability.minPayment) return null
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Payoff projection</h2>
+                <p className="text-2xs text-slate-400">
+                  {portfolioStrategy === 'avalanche' ? 'Avalanche' : 'Snowball'} · {fmt(totalExtra)}/mo extra
+                </p>
+              </div>
 
-                const result = calculatePayoff(liability.balance, liability.interestRate, liability.minPayment, plan.extraPayment, plan.strategy)
-                const noExtra = calculatePayoff(liability.balance, liability.interestRate, liability.minPayment, 0, plan.strategy)
-                const interestSaved = noExtra.interestPaid - result.interestPaid
-
-                return (
-                  <div key={plan.id} className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{liability.name}</h3>
-                        <p className="text-xs text-slate-400">{plan.strategy === 'avalanche' ? 'Avalanche' : 'Snowball'} strategy · {fmt(plan.extraPayment)}/mo extra</p>
-                      </div>
-                      <button onClick={() => deletePlan(plan.id)} className="text-slate-300 hover:text-rose-400 transition-colors p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950">
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                      </button>
+              {!portfolio.feasible ? (
+                <div className="rounded-2xl border border-red-100 dark:border-red-900/40 bg-red-50 dark:bg-red-950/30 p-5">
+                  <h3 className="text-sm font-semibold text-red-700 dark:text-red-300">
+                    These payments will never clear the debt
+                  </h3>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1 leading-relaxed">
+                    The minimum payments do not cover the interest being charged, so the balance grows
+                    every month no matter how long you keep paying.
+                  </p>
+                  <ul className="mt-3 space-y-1">
+                    {portfolio.neverPaidOff.map((d) => (
+                      <li key={d.id} className="text-xs text-red-700 dark:text-red-300">
+                        <span className="font-medium">{d.name}</span> — short by about{' '}
+                        {fmt(Math.ceil(d.shortfall))}/mo
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-3">
+                    Increasing the extra payment above the shortfall is what turns this around.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-2xs text-slate-400 mb-0.5">Debt free in</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {Math.floor(portfolio.months / 12)}y {portfolio.months % 12}m
+                      </p>
                     </div>
-                    <div className="grid grid-cols-4 gap-4">
-                      <div>
-                        <p className="text-2xs text-slate-400 mb-0.5">Payoff time</p>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{result.months} mo ({Math.floor(result.months / 12)}y {result.months % 12}m)</p>
-                      </div>
-                      <div>
-                        <p className="text-2xs text-slate-400 mb-0.5">Interest paid</p>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{fmt(Math.round(result.interestPaid))}</p>
-                      </div>
-                      <div>
-                        <p className="text-2xs text-slate-400 mb-0.5">Interest saved</p>
-                        <p className="text-sm font-semibold text-teal-700 dark:text-teal-400">{fmt(Math.round(interestSaved))}</p>
-                      </div>
-                      <div>
-                        <p className="text-2xs text-slate-400 mb-0.5">Total paid</p>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{fmt(Math.round(result.totalPaid))}</p>
-                      </div>
+                    <div>
+                      <p className="text-2xs text-slate-400 mb-0.5">Total interest</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {fmt(Math.round(portfolio.totalInterest))}
+                      </p>
                     </div>
-                    <div className="mt-3 h-2 bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
-                      <div className="h-full bg-teal-600 rounded-full transition-all" style={{ width: `${Math.min(100, (result.months > 0 ? (1 - result.interestPaid / noExtra.interestPaid) * 100 : 0))}%` }} />
+                    <div>
+                      <p className="text-2xs text-slate-400 mb-0.5">Interest saved</p>
+                      <p className="text-sm font-semibold text-teal-700 dark:text-teal-400">
+                        {interestSaved !== null ? fmt(Math.round(interestSaved)) : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-2xs text-slate-400 mb-0.5">Months saved</p>
+                      <p className="text-sm font-semibold text-teal-700 dark:text-teal-400">
+                        {monthsSaved !== null ? `${monthsSaved} mo` : '—'}
+                      </p>
                     </div>
                   </div>
-                )
-              })}
+
+                  {/* Clearing order — what the strategy actually decides */}
+                  <div className="mt-5 space-y-2">
+                    <p className="text-2xs font-medium text-slate-400 uppercase tracking-wide">Clearing order</p>
+                    {[...portfolio.perDebt]
+                      .sort((a, b) => a.clearedInMonth - b.clearedInMonth)
+                      .map((d, i) => (
+                        <div key={d.id} className="flex items-center gap-3">
+                          <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 text-2xs font-semibold text-slate-500 flex items-center justify-center shrink-0">
+                            {i + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-slate-900 dark:text-slate-100 truncate">{d.name}</p>
+                            <p className="text-2xs text-slate-400">
+                              {fmt(d.balance)} · {fmt(Math.round(d.interestPaid))} interest
+                            </p>
+                          </div>
+                          <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">
+                            month {d.clearedInMonth}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+
+                  {strategyComparison?.cheaper && strategyComparison.interestDifference !== null && (
+                    <p className="mt-4 pt-3 border-t border-slate-50 dark:border-slate-800 text-2xs text-slate-500 dark:text-slate-400">
+                      {strategyComparison.interestDifference < 1
+                        ? 'Both strategies cost about the same here — pick whichever keeps you going.'
+                        : `Avalanche costs ${fmt(Math.round(strategyComparison.interestDifference))} less interest than snowball on these debts. Snowball clears the smallest balance first, which some people find easier to stick to.`}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Individual plan rows, so each can still be removed */}
+              <div className="space-y-2">
+                {plans.map((plan) => {
+                  const liability = liabilities.find((l) => l.id === plan.liabilityId)
+                  if (!liability) return null
+                  return (
+                    <div
+                      key={plan.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-slate-900 dark:text-slate-100 truncate">{liability.name}</p>
+                        <p className="text-2xs text-slate-400">
+                          {plan.strategy === 'avalanche' ? 'Avalanche' : 'Snowball'} · {fmt(plan.extraPayment)}/mo extra
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => deletePlan(plan.id)}
+                        aria-label={`Delete plan for ${liability.name}`}
+                        className="text-slate-300 hover:text-rose-400 transition-colors p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950 shrink-0"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                          <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
 
           {/* Strategy comparison */}
-          {liabilities.filter(l => l.interestRate && l.minPayment).length >= 2 && (
+          {strategyComparison?.avalanche.feasible && liabilities.length >= 2 && (
             <Disclosure title="Strategy comparison">
-              <p className="text-xs text-slate-400 mb-4">How snowball vs avalanche compares on your current debts.</p>
+              <p className="text-xs text-slate-400 mb-4">
+                The month each debt clears under either strategy, with payments rolled over as debts are
+                paid off. These columns used to be identical because the strategy was never applied.
+              </p>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
@@ -226,21 +310,22 @@ export default function DebtPage() {
                       <th className="text-left pb-2 font-medium text-slate-400">Debt</th>
                       <th className="text-right pb-2 font-medium text-slate-400">Balance</th>
                       <th className="text-right pb-2 font-medium text-slate-400">Rate</th>
-                      <th className="text-right pb-2 font-medium text-slate-400 text-teal-700 dark:text-teal-400">Snowball months</th>
-                      <th className="text-right pb-2 font-medium text-slate-400 text-red-600 dark:text-red-400">Avalanche months</th>
+                      <th className="text-right pb-2 font-medium text-teal-700 dark:text-teal-400">Snowball clears</th>
+                      <th className="text-right pb-2 font-medium text-red-600 dark:text-red-400">Avalanche clears</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {liabilities.filter(l => l.interestRate && l.minPayment).map(l => {
-                      const snowball = calculatePayoff(l.balance, l.interestRate!, l.minPayment!, 0, 'snowball')
-                      const avalanche = calculatePayoff(l.balance, l.interestRate!, l.minPayment!, 0, 'avalanche')
+                    {liabilities.map(l => {
+                      const snowball = strategyComparison.snowball.perDebt.find(d => d.id === l.id)
+                      const avalanche = strategyComparison.avalanche.perDebt.find(d => d.id === l.id)
+                      if (!snowball || !avalanche) return null
                       return (
                         <tr key={l.id} className="border-b border-slate-50 dark:border-slate-800">
                           <td className="py-2.5 font-medium text-slate-900 dark:text-slate-100">{l.name}</td>
                           <td className="py-2.5 text-right text-slate-700 dark:text-slate-300">{fmt(l.balance)}</td>
-                          <td className="py-2.5 text-right text-slate-500">{l.interestRate}%</td>
-                          <td className="py-2.5 text-right font-medium text-teal-700 dark:text-teal-400">{snowball.months}mo</td>
-                          <td className="py-2.5 text-right font-medium text-red-600 dark:text-red-400">{avalanche.months}mo</td>
+                          <td className="py-2.5 text-right text-slate-500">{l.interestRate ?? 0}%</td>
+                          <td className="py-2.5 text-right font-medium text-teal-700 dark:text-teal-400">{snowball.clearedInMonth}mo</td>
+                          <td className="py-2.5 text-right font-medium text-red-600 dark:text-red-400">{avalanche.clearedInMonth}mo</td>
                         </tr>
                       )
                     })}
@@ -253,6 +338,13 @@ export default function DebtPage() {
                   <span className="font-semibold ml-2">Avalanche</span> targets highest interest rates first (saves the most money).
                   The best strategy depends on whether you need momentum or math on your side.
                 </p>
+                {strategyComparison.interestDifference !== null && strategyComparison.interestDifference >= 1 && (
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">
+                    On your debts, avalanche costs{' '}
+                    <span className="font-semibold">{fmt(Math.round(strategyComparison.interestDifference))}</span>{' '}
+                    less in interest overall.
+                  </p>
+                )}
               </div>
             </Disclosure>
           )}

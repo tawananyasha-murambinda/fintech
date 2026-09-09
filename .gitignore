@@ -46,3 +46,6 @@ coverage
 fintrack-release.properties
 *.keystore
 *.jks
+
+# Sentry
+.sentryclirc

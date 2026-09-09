@@ -17,7 +17,36 @@ export async function GET() {
     include: { vault: true },
   })
 
-  return NextResponse.json({ vaults, roundUpRule: rule })
+  // Recent sweeps, so the vault balance is explainable rather than a number
+  // that changes overnight with nothing to show for it.
+  const [contributions, roundUpTotal] = await Promise.all([
+    prisma.vaultContribution.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      include: {
+        transaction: { select: { merchantName: true, description: true, amount: true, date: true } },
+      },
+    }),
+    prisma.vaultContribution.aggregate({
+      where: { userId: session.user.id, source: 'roundup' },
+      _count: true,
+    }),
+  ])
+
+  return NextResponse.json({
+    vaults,
+    roundUpRule: rule,
+    recentContributions: contributions.map((c) => ({
+      id: c.id,
+      amount: c.amount,
+      source: c.source,
+      createdAt: c.createdAt,
+      merchant: c.transaction?.merchantName || c.transaction?.description || null,
+      transactionAmount: c.transaction?.amount ?? null,
+    })),
+    roundUpCount: roundUpTotal._count,
+  })
 }
 
 export async function POST(req: Request) {

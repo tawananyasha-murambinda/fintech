@@ -28,8 +28,11 @@ export function encrypt(plaintext: string): string {
 }
 
 export function decrypt(ciphertext: string): string {
-  const [ivHex, encryptedHex, tagHex] = ciphertext.split(':')
-  if (!ivHex || !encryptedHex || !tagHex) throw new Error('Invalid ciphertext format')
+  const parts = ciphertext.split(':')
+  const [ivHex, encryptedHex, tagHex] = parts
+  // The payload segment is legitimately empty when the plaintext was empty, so
+  // only the IV and auth tag are required to be non-empty.
+  if (parts.length !== 3 || !ivHex || !tagHex) throw new Error('Invalid ciphertext format')
   const iv = Buffer.from(ivHex, 'hex')
   const encrypted = Buffer.from(encryptedHex, 'hex')
   const tag = Buffer.from(tagHex, 'hex')

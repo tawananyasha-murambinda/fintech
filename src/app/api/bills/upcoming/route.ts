@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { nextDueDate } from '@/lib/bills'
+import { nextDueDate, daysUntilDue } from '@/lib/bills'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -16,9 +16,8 @@ export async function GET() {
 
   const upcoming = bills
     .map((bill) => {
-      const nextDueDateValue = nextDueDate(bill.dueDate, now)
-      const daysUntilDue = Math.ceil((nextDueDateValue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      return { ...bill, nextDueDate: nextDueDateValue.toISOString(), daysUntilDue }
+      const next = nextDueDate(bill, now)
+      return { ...bill, nextDueDate: next.toISOString(), daysUntilDue: daysUntilDue(next, now) }
     })
     .filter((b) => b.daysUntilDue <= (b.reminderDays || 3) && b.daysUntilDue >= 0)
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue)

@@ -21,6 +21,10 @@ export default function CashflowPage() {
         fetch('/api/bills').then(r => r.json()),
       ])
 
+      // /api/bills now returns { bills, monthlyTotal } and projects each bill's
+      // next occurrence from its own frequency.
+      const bills: any[] = Array.isArray(billRes?.bills) ? billRes.bills : []
+
       const now = new Date()
       const currentDay = now.getDate()
       const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
@@ -29,14 +33,31 @@ export default function CashflowPage() {
       const expenses = txRes.transactions?.filter((t: any) => t.direction === 'debit').reduce((s: number, t: any) => s + Math.abs(t.amount), 0) || 0
       const avgDailyExpense = currentDay > 0 ? expenses / currentDay : 0
 
-      const monthlyBills = (billRes || []).filter((b: any) => b.isActive).reduce((s: number, b: any) => s + b.amount, 0)
+      // Normalised per frequency: a yearly bill contributes a twelfth, not its
+      // whole amount. Previously every bill counted at face value each month.
+      const monthlyBills =
+        billRes?.monthlyTotal ??
+        bills.filter((b) => b.isActive).reduce((s: number, b: any) => s + (b.monthlyEquivalent ?? b.amount), 0)
+
+      // Place each bill on the day it actually next falls due rather than
+      // assuming dueDate is a day of this month — which put weekly bills on one
+      // day a month and yearly bills on a day they are not due at all.
+      const billsByDay = new Map<number, any[]>()
+      for (const bill of bills) {
+        if (!bill.isActive || !bill.nextDueDate) continue
+        const due = new Date(bill.nextDueDate)
+        if (due.getUTCFullYear() !== now.getFullYear() || due.getUTCMonth() !== now.getMonth()) continue
+        const day = due.getUTCDate()
+        if (!billsByDay.has(day)) billsByDay.set(day, [])
+        billsByDay.get(day)!.push(bill)
+      }
 
       let runningBalance = income - expenses
       const dailyProjection = []
 
       for (let d = currentDay; d <= daysInMonth; d++) {
         const events: string[] = []
-        const dayBills = (billRes || []).filter((b: any) => b.isActive && b.dueDate === d)
+        const dayBills = billsByDay.get(d) ?? []
         for (const bill of dayBills) {
           runningBalance -= bill.amount
           events.push(`Bill: ${bill.name} (${fmt(bill.amount)})`)
@@ -52,7 +73,7 @@ export default function CashflowPage() {
         })
       }
 
-      setData({ bills: billRes || [], income, monthlyBills, projectedBalance: runningBalance, dailyProjection })
+      setData({ bills, income, monthlyBills, projectedBalance: runningBalance, dailyProjection })
       setLoading(false)
     }
     load()

@@ -56,6 +56,14 @@ export async function exportUserData(userId: string) {
       currency: profile.currency,
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
+      plan: profile.plan,
+      lastLoginAt: profile.lastLoginAt,
+      // The status is the user's data and belongs in an export; the secret
+      // and the recovery-code hashes are credentials and never leave the
+      // server. This object is an explicit allow-list for exactly that reason
+      // — do not spread `profile` here.
+      twoFactorEnabled: profile.twoFactorEnabled,
+      twoFactorEnabledAt: profile.twoFactorVerifiedAt,
     },
     oauthAccounts: safeAccounts,
     linkedBanks: linkedBanks.map((b) => ({

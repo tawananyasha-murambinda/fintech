@@ -7,8 +7,13 @@ import Link from 'next/link'
 interface Subscription {
   name: string
   category: string | null
+  amount: number
   monthlyAmount: number
-  frequency: string
+  cadence: string
+  medianGapDays: number
+  nextExpected: string | null
+  confidence: number
+  priceChanged: boolean
   lastCharge: string
   transactionCount: number
 }
@@ -92,7 +97,12 @@ const SUBSCRIPTION_COLORS = [
 
 export default function SubscriptionsPage() {
   const { format: fmt } = useCurrency()
-  const [data, setData] = useState<{ subscriptions: Subscription[]; totalMonthly: number; count: number } | null>(null)
+  const [data, setData] = useState<{
+    subscriptions: Subscription[]
+    totalMonthly: number
+    totalYearly: number
+    count: number
+  } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -157,7 +167,7 @@ export default function SubscriptionsPage() {
             </div>
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
               <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1">Yearly cost</p>
-              <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{fmt(data.totalMonthly * 12)}</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{fmt(data.totalYearly)}</p>
             </div>
           </div>
 
@@ -175,14 +185,26 @@ export default function SubscriptionsPage() {
                       <div>
                         <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{sub.name}</p>
                         <p className="text-2xs text-slate-400">
-                          {sub.category || 'Uncategorized'} · every {sub.frequency} · {sub.transactionCount} charge{sub.transactionCount !== 1 ? 's' : ''}
+                          {sub.category} · {describeCadence(sub)} · {sub.transactionCount} charge{sub.transactionCount !== 1 ? 's' : ''}
+                          {sub.priceChanged && (
+                            <span className="ml-1 text-amber-600 dark:text-amber-400">· price changed</span>
+                          )}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmt(sub.monthlyAmount)}</p>
-                        <p className="text-2xs text-slate-400">{fmt(sub.monthlyAmount * 12)}/yr</p>
+                        <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                          {fmt(sub.amount)}
+                          {sub.cadence !== 'monthly' && (
+                            <span className="text-2xs font-normal text-slate-400">/{CADENCE_UNIT[sub.cadence] || 'charge'}</span>
+                          )}
+                        </p>
+                        <p className="text-2xs text-slate-400">
+                          {sub.cadence === 'monthly'
+                            ? `${fmt(sub.monthlyAmount * 12)}/yr`
+                            : `${fmt(sub.monthlyAmount)}/mo equivalent`}
+                        </p>
                       </div>
                       {cancelUrl && (
                         <a href={cancelUrl} target="_blank" rel="noopener noreferrer"
@@ -200,4 +222,29 @@ export default function SubscriptionsPage() {
       )}
     </div>
   )
+}
+
+const CADENCE_UNIT: Record<string, string> = {
+  weekly: 'wk',
+  monthly: 'mo',
+  quarterly: 'qtr',
+  yearly: 'yr',
+}
+
+const CADENCE_LABEL: Record<string, string> = {
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+  yearly: 'Yearly',
+}
+
+function describeCadence(sub: Subscription): string {
+  const label = CADENCE_LABEL[sub.cadence]
+  if (!label) return `every ~${sub.medianGapDays} days`
+  if (!sub.nextExpected) return label
+  const next = new Date(sub.nextExpected).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+  })
+  return `${label} · next ~${next}`
 }

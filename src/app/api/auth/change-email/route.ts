@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const limited = rateLimit(req, { limit: 5, windowMs: 15 * 60 * 1000, key: `change-email:${session.user.id}`, scope: 'user' })
+    const limited = await rateLimit(req, { limit: 5, windowMs: 15 * 60 * 1000, key: `change-email:${session.user.id}`, scope: 'user' })
     if (limited) return limited
 
     const body = await req.json()

@@ -75,7 +75,7 @@ export default function AlertsPage() {
           </div>
           <h2 className="text-base font-semibold text-slate-900 mb-1 dark:text-slate-100">All clear</h2>
           <p className="text-sm text-slate-500 max-w-sm mx-auto dark:text-slate-400">
-            You'll see alerts here when you overspend a budget, get charged more than usual, or when duplicate charges are detected.
+            You&apos;ll see alerts here when you overspend a budget, get charged more than usual, or when duplicate charges are detected.
           </p>
         </div>
       ) : (

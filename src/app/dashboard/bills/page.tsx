@@ -13,9 +13,14 @@ interface Bill {
   category: string | null
   reminderDays: number
   isActive: boolean
+  anchorDate: string | null
   nextDueDate: string
+  followingDueDate: string
   daysUntilDue: number
+  monthlyEquivalent: number
 }
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const CATEGORIES = ['Housing', 'Utilities', 'Insurance', 'Internet', 'Phone', 'Streaming', 'Memberships', 'Other']
 
@@ -31,14 +36,16 @@ export default function BillsPage() {
   const [bills, setBills] = useState<Bill[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', amount: '', dueDate: '', frequency: 'monthly', category: '', reminderDays: '3' })
+  const [form, setForm] = useState({ name: '', amount: '', dueDate: '', frequency: 'monthly', category: '', reminderDays: '3', anchorDate: '' })
+  const [monthlyTotal, setMonthlyTotal] = useState(0)
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const fetchBills = useCallback(async () => {
     const res = await fetch('/api/bills')
     const data = await res.json()
-    setBills(data)
+    setBills(Array.isArray(data.bills) ? data.bills : [])
+    setMonthlyTotal(data.monthlyTotal ?? 0)
     setLoading(false)
   }, [])
 
@@ -50,7 +57,14 @@ export default function BillsPage() {
     if (!form.name || !form.amount || !form.dueDate) { setError('Fill in all required fields'); return }
 
     const dueDateNum = parseInt(form.dueDate)
-    if (dueDateNum < 1 || dueDateNum > 31) { setError('Due date must be 1-31'); return }
+    if (form.frequency === 'weekly') {
+      if (dueDateNum < 0 || dueDateNum > 6) { setError('Pick a day of the week'); return }
+    } else if (dueDateNum < 1 || dueDateNum > 31) {
+      setError('Due date must be 1-31'); return
+    }
+    if ((form.frequency === 'quarterly' || form.frequency === 'yearly') && !form.anchorDate) {
+      setError(`A ${form.frequency} bill needs a first occurrence date`); return
+    }
 
     const url = editingId ? `/api/bills/${editingId}` : '/api/bills'
     const method = editingId ? 'PUT' : 'POST'
@@ -65,13 +79,14 @@ export default function BillsPage() {
         frequency: form.frequency,
         category: form.category || null,
         reminderDays: parseInt(form.reminderDays),
+        anchorDate: form.anchorDate || null,
       }),
     })
 
     if (!res.ok) { const d = await res.json(); setError(d.error || 'Failed'); return }
     setShowForm(false)
     setEditingId(null)
-    setForm({ name: '', amount: '', dueDate: '', frequency: 'monthly', category: '', reminderDays: '3' })
+    setForm({ name: '', amount: '', dueDate: '', frequency: 'monthly', category: '', reminderDays: '3', anchorDate: '' })
     fetchBills()
   }
 
@@ -83,6 +98,7 @@ export default function BillsPage() {
       frequency: bill.frequency,
       category: bill.category || '',
       reminderDays: String(bill.reminderDays),
+      anchorDate: bill.anchorDate ? bill.anchorDate.slice(0, 10) : '',
     })
     setEditingId(bill.id)
     setShowForm(true)
@@ -131,7 +147,7 @@ export default function BillsPage() {
             <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">Track recurring bills and upcoming due dates.</p>
           </div>
         </div>
-        <button onClick={() => { setShowForm(!showForm); setEditingId(null); setForm({ name: '', amount: '', dueDate: '', frequency: 'monthly', category: '', reminderDays: '3' }) }}
+        <button onClick={() => { setShowForm(!showForm); setEditingId(null); setForm({ name: '', amount: '', dueDate: '', frequency: 'monthly', category: '', reminderDays: '3', anchorDate: '' }) }}
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">
           {showForm ? 'Cancel' : 'Add bill'}
         </button>
@@ -153,10 +169,20 @@ export default function BillsPage() {
                 className="input text-sm" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">Due date (day) *</label>
-              <input type="number" min="1" max="31" placeholder="1" value={form.dueDate}
-                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                className="input text-sm" />
+              <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                {form.frequency === 'weekly' ? 'Day of week *' : 'Due date (day) *'}
+              </label>
+              {form.frequency === 'weekly' ? (
+                <select value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                  className="input text-sm">
+                  <option value="">Select day</option>
+                  {WEEKDAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}
+                </select>
+              ) : (
+                <input type="number" min="1" max="31" placeholder="1" value={form.dueDate}
+                  onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                  className="input text-sm" />
+              )}
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">Frequency</label>
@@ -168,6 +194,21 @@ export default function BillsPage() {
                 <option value="yearly">Yearly</option>
               </select>
             </div>
+            {form.frequency !== 'monthly' && (
+              <div>
+                <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                  {form.frequency === 'weekly' ? 'First occurrence' : 'First occurrence *'}
+                </label>
+                <input type="date" value={form.anchorDate}
+                  onChange={(e) => setForm({ ...form, anchorDate: e.target.value })}
+                  className="input text-sm" />
+                <p className="text-2xs text-slate-400 mt-1">
+                  {form.frequency === 'weekly'
+                    ? 'Optional — pins the exact week this repeats from.'
+                    : `Tells us which month this ${form.frequency} bill falls in.`}
+                </p>
+              </div>
+            )}
             <div>
               <label className="text-xs font-semibold text-slate-400 dark:text-slate-500">Category</label>
               <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -314,7 +355,7 @@ export default function BillsPage() {
                     <div>
                       <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{bill.name}</p>
                       <p className="text-2xs text-slate-400">
-                        Due {formatDay(bill.dueDate)} · {FREQUENCY_LABELS[bill.frequency] || bill.frequency}
+                        {describeSchedule(bill)}
                         {bill.category && ` · ${bill.category}`}
                       </p>
                     </div>
@@ -356,4 +397,22 @@ export default function BillsPage() {
 function formatDay(day: number): string {
   const suffix = day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th'
   return `the ${day}${suffix}`
+}
+
+// A bill's cadence is only meaningful together with its frequency: "the 3rd"
+// means a day of the month for a monthly bill and a weekday for a weekly one.
+function describeSchedule(bill: Bill): string {
+  const label = FREQUENCY_LABELS[bill.frequency] || bill.frequency
+  const next = new Date(bill.nextDueDate).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+  })
+
+  if (bill.frequency === 'weekly') {
+    return `Every ${WEEKDAYS[new Date(bill.nextDueDate).getUTCDay()]} · next ${next}`
+  }
+  if (bill.frequency === 'monthly') {
+    return `${label} on ${formatDay(bill.dueDate)} · next ${next}`
+  }
+  return `${label} · next ${next}`
 }

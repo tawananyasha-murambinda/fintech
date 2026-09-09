@@ -3,37 +3,146 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * Design tokens.
+   *
+   * Neutrals are warmed very slightly off pure grey (a touch of blue in the
+   * darks, a touch of warmth in the lights) so large surfaces do not read as
+   * the flat #f5f5f5 that makes an interface feel unconsidered. Every step is
+   * a real step — no two tokens within two percent of each other.
+   */
   :root {
-    --font-inter: 'Inter', system-ui, sans-serif;
+    color-scheme: light;
+
+    --font-sans: 'Manrope', system-ui, sans-serif;
+    --font-display: 'Bricolage Grotesque', 'Manrope', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+    /* Ink — text and solid marks, darkest first. */
     --ink: #10131a;
-    --ink-soft: #1b1f2a;
+    --ink-soft: #343b4a;
+    --ink-muted: #6b7382;
+    --ink-faint: #9aa1ad;
+
+    /* Surfaces — the page sits on `base`, cards on `surface`, insets on `sunken`. */
+    --wash-base: #f4f5f7;
     --surface: #ffffff;
-    --surface-muted: #f6f7f9;
-    --line: #eceef1;
+    --surface-muted: #f4f5f7;
+    --surface-sunken: #eceef1;
+
+    --line: #e4e7ec;
+    --line-strong: #d3d8e0;
+
+    /* Accent. One hue, three roles: rest, hover, and a wash for backgrounds. */
     --accent: #1e5eff;
-    --wash-base: #f6f7f9;
+    --accent-hover: #1550e6;
+    --accent-wash: #eef3ff;
+    --accent-ink: #0b3fbd;
+
+    /* Semantics. Money moving in and out earns its own pair. */
+    --positive: #0f7a5a;
+    --positive-wash: #e6f5ef;
+    --negative: #c0342b;
+    --negative-wash: #fdecea;
+    --warning: #a55a09;
+    --warning-wash: #fdf3e4;
+
+    /*
+     * Elevation. Layered, low-opacity shadows rather than one heavy blur —
+     * the difference between something sitting on the page and something
+     * smudged onto it.
+     */
+    --shadow-sm: 0 1px 2px rgb(16 19 26 / 0.04), 0 1px 1px rgb(16 19 26 / 0.03);
+    --shadow-md: 0 2px 4px rgb(16 19 26 / 0.04), 0 4px 12px rgb(16 19 26 / 0.05);
+    --shadow-lg: 0 4px 8px rgb(16 19 26 / 0.04), 0 12px 32px rgb(16 19 26 / 0.08);
+
+    /* Motion. Short and eased-out: the UI should feel answered, not animated. */
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --dur-fast: 120ms;
+    --dur: 180ms;
+  }
+
+  html.dark {
+    color-scheme: dark;
+
+    --ink: #e9ebef;
+    --ink-soft: #b3b9c4;
+    --ink-muted: #8891a0;
+    --ink-faint: #5d6675;
+
+    /* Dark surfaces get lighter as they come forward, which is how depth
+       actually works without shadows to lean on. */
+    --wash-base: #0a0c10;
+    --surface: #13161d;
+    --surface-muted: #0f1218;
+    --surface-sunken: #090b0f;
+
+    --line: #22262f;
+    --line-strong: #2f3541;
+
+    --accent: #4d82ff;
+    --accent-hover: #6a97ff;
+    --accent-wash: #131c33;
+    --accent-ink: #a9c4ff;
+
+    --positive: #3fc79a;
+    --positive-wash: #0d2620;
+    --negative: #f4796d;
+    --negative-wash: #2a1210;
+    --warning: #e0a340;
+    --warning-wash: #2a1e0c;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 2px 4px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 4px 8px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.5);
   }
 
   * { box-sizing: border-box; }
 
   html {
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
 
   body {
-    background: var(--surface-muted);
+    background: var(--wash-base);
     color: var(--ink);
+    font-family: var(--font-sans);
   }
 
-  html.dark body {
-    background: #0a0c10;
-    color: #e9ebef;
+  /* Display face is rationed to headings and the wordmark. */
+  .font-display,
+  h1,
+  h2.display {
+    font-family: var(--font-display);
+    letter-spacing: -0.03em;
   }
 
-  html.dark {
-    --wash-base: #0a0c10;
+  .font-mono { font-family: var(--font-mono); }
+
+  ::selection {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* Every focus ring in the app, in one place, so none of them are missing. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   .tabular {
@@ -43,91 +152,183 @@
 }
 
 @layer components {
+  /*
+   * Primitives.
+   *
+   * Everything here is built on the tokens rather than hard-coded Tailwind
+   * palette classes, so a change to --accent or --line moves the whole app
+   * instead of one card. Every one of these previously repeated `dark:` for
+   * each colour; the tokens already swap, so they no longer need to.
+   */
+
+  /* Money and any figure that changes in place. Tabular so digits do not
+     jitter as values update, tight so large numbers stay a single shape. */
   .stat-number {
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum';
-    letter-spacing: -0.02em;
+    letter-spacing: -0.025em;
+    font-weight: 600;
+  }
+
+  .display-number {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+    letter-spacing: -0.04em;
+    font-weight: 600;
+    line-height: 1;
   }
 
   .card {
-    @apply bg-white border border-slate-200/70 rounded-2xl dark:bg-slate-900 dark:border-slate-800;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+  }
+
+  .card-raised {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow-sm);
   }
 
   .card-hover {
-    @apply transition-colors duration-150 hover:border-slate-300 dark:hover:border-slate-700;
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+      transform var(--dur) var(--ease);
+  }
+  .card-hover:hover {
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow-md);
+    /* A single pixel. Enough to feel responsive, small enough that a grid of
+       cards does not appear to wobble as the pointer crosses it. */
+    transform: translateY(-1px);
   }
 
   .btn-primary {
-    @apply bg-slate-900 text-white px-5 py-3 rounded-full text-sm font-semibold
-           hover:bg-slate-800 transition-colors duration-100
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2
-           dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 dark:focus-visible:ring-white dark:focus-visible:ring-offset-slate-950;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold;
+    background: var(--ink);
+    color: var(--surface);
+    transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
   }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-primary:active { transform: scale(0.985); }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
   .btn-secondary {
-    @apply bg-white text-slate-800 px-5 py-3 rounded-full text-sm font-semibold
-           border border-slate-200 hover:bg-slate-50
-           transition-colors duration-100
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2
-           dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-950;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold;
+    background: var(--surface);
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+    transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+      transform var(--dur-fast) var(--ease);
   }
+  .btn-secondary:hover { background: var(--surface-muted); border-color: var(--line-strong); }
+  .btn-secondary:active { transform: scale(0.985); }
+  .btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
   .btn-accent {
-    @apply bg-[var(--accent)] text-white px-5 py-3 rounded-full text-sm font-semibold
-           hover:brightness-95 transition-all duration-100
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold;
+    background: var(--accent);
+    color: #fff;
+    transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
   }
+  .btn-accent:hover { background: var(--accent-hover); }
+  .btn-accent:active { transform: scale(0.985); }
+  .btn-accent:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium;
+    color: var(--ink-muted);
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  }
+  .btn-ghost:hover { background: var(--surface-muted); color: var(--ink); }
 
   .input {
-    @apply w-full px-4 py-3 text-sm text-slate-900 bg-white border border-slate-200
-           rounded-xl placeholder:text-slate-400
-           focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900
-           transition-colors duration-100
-           dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:placeholder:text-slate-500 dark:focus:border-slate-500 dark:focus:ring-slate-500;
+    @apply w-full px-3.5 py-2.5 text-sm rounded-xl;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
   }
+  .input::placeholder { color: var(--ink-faint); }
+  .input:focus {
+    outline: none;
+    border-color: var(--accent);
+    /* A ring rather than a thicker border, so the field does not resize on
+       focus and shift everything beside it. */
+    box-shadow: 0 0 0 3px var(--accent-wash);
+  }
+  .input:disabled { background: var(--surface-muted); color: var(--ink-faint); cursor: not-allowed; }
 
   .label {
-    @apply block text-sm font-medium text-slate-600 mb-2 dark:text-slate-300;
+    @apply block text-xs font-semibold mb-1.5;
+    color: var(--ink-muted);
+    letter-spacing: 0.01em;
   }
 
   .badge {
-    @apply inline-flex items-center px-2.5 py-1 rounded-full text-2xs font-semibold;
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-2xs font-semibold;
   }
-  .badge-credit {
-    @apply badge bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400;
-  }
-  .badge-debit {
-    @apply badge bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300;
-  }
-  .badge-pending {
-    @apply badge bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400;
-  }
+  .badge-credit { background: var(--positive-wash); color: var(--positive); }
+  .badge-debit { background: var(--surface-sunken); color: var(--ink-muted); }
+  .badge-pending { background: var(--warning-wash); color: var(--warning); }
+  .badge-accent { background: var(--accent-wash); color: var(--accent-ink); }
 
   .section-title {
-    @apply text-base font-semibold text-slate-900 dark:text-slate-100;
+    @apply text-sm font-semibold;
+    color: var(--ink);
+  }
+
+  /* Page header: the display face gets exactly one line per screen. */
+  .page-title {
+    font-family: var(--font-display);
+    @apply text-2xl font-semibold;
+    letter-spacing: -0.035em;
+    color: var(--ink);
+  }
+
+  .page-subtitle {
+    @apply text-sm mt-1;
+    color: var(--ink-muted);
+  }
+
+  /* Hairline divider that respects the token, used instead of ad-hoc borders. */
+  .divider { height: 1px; background: var(--line); }
+
+  /* Loading placeholder that shimmers rather than pulsing the whole block. */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--surface-muted) 25%,
+      var(--surface-sunken) 37%,
+      var(--surface-muted) 63%
+    );
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+    border-radius: 8px;
+  }
+
+  @keyframes shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: 0 0; }
   }
 }
 
 .recharts-cartesian-grid-horizontal line,
 .recharts-cartesian-grid-vertical line {
-  stroke: #eceef1;
+  stroke: var(--line);
 }
-html.dark .recharts-cartesian-grid-horizontal line,
-html.dark .recharts-cartesian-grid-vertical line {
-  stroke: #1e293b;
-}
+.recharts-text { fill: var(--ink-faint); font-size: 11px; }
 .recharts-tooltip-wrapper .recharts-default-tooltip {
-  border: 1px solid #e2e8f0 !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--line) !important;
   border-radius: 12px !important;
-  box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.12) !important;
-}
-html.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
-  border-color: #334155 !important;
-  background: #0f172a !important;
+  box-shadow: var(--shadow-lg) !important;
+  font-size: 12px !important;
 }
 
 *:focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 6px;
 }

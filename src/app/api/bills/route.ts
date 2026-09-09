@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { nextDueDate } from '@/lib/bills'
+import { nextDueDate, followingDueDate, daysUntilDue, monthlyEquivalent, isBillFrequency } from '@/lib/bills'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -16,17 +16,29 @@ export async function GET() {
   const now = new Date()
 
   const billsWithNextDue = bills.map((bill) => {
-    const nextDueDateValue = nextDueDate(bill.dueDate, now)
-    const daysUntilDue = Math.ceil((nextDueDateValue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    const next = nextDueDate(bill, now)
 
     return {
       ...bill,
-      nextDueDate: nextDueDateValue.toISOString(),
-      daysUntilDue,
+      nextDueDate: next.toISOString(),
+      followingDueDate: followingDueDate(bill, now).toISOString(),
+      daysUntilDue: daysUntilDue(next, now),
+      // What this bill costs per month once its frequency is accounted for,
+      // so a yearly £120 bill contributes £10 to the monthly total, not £120.
+      monthlyEquivalent: monthlyEquivalent(bill.amount, bill.frequency),
     }
   })
 
-  return NextResponse.json(billsWithNextDue)
+  const monthlyTotal = billsWithNextDue
+    .filter((b) => b.isActive)
+    .reduce((total, b) => total + b.monthlyEquivalent, 0)
+
+  return NextResponse.json({
+    bills: billsWithNextDue.sort(
+      (a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime()
+    ),
+    monthlyTotal: Math.round(monthlyTotal * 100) / 100,
+  })
 }
 
 export async function POST(req: NextRequest) {
@@ -35,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { name, amount, dueDate, frequency, category, reminderDays } = body
+    const { name, amount, dueDate, frequency, category, reminderDays, anchorDate } = body
 
     if (!name || amount === undefined || amount === null || amount === '' || dueDate === undefined) {
       return NextResponse.json({ error: 'Name, amount, and due date are required' }, { status: 400 })
@@ -48,8 +60,29 @@ export async function POST(req: NextRequest) {
     if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
       return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 })
     }
-    if (Number.isNaN(parsedDueDate) || parsedDueDate < 1 || parsedDueDate > 31) {
+    const resolvedFrequency = isBillFrequency(frequency) ? frequency : 'monthly'
+
+    // Weekly bills are keyed on a weekday (0 = Sunday), everything else on a
+    // day of the month.
+    if (resolvedFrequency === 'weekly') {
+      if (Number.isNaN(parsedDueDate) || parsedDueDate < 0 || parsedDueDate > 6) {
+        return NextResponse.json({ error: 'For a weekly bill, pick a day of the week.' }, { status: 400 })
+      }
+    } else if (Number.isNaN(parsedDueDate) || parsedDueDate < 1 || parsedDueDate > 31) {
       return NextResponse.json({ error: 'Due date must be a day of the month between 1 and 31' }, { status: 400 })
+    }
+
+    // Quarterly and yearly bills are meaningless without knowing which month
+    // they fall in, so an anchor is required for them.
+    const parsedAnchor = anchorDate ? new Date(anchorDate) : null
+    if (parsedAnchor && Number.isNaN(parsedAnchor.getTime())) {
+      return NextResponse.json({ error: 'Start date is not a valid date.' }, { status: 400 })
+    }
+    if ((resolvedFrequency === 'quarterly' || resolvedFrequency === 'yearly') && !parsedAnchor) {
+      return NextResponse.json(
+        { error: `A ${resolvedFrequency} bill needs a start date so we know which month it falls in.` },
+        { status: 400 }
+      )
     }
 
     const bill = await prisma.bill.create({
@@ -58,7 +91,8 @@ export async function POST(req: NextRequest) {
         name,
         amount: parsedAmount,
         dueDate: parsedDueDate,
-        frequency: frequency || 'monthly',
+        frequency: resolvedFrequency,
+        anchorDate: parsedAnchor,
         category: category || null,
         reminderDays: parsedReminder,
       },

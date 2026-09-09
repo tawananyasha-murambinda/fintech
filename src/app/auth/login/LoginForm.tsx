@@ -16,6 +16,10 @@ export default function LoginForm() {
   const [error, setError] = useState(oauthError ? oauthErrorMessage(oauthError) : '')
   const [loading, setLoading] = useState(false)
   const [googleEnabled, setGoogleEnabled] = useState(false)
+  // Two-factor is a second step, not a second field: the code is only asked
+  // for once the password has already been accepted.
+  const [totp, setTotp] = useState('')
+  const [needsTotp, setNeedsTotp] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -38,12 +42,28 @@ export default function LoginForm() {
     const res = await signIn('credentials', {
       email,
       password,
+      ...(needsTotp ? { totp } : {}),
       redirect: false,
       callbackUrl,
     })
 
     if (res?.error) {
-      setError('Invalid email or password.')
+      // authorize() throws these so the client can tell "needs a code" apart
+      // from "wrong password" without leaking which accounts have 2FA on
+      // before the password is correct.
+      if (res.error.includes('TWO_FACTOR_REQUIRED')) {
+        setNeedsTotp(true)
+        setError('')
+      } else if (res.error.includes('TWO_FACTOR_INVALID')) {
+        setNeedsTotp(true)
+        setTotp('')
+        setError('That code is not right. Try the current one from your app.')
+      } else if (res.error.includes('ACCOUNT_LOCKED')) {
+        setError('Too many failed attempts. Try again in about 15 minutes.')
+      } else {
+        setNeedsTotp(false)
+        setError('Invalid email or password.')
+      }
       setLoading(false)
     } else {
       router.push(callbackUrl)
@@ -94,7 +114,29 @@ export default function LoginForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
+        {needsTotp && (
+          <div>
+            <label className="label" htmlFor="totp">
+              Authentication code
+            </label>
+            <input
+              id="totp"
+              type="text"
+              inputMode="numeric"
+              value={totp}
+              onChange={(e) => setTotp(e.target.value)}
+              className="input tracking-[0.4em] text-center text-lg"
+              placeholder="000000"
+              autoComplete="one-time-code"
+              autoFocus
+              required
+            />
+            <p className="text-xs text-slate-500 mt-1.5 dark:text-slate-400">
+              From your authenticator app. You can also use one of your recovery codes.
+            </p>
+          </div>
+        )}
+        <div className={needsTotp ? 'hidden' : undefined}>
           <label className="label">Email address</label>
           <input
             type="email"
@@ -106,7 +148,7 @@ export default function LoginForm() {
             autoComplete="email"
           />
         </div>
-        <div>
+        <div className={needsTotp ? 'hidden' : undefined}>
           <div className="flex items-center justify-between mb-1.5">
             <label className="label mb-0">Password</label>
             <Link href="/auth/forgot-password" className="text-xs text-teal-700 hover:underline dark:text-teal-400">
@@ -136,8 +178,22 @@ export default function LoginForm() {
           disabled={loading}
           className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {loading ? 'Signing in…' : 'Sign in'}
+          {loading ? 'Signing in…' : needsTotp ? 'Verify code' : 'Sign in'}
         </button>
+
+        {needsTotp && (
+          <button
+            type="button"
+            onClick={() => {
+              setNeedsTotp(false)
+              setTotp('')
+              setError('')
+            }}
+            className="w-full text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+          >
+            Back
+          </button>
+        )}
       </form>
     </div>
   )

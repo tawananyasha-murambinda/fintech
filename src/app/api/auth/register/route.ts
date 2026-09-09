@@ -14,7 +14,7 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const limited = rateLimit(req, { limit: 10, windowMs: 15 * 60 * 1000, key: 'register' })
+    const limited = await rateLimit(req, { limit: 10, windowMs: 15 * 60 * 1000, key: 'register' })
     if (limited) return limited
 
     const body = await req.json()

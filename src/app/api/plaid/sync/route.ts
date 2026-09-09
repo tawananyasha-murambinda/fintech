@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { syncAllForUser } from '@/lib/bank-sync'
 import { logAudit, requestMeta } from '@/lib/audit'
+import { runRoundUpsForUser } from '@/lib/round-ups'
+import { logger } from '@/lib/logger'
 
 // POST /api/plaid/sync — pull latest transactions for all linked accounts
 export async function POST(req: NextRequest) {
@@ -34,5 +36,17 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  return NextResponse.json({ synced, transactions, failed })
+  // New transactions may be eligible for round-ups. Best-effort: a failure
+  // here must not turn a successful sync into an error for the user.
+  let roundUps = { swept: 0, contributed: 0 }
+  if (transactions > 0) {
+    try {
+      const result = await runRoundUpsForUser(session.user.id)
+      roundUps = { swept: result.swept, contributed: result.contributed }
+    } catch (err) {
+      logger.error('Round-up sweep after sync failed', { userId: session.user.id, error: err })
+    }
+  }
+
+  return NextResponse.json({ synced, transactions, failed, roundUps })
 }

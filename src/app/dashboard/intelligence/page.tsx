@@ -329,7 +329,7 @@ export default function IntelligencePage() {
           </div>
           <h2 className="text-base font-semibold text-slate-900 mb-1 dark:text-slate-100">Ready to analyse</h2>
           <p className="text-sm text-slate-500 max-w-sm mx-auto mb-6 dark:text-slate-400">
-            Click "Run analysis" to get a full breakdown of your spending, merchant alternatives, and savings recommendations.
+            Click &quot;Run analysis&quot; to get a full breakdown of your spending, merchant alternatives, and savings recommendations.
             {userLocation?.city && ` Using location: ${userLocation.city}${userLocation.country ? `, ${userLocation.country}` : ''}.`}
           </p>
           <button onClick={runAnalysis} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">

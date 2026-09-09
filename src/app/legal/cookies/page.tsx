@@ -21,7 +21,7 @@ export default function CookiesPage() {
 
       <h2>2. Functional storage</h2>
       <ul>
-        <li><strong>Consent choice.</strong> We remember the consent choices you make so we don't ask again.</li>
+        <li><strong>Consent choice.</strong> We remember the consent choices you make so we don&apos;t ask again.</li>
         <li><strong>Theme preference.</strong> Your light/dark theme selection.</li>
       </ul>
 

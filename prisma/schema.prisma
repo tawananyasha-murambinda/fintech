@@ -22,35 +22,67 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts              Account[]
-  sessions              Session[]
-  linkedBanks           LinkedBank[]
-  transactions          Transaction[]
-  manualTransactions    ManualTransaction[]
-  aiInsights            AiInsight[]
-  budgets               Budget[]
-  goals                 Goal[]
-  bills                 Bill[]
-  chatMessages          ChatMessage[]
-  alerts                Alert[]
-  categorizationRules   CategorizationRule[]
-  assets                Asset[]
-  liabilities           Liability[]
-  debtPlans             DebtPlan[]
-  taxEntries            TaxEntry[]
-  investments           Investment[]
-  householdMember       HouseholdMember[]
-  creditScore           CreditScore[]
-  notifications         Notification[]
-  pushSubscriptions     PushSubscription[]
-  receipts              Receipt[]
-  vaults                Vault[]
-  roundUpRules          RoundUpRule[]
-  consents              Consent[]
-  auditLogs             AuditLog[]
-  errorLogs             ErrorLog[]
-  feedbacks             Feedback[]
-  aiUsage               AiUsage[]
+  // Billing. `plan` is the entitlement the app reads on every request;
+  // the Stripe columns are the bookkeeping that keeps it in sync.
+  plan                 String    @default("free") // "free" | "plus" | "pro"
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  subscriptionStatus   String? // Stripe subscription.status, verbatim
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+
+  // Any JWT issued before this instant is refused. Bumped on password change
+  // and password reset so a stolen session cannot outlive the credential.
+  sessionsValidFrom DateTime?
+
+  // Two-factor authentication (TOTP). The secret is encrypted at rest with the
+  // same AES-256-GCM key as bank tokens; `twoFactorEnabled` only flips true
+  // once the user has proved they can generate a code from it.
+  twoFactorSecret     String?
+  twoFactorEnabled    Boolean   @default(false)
+  twoFactorVerifiedAt DateTime?
+
+  // Failed sign-in throttling. Counted server-side so it survives a change of
+  // IP, which an IP-keyed rate limit alone does not.
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+
+  accounts            Account[]
+  sessions            Session[]
+  linkedBanks         LinkedBank[]
+  transactions        Transaction[]
+  manualTransactions  ManualTransaction[]
+  aiInsights          AiInsight[]
+  budgets             Budget[]
+  goals               Goal[]
+  bills               Bill[]
+  chatMessages        ChatMessage[]
+  alerts              Alert[]
+  categorizationRules CategorizationRule[]
+  assets              Asset[]
+  liabilities         Liability[]
+  debtPlans           DebtPlan[]
+  taxEntries          TaxEntry[]
+  investments         Investment[]
+  householdMember     HouseholdMember[]
+  creditScore         CreditScore[]
+  notifications       Notification[]
+  pushSubscriptions   PushSubscription[]
+  receipts            Receipt[]
+  vaults              Vault[]
+  roundUpRules        RoundUpRule[]
+  consents            Consent[]
+  auditLogs           AuditLog[]
+  errorLogs           ErrorLog[]
+  feedbacks           Feedback[]
+  aiUsage             AiUsage[]
+  billingEvents       BillingEvent[]
+  VaultContribution   VaultContribution[]
+  recoveryCodes       TwoFactorRecoveryCode[]
+  netWorthSnapshots   NetWorthSnapshot[]
+
+  @@index([stripeCustomerId])
 }
 
 model Account {
@@ -89,44 +121,45 @@ model VerificationToken {
 }
 
 model LinkedBank {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   userId          String
-  plaidAccountId  String   @unique
+  plaidAccountId  String    @unique
   plaidItemId     String?
   institutionName String
   accountType     String
   accountName     String
-  currency        String   @default("USD")
-  accessToken     String   // encrypted Plaid access token
+  currency        String    @default("USD")
+  accessToken     String // encrypted Plaid access token
   lastSynced      DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
 }
 
 model Transaction {
-  id               String   @id @default(cuid())
-  userId           String
-  linkedBankId     String
+  id                 String   @id @default(cuid())
+  userId             String
+  linkedBankId       String
   plaidTransactionId String   @unique
-  date             DateTime
-  amount           Float
-  direction        String   // "credit" | "debit"
-  description      String
-  merchantName     String?
-  merchantCategory String?
-  merchantCity     String?
-  merchantState    String?
-  merchantCountry  String?
-  status           String   // "posted" | "pending"
-  type             String?  // "card_payment" | "transfer" | etc.
-  runningBalance   Float?
-  createdAt        DateTime @default(now())
+  date               DateTime
+  amount             Decimal  @db.Decimal(14, 2)
+  direction          String // "credit" | "debit"
+  description        String
+  merchantName       String?
+  merchantCategory   String?
+  merchantCity       String?
+  merchantState      String?
+  merchantCountry    String?
+  status             String // "posted" | "pending"
+  type               String? // "card_payment" | "transfer" | etc.
+  runningBalance     Decimal? @db.Decimal(14, 2)
+  createdAt          DateTime @default(now())
 
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  linkedBank LinkedBank @relation(fields: [linkedBankId], references: [id], onDelete: Cascade)
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedBank    LinkedBank          @relation(fields: [linkedBankId], references: [id], onDelete: Cascade)
+  contributions VaultContribution[]
 
   @@index([userId, date])
   @@index([userId, merchantCategory])
@@ -136,8 +169,8 @@ model Transaction {
 model AiInsight {
   id        String   @id @default(cuid())
   userId    String
-  type      String   // "category_breakdown" | "merchant_alternatives" | "savings_tips" | "location_analysis"
-  period    String   // "week" | "month" | "quarter"
+  type      String // "category_breakdown" | "merchant_alternatives" | "savings_tips" | "location_analysis"
+  period    String // "week" | "month" | "quarter"
   data      Json
   createdAt DateTime @default(now())
   expiresAt DateTime
@@ -151,7 +184,7 @@ model Budget {
   id        String   @id @default(cuid())
   userId    String
   category  String
-  amount    Float
+  amount    Decimal  @db.Decimal(14, 2)
   period    String   @default("monthly") // "weekly" | "monthly" | "quarterly"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -166,8 +199,8 @@ model Goal {
   id            String    @id @default(cuid())
   userId        String
   name          String
-  targetAmount  Float
-  currentAmount Float     @default(0)
+  targetAmount  Decimal   @db.Decimal(14, 2)
+  currentAmount Decimal   @default(0) @db.Decimal(14, 2)
   deadline      DateTime?
   color         String    @default("teal")
   createdAt     DateTime  @default(now())
@@ -179,18 +212,21 @@ model Goal {
 }
 
 model Bill {
-  id            String    @id @default(cuid())
-  userId        String
-  name          String
-  amount        Float
-  dueDate       Int       // day of month (1-31)
-  frequency     String    @default("monthly") // "weekly" | "monthly" | "quarterly" | "yearly"
-  category      String?
-  reminderDays  Int       @default(3)
-  isActive      Boolean   @default(true)
-  lastReminded  DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  userId       String
+  name         String
+  amount       Decimal   @db.Decimal(14, 2)
+  dueDate      Int // day of month (1-31); weekday 0-6 for weekly bills with no anchor
+  frequency    String    @default("monthly") // "weekly" | "monthly" | "quarterly" | "yearly"
+  // First known occurrence. Weekly bills need it for the weekday, quarterly
+  // and yearly ones for the month; monthly bills work from dueDate alone.
+  anchorDate   DateTime?
+  category     String?
+  reminderDays Int       @default(3)
+  isActive     Boolean   @default(true)
+  lastReminded DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -200,7 +236,7 @@ model Bill {
 model ChatMessage {
   id        String   @id @default(cuid())
   userId    String
-  role      String   // "user" | "assistant"
+  role      String // "user" | "assistant"
   content   String   @db.Text
   createdAt DateTime @default(now())
 
@@ -213,8 +249,8 @@ model ManualTransaction {
   id               String   @id @default(cuid())
   userId           String
   date             DateTime
-  amount           Float
-  direction        String   // "credit" | "debit"
+  amount           Decimal  @db.Decimal(14, 2)
+  direction        String // "credit" | "debit"
   description      String
   merchantName     String?
   merchantCategory String?
@@ -229,14 +265,14 @@ model ManualTransaction {
 }
 
 model Receipt {
-  id         String   @id @default(cuid())
-  userId     String
-  filename   String
-  data       Bytes
-  mimeType   String
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  filename  String
+  data      Bytes
+  mimeType  String
+  createdAt DateTime @default(now())
 
-  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   manualTransactions ManualTransaction[]
 
   @@index([userId])
@@ -245,12 +281,12 @@ model Receipt {
 model Alert {
   id        String   @id @default(cuid())
   userId    String
-  type      String   // "overspend" | "price_change" | "duplicate" | "bill_reminder" | "goal_progress"
+  type      String // "overspend" | "price_change" | "duplicate" | "bill_reminder" | "goal_progress"
   title     String
   message   String
   severity  String   @default("info") // "info" | "warning" | "critical"
   read      Boolean  @default(false)
-  data      Json?    // extra context
+  data      Json? // extra context
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -262,7 +298,7 @@ model Alert {
 model CategorizationRule {
   id         String   @id @default(cuid())
   userId     String
-  matchType  String   // "merchant" | "description" | "amount_lt" | "amount_gt"
+  matchType  String // "merchant" | "description" | "amount_lt" | "amount_gt"
   matchValue String
   category   String
   priority   Int      @default(0)
@@ -279,8 +315,8 @@ model Asset {
   id        String   @id @default(cuid())
   userId    String
   name      String
-  type      String   // "checking" | "savings" | "investment" | "crypto" | "property" | "vehicle" | "other"
-  value     Float
+  type      String // "checking" | "savings" | "investment" | "crypto" | "property" | "vehicle" | "other"
+  value     Decimal  @db.Decimal(14, 2)
   notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -291,16 +327,16 @@ model Asset {
 }
 
 model Liability {
-  id        String   @id @default(cuid())
-  userId    String
-  name      String
-  type      String   // "credit_card" | "student_loan" | "mortgage" | "auto_loan" | "personal_loan" | "other"
-  balance   Float
-  interestRate Float?
-  minPayment   Float?
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  type         String // "credit_card" | "student_loan" | "mortgage" | "auto_loan" | "personal_loan" | "other"
+  balance      Decimal  @db.Decimal(14, 2)
+  interestRate Decimal? @db.Decimal(7, 4)
+  minPayment   Decimal? @db.Decimal(14, 2)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   debtPlans DebtPlan[]
@@ -309,16 +345,16 @@ model Liability {
 }
 
 model DebtPlan {
-  id            String   @id @default(cuid())
-  userId        String
-  liabilityId   String
-  strategy      String   // "snowball" | "avalanche" | "custom"
-  extraPayment  Float    @default(0)
-  targetDate    DateTime?
-  totalInterestSaved Float?
-  payoffDate    DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  userId             String
+  liabilityId        String
+  strategy           String // "snowball" | "avalanche" | "custom"
+  extraPayment       Decimal   @default(0) @db.Decimal(14, 2)
+  targetDate         DateTime?
+  totalInterestSaved Decimal?  @db.Decimal(14, 2)
+  payoffDate         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   liability Liability @relation(fields: [liabilityId], references: [id], onDelete: Cascade)
@@ -327,16 +363,16 @@ model DebtPlan {
 }
 
 model TaxEntry {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   userId      String
   year        Int
-  type        String   // "deduction" | "income" | "donation" | "business_expense" | "medical" | "education" | "other"
+  type        String // "deduction" | "income" | "donation" | "business_expense" | "medical" | "education" | "other"
   description String
-  amount      Float
+  amount      Decimal   @db.Decimal(14, 2)
   category    String?
   date        DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -345,17 +381,17 @@ model TaxEntry {
 }
 
 model Investment {
-  id        String   @id @default(cuid())
-  userId    String
-  name      String
-  type      String   // "stock" | "etf" | "mutual_fund" | "crypto" | "bond" | "real_estate" | "other"
-  shares    Float?
-  costBasis Float?
-  currentPrice Float?
-  ticker    String?
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  type         String // "stock" | "etf" | "mutual_fund" | "crypto" | "bond" | "real_estate" | "other"
+  shares       Decimal? @db.Decimal(18, 8)
+  costBasis    Decimal? @db.Decimal(14, 2)
+  currentPrice Decimal? @db.Decimal(14, 4)
+  ticker       String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -366,7 +402,7 @@ model CreditScore {
   id        String   @id @default(cuid())
   userId    String
   score     Int
-  provider  String?  // "equifax" | "experian" | "transunion" | "credit_karma" | "other"
+  provider  String? // "equifax" | "experian" | "transunion" | "credit_karma" | "other"
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -401,7 +437,7 @@ model Notification {
   userId    String
   title     String
   body      String
-  type      String   // "bill_reminder" | "alert" | "goal" | "report" | "system"
+  type      String // "bill_reminder" | "alert" | "goal" | "report" | "system"
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 
@@ -415,25 +451,30 @@ model Vault {
   id            String   @id @default(cuid())
   userId        String
   name          String
-  targetAmount  Float?
-  currentAmount Float    @default(0)
+  targetAmount  Decimal? @db.Decimal(14, 2)
+  currentAmount Decimal  @default(0) @db.Decimal(14, 2)
   color         String   @default("teal")
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  roundUpRules RoundUpRule[]
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roundUpRules  RoundUpRule[]
+  contributions VaultContribution[]
 
   @@index([userId])
 }
 
 model RoundUpRule {
-  id        String   @id @default(cuid())
-  userId    String
-  vaultId   String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id                String   @id @default(cuid())
+  userId            String
+  vaultId           String?
+  isActive          Boolean  @default(true)
+  // Round every debit up to the next multiple of this, in currency units.
+  roundTo           Decimal  @default(1) @db.Decimal(6, 2)
+  // Optional ceiling so one large purchase cannot sweep a whole paycheque.
+  maxPerTransaction Decimal? @db.Decimal(14, 2)
+  createdAt         DateTime @default(now())
 
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   vault Vault? @relation(fields: [vaultId], references: [id], onDelete: SetNull)
@@ -457,7 +498,7 @@ model PushSubscription {
 model Consent {
   id        String   @id @default(cuid())
   userId    String
-  type      String   // "cookies" | "analytics" | "marketing" | "terms"
+  type      String // "cookies" | "analytics" | "marketing" | "terms"
   granted   Boolean
   version   String?
   ip        String?
@@ -504,7 +545,7 @@ model ErrorLog {
 model Feedback {
   id        String   @id @default(cuid())
   userId    String?
-  category  String   // "bug" | "feature" | "feedback" | "support"
+  category  String // "bug" | "feature" | "feedback" | "support"
   message   String   @db.Text
   rating    Int?
   userAgent String?
@@ -518,7 +559,7 @@ model Feedback {
 model AiUsage {
   id        String   @id @default(cuid())
   userId    String
-  date      String   // YYYY-MM-DD
+  date      String // YYYY-MM-DD
   count     Int      @default(0)
   updatedAt DateTime @updatedAt
 
@@ -526,4 +567,80 @@ model AiUsage {
 
   @@unique([userId, date])
   @@index([date])
+}
+
+// Stripe delivers webhooks at least once and retries on any non-2xx, so every
+// event id is recorded before its side effects run. A replayed event finds its
+// id already present and is acknowledged without being applied twice.
+model BillingEvent {
+  id        String   @id // Stripe event id (evt_...)
+  userId    String?
+  type      String
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([type])
+}
+
+// One row per transaction swept into a vault. Without a ledger there is no way
+// to tell which transactions have already contributed — a re-run would double
+// count — and no way to show the user where a vault balance came from.
+model VaultContribution {
+  id            String   @id @default(cuid())
+  userId        String
+  vaultId       String
+  // Null for a manual deposit. Unique so a transaction is only ever swept once.
+  transactionId String?  @unique
+  amount        Decimal  @db.Decimal(14, 2)
+  source        String   @default("roundup") // "roundup" | "manual"
+  createdAt     DateTime @default(now())
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vault       Vault        @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([vaultId, createdAt])
+}
+
+// Single-use recovery codes for when the authenticator device is lost. Stored
+// as bcrypt hashes — a leaked database must not hand over working codes.
+model TwoFactorRecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// A nightly point-in-time record of net worth.
+//
+// Assets and liabilities only ever stored a *current* value, so the net-worth
+// screen could show today's number and nothing else — no trend, no "am I
+// better off than last quarter", which is the main reason to track it at all.
+// One row per user per day; the unique constraint makes the nightly job
+// idempotent.
+model NetWorthSnapshot {
+  id          String   @id @default(cuid())
+  userId      String
+  date        String // YYYY-MM-DD, sorts lexicographically
+  assets      Decimal  @db.Decimal(14, 2)
+  liabilities Decimal  @db.Decimal(14, 2)
+  netWorth    Decimal  @db.Decimal(14, 2)
+  // Cash held in linked accounts, tracked separately so the trend can show
+  // liquidity as well as total worth.
+  cash        Decimal  @db.Decimal(14, 2)
+  investments Decimal  @db.Decimal(14, 2)
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }

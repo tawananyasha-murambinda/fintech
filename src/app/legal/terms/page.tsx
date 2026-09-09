@@ -36,7 +36,7 @@ export default function TermsPage() {
       </ul>
 
       <h2>5. Acceptable use</h2>
-      <p>You agree not to misuse the service, including: attempting to access another user's data, scraping, interfering with the service, submitting unlawful content, or attempting to break the security of the service.</p>
+      <p>You agree not to misuse the service, including: attempting to access another user&apos;s data, scraping, interfering with the service, submitting unlawful content, or attempting to break the security of the service.</p>
 
       <h2>6. No professional advice</h2>
       <p>
@@ -59,7 +59,7 @@ export default function TermsPage() {
       </p>
 
       <h2>9. Intellectual property</h2>
-      <p>FinTrack's software, design, and branding belong to us. You may not copy or resell the service.</p>
+      <p>FinTrack&apos;s software, design, and branding belong to us. You may not copy or resell the service.</p>
 
       <h2>10. Suspension and termination</h2>
       <p>We may suspend or close accounts that violate these terms or that are used fraudulently. You can delete your account at any time from Settings.</p>

@@ -7,6 +7,24 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   createdAt: string
+  /** Which lookups the answer was built from — grounding, not decoration. */
+  sources?: string[]
+  error?: boolean
+}
+
+// Human names for the tool identifiers the API returns.
+const SOURCE_LABELS: Record<string, string> = {
+  search_transactions: 'Transactions',
+  spending_by_category: 'Category spending',
+  cashflow_summary: 'Cashflow',
+  budget_status: 'Budgets',
+  goal_progress: 'Goals',
+  upcoming_bills: 'Bills',
+  debt_payoff: 'Debt plan',
+  net_worth: 'Net worth',
+  subscriptions: 'Subscriptions',
+  unusual_activity: 'Unusual activity',
+  top_merchants: 'Top merchants',
 }
 
 export default function ChatPage() {
@@ -53,8 +71,10 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, {
         id: 'resp-' + Date.now(),
         role: 'assistant',
-        content: data.reply || 'Sorry, I could not process that request.',
+        content: data.reply || data.error || 'Sorry, I could not process that request.',
         createdAt: new Date().toISOString(),
+        sources: Array.isArray(data.sources) ? data.sources : undefined,
+        error: !res.ok,
       }])
     } catch {
       setMessages((prev) => [...prev, {
@@ -100,9 +120,9 @@ export default function ChatPage() {
             <h2 className="text-base font-semibold text-slate-900 mb-1 dark:text-slate-100">Start a conversation</h2>
             <p className="text-sm text-slate-500 max-w-sm mx-auto dark:text-slate-400 leading-relaxed">
               Try asking things like:<br />
-              "How much did I spend on dining this month?"<br />
-              "Can I afford a $500 purchase?"<br />
-              "Where can I save money?"
+              &quot;How much did I spend on dining this month?&quot;<br />
+              &quot;Can I afford a $500 purchase?&quot;<br />
+              &quot;Where can I save money?&quot;
             </p>
           </div>
         ) : (
@@ -114,6 +134,18 @@ export default function ChatPage() {
                   : 'bg-white border border-slate-100 text-slate-700 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300'
               }`}>
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                {msg.sources && msg.sources.length > 0 && (
+                  <div className="mt-2.5 pt-2.5 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-wrap gap-1.5">
+                    {msg.sources.map((source) => (
+                      <span
+                        key={source}
+                        className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                      >
+                        {SOURCE_LABELS[source] || source}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <p className={`text-2xs mt-1.5 ${msg.role === 'user' ? 'text-teal-200' : 'text-slate-400'}`}>
                   {new Date(msg.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                 </p>

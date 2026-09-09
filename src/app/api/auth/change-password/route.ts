@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const limited = rateLimit(req, { limit: 10, windowMs: 15 * 60 * 1000, key: `change-password:${session.user.id}`, scope: 'user' })
+    const limited = await rateLimit(req, { limit: 10, windowMs: 15 * 60 * 1000, key: `change-password:${session.user.id}`, scope: 'user' })
     if (limited) return limited
 
     const body = await req.json()
@@ -56,7 +56,9 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(newPassword, 12)
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { password: hashedPassword },
+      // Revokes every session issued before now, including this one — a
+      // password change should not leave a stolen token still working.
+      data: { password: hashedPassword, sessionsValidFrom: new Date() },
     })
 
     await logAudit(session.user.id, 'auth.password_changed', requestMeta(req))

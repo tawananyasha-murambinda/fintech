@@ -11,6 +11,14 @@ interface Budget {
   spent: number
   remaining: number
   period: string
+  /** Fraction of the budget spent (can exceed 1). */
+  used: number
+  /** Fraction of the period elapsed. */
+  elapsed: number
+  window: { start: string; end: string; label: string }
+  isOver: boolean
+  isOnPace: boolean
+  safeDailySpend: number
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -26,7 +34,9 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Coffee': 'bg-yellow-600',
 }
 
-const COMMON_CATEGORIES = [
+// Fallback only. The live list comes from the API so the options always match
+// the categories transactions are actually normalised into.
+const FALLBACK_CATEGORIES = [
   'Food & Dining', 'Groceries', 'Shopping', 'Transportation',
   'Entertainment', 'Bills & Utilities', 'Health & Fitness',
   'Travel', 'Education', 'Coffee',
@@ -39,11 +49,13 @@ export default function BudgetsPage() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ category: '', amount: '', period: 'monthly' })
   const [error, setError] = useState('')
+  const [categories, setCategories] = useState<string[]>(FALLBACK_CATEGORIES)
 
   const fetchBudgets = useCallback(async () => {
     const res = await fetch('/api/budgets')
     const data = await res.json()
-    setBudgets(data)
+    setBudgets(Array.isArray(data.budgets) ? data.budgets : [])
+    if (Array.isArray(data.categories) && data.categories.length > 0) setCategories(data.categories)
     setLoading(false)
   }, [])
 
@@ -105,7 +117,7 @@ export default function BudgetsPage() {
                 className="input text-sm"
               >
                 <option value="">Select category</option>
-                {COMMON_CATEGORIES.map((c) => (
+                {categories.map((c) => (
                   <option key={c} value={c.replace(/\s/g, '_').toUpperCase()}>{c}</option>
                 ))}
               </select>
@@ -179,10 +191,10 @@ export default function BudgetsPage() {
 
           <div className="space-y-3">
             {budgets.map((budget) => {
-              const pct = budget.amount > 0 ? (budget.spent / budget.amount) * 100 : 0
+              const pct = budget.used * 100
               const colorClass = CATEGORY_COLORS[budget.category] || 'bg-teal-500'
-              const isOver = pct > 100
-              const isWarning = pct > 80 && pct <= 100
+              const isOver = budget.isOver
+              const isWarning = !isOver && pct > 80
 
               return (
                 <div key={budget.id} className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
@@ -191,7 +203,7 @@ export default function BudgetsPage() {
                       <div className={`w-3 h-3 rounded-full ${colorClass}`} />
                       <div>
                         <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{budget.category}</p>
-                        <p className="text-2xs text-slate-400">{budget.period}</p>
+                        <p className="text-2xs text-slate-400">{budget.period} · {budget.window.label}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -230,8 +242,8 @@ export default function BudgetsPage() {
                     </span>
                   </div>
 
-                  {/* Pace projection */}
-                  <BudgetPace spent={budget.spent} budgeted={budget.amount} fmt={fmt} />
+                  {/* Pace projection, measured against this budget's own period */}
+                  <BudgetPace budget={budget} fmt={fmt} />
                 </div>
               )
             })}
@@ -242,40 +254,46 @@ export default function BudgetsPage() {
   )
 }
 
-function BudgetPace({ spent, budgeted, fmt }: { spent: number; budgeted: number; fmt: (n: number) => string }) {
-  const now = new Date()
-  const dayOfMonth = now.getDate()
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-  const monthProgress = dayOfMonth / daysInMonth
+function BudgetPace({ budget, fmt }: { budget: Budget; fmt: (n: number) => string }) {
+  // Progress comes from the server, which knows whether this budget runs over
+  // a week, a month or a quarter. This used to assume a calendar month for
+  // every budget, so a weekly budget always looked wildly overspent.
+  const { used, elapsed, amount, isOver, safeDailySpend, window } = budget
 
-  if (monthProgress === 0 || budgeted === 0) return null
+  if (amount === 0 || elapsed <= 0) return null
 
-  const projectedRate = spent / monthProgress
-  const projectedTotal = projectedRate * 1
-  const willExceed = projectedTotal > budgeted
-  const projectedOvershoot = projectedTotal - budgeted
+  const projectedTotal = used / Math.max(elapsed, 0.01) * amount
+  const willExceed = projectedTotal > amount
+  const remainingLabel =
+    window.label === 'this week' ? 'week' : window.label === 'this month' ? 'month' : 'quarter'
 
   return (
     <div className="mt-2 pt-2 border-t border-slate-50 dark:border-slate-800">
-      <div className="flex items-center justify-between">
-        <span className={`text-2xs ${willExceed ? 'text-amber-600 dark:text-amber-400' : 'text-teal-600 dark:text-teal-400'}`}>
-          {willExceed
-            ? `On pace to exceed by ${fmt(Math.round(projectedOvershoot))}`
-            : `On track to stay under budget`
-          }
+      <div className="flex items-center justify-between gap-3">
+        <span
+          className={`text-2xs ${
+            isOver
+              ? 'text-red-500'
+              : willExceed
+                ? 'text-amber-600 dark:text-amber-400'
+                : 'text-teal-600 dark:text-teal-400'
+          }`}
+        >
+          {isOver
+            ? `Over by ${fmt(Math.abs(budget.remaining))}`
+            : willExceed
+              ? `On pace to exceed by ${fmt(Math.round(projectedTotal - amount))}`
+              : `${fmt(safeDailySpend)}/day keeps you on track`}
         </span>
-        <span className="text-2xs text-slate-400">
-          {monthProgress < 1
-            ? `${(monthProgress * 100).toFixed(0)}% of month passed`
-            : 'End of month'
-          }
+        <span className="text-2xs text-slate-400 shrink-0">
+          {elapsed < 1 ? `${(elapsed * 100).toFixed(0)}% of ${remainingLabel} passed` : `End of ${remainingLabel}`}
         </span>
       </div>
-      {willExceed && (
+      {willExceed && !isOver && (
         <div className="mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
           <div
             className="h-full rounded-full bg-amber-400"
-            style={{ width: `${Math.min(100, (projectedTotal / budgeted) * 100)}%` }}
+            style={{ width: `${Math.min(100, (projectedTotal / amount) * 100)}%` }}
           />
         </div>
       )}

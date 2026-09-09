@@ -13,6 +13,7 @@ import type {
 } from '@/types'
 import { findLocalAlternatives } from './geocode'
 import { redactPII, redactTransactions, redactHistory } from './pii'
+import { canonicalCategory } from './categories'
 
 // ── Currency formatting for AI output ──────────────────────────────
 // The assistant runs on the server, so it must be told the user's currency
@@ -92,10 +93,28 @@ interface AnalysisInput {
   currency?: string
 }
 
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022'
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5'
 
+// Adaptive thinking lets Claude decide how much to reason per request; `effort`
+// caps the spend. `budget_tokens` (the old fixed-budget knob) is rejected with
+// a 400 on this model family, so it must not come back.
+const THINKING = { type: 'adaptive' } as const
+
+// Thinking tokens count against max_tokens, so every call below leaves
+// headroom above the length of the answer it actually wants.
+function textOf(content: Anthropic.ContentBlock[]): string {
+  return content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+}
+
+// Categories reach the AI surfaces through the same normaliser as everything
+// else, so a prompt, a budget and an alert all name a category identically.
+// This used to title-case the raw Plaid code, producing "Food And Drink" where
+// budgets said "Food & Dining".
 function cleanCategory(cat?: string | null) {
-  return (cat || 'Uncategorized').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  return canonicalCategory(cat)
 }
 
 function mergeCategoryGroups(
@@ -966,11 +985,13 @@ Return ONLY a JSON object with this exact shape and no other text:
     if (!client) throw new Error('ANTHROPIC_API_KEY not configured')
     const message = await client.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 8192,
+      thinking: THINKING,
+      output_config: { effort: 'medium' },
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const text = message.content[0].type === 'text' ? message.content[0].text : ''
+    const text = textOf(message.content)
     const parsed = sanitizeAiResponse(text)
     if (parsed.summary) summary = parsed.summary
     if (parsed.topInsight) topInsight = parsed.topInsight
@@ -1112,10 +1133,14 @@ Return ONLY the tip as plain text — no quotation marks, no label, no prefix.`
     if (!client) throw new Error('ANTHROPIC_API_KEY not configured')
     const message = await client.messages.create({
       model: MODEL,
-      max_tokens: 220,
+      max_tokens: 4096,
+      thinking: THINKING,
+      // A one-line tip does not need deep reasoning, and this route runs on
+      // every dashboard load — keep the per-call spend at the floor.
+      output_config: { effort: 'low' },
       messages: [{ role: 'user', content: prompt }],
     })
-    const text = message.content[0].type === 'text' ? message.content[0].text : ''
+    const text = textOf(message.content)
     const tip = text.trim().replace(/^["'`]+|["'`]+$/g, '')
     if (tip.length >= 20) return { tip, source: 'ai' }
     return buildLocal()
@@ -1725,64 +1750,59 @@ Guardrails: Only state figures that are supported by the data provided or fetche
   try {
     const client = getClient()
     if (!client) throw new Error('ANTHROPIC_API_KEY not configured')
-    let response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 2048,
-      system: systemPrompt,
-      messages,
-      tools,
-    })
-
-    let finalContent = ''
-
-    for (const block of response.content) {
-      if (block.type === 'text') {
-        finalContent += block.text
-      } else if (block.type === 'tool_use') {
-        const args = block.input as Record<string, any>
-        let result: any
-
-        switch (block.name) {
-          case 'search_transactions':
-            result = searchTransactions(args)
-            break
-          case 'get_category_totals':
-            result = getCategoryTotals(args)
-            break
-          case 'get_merchant_info':
-            result = getMerchantInfo(args)
-            break
-          default:
-            result = { error: 'Unknown tool' }
-        }
-
-        messages.push({ role: 'assistant', content: response.content })
-        messages.push({
-          role: 'user',
-          content: [{
-            type: 'tool_result',
-            tool_use_id: block.id,
-            content: JSON.stringify(result),
-          }],
-        })
-
-        const client = getClient()
-        if (client) {
-          const followUp = await client.messages.create({
-            model: MODEL,
-            max_tokens: 2048,
-            system: systemPrompt,
-            messages,
-          })
-
-          for (const fb of followUp.content) {
-            if (fb.type === 'text') finalContent += fb.text
-          }
-        }
+    function runTool(name: string, args: Record<string, any>): any {
+      switch (name) {
+        case 'search_transactions':
+          return searchTransactions(args)
+        case 'get_category_totals':
+          return getCategoryTotals(args)
+        case 'get_merchant_info':
+          return getMerchantInfo(args)
+        default:
+          return { error: 'Unknown tool' }
       }
     }
 
-    return finalContent || 'I analyzed your data but could not generate a response.'
+    // Agentic loop. One response can contain several tool_use blocks, and the
+    // API requires that every result for a turn come back in a single user
+    // message — splitting them across messages, or replaying the assistant
+    // turn once per block, corrupts the transcript and teaches Claude to stop
+    // calling tools in parallel. MAX_TURNS bounds a model that keeps asking.
+    const MAX_TURNS = 6
+    let finalContent = ''
+
+    for (let turn = 0; turn < MAX_TURNS; turn++) {
+      const response = await client.messages.create({
+        model: MODEL,
+        max_tokens: 8192,
+        thinking: THINKING,
+        output_config: { effort: 'medium' },
+        system: systemPrompt,
+        messages,
+        tools,
+      })
+
+      const toolUses = response.content.filter(
+        (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
+      )
+      finalContent += textOf(response.content)
+
+      if (toolUses.length === 0) break
+
+      // Echo the assistant turn back verbatim — thinking blocks included, which
+      // the API needs to validate the tool calls that follow them.
+      messages.push({ role: 'assistant', content: response.content })
+      messages.push({
+        role: 'user',
+        content: toolUses.map((block) => ({
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content: JSON.stringify(runTool(block.name, block.input as Record<string, any>)),
+        })),
+      })
+    }
+
+    return finalContent.trim() || 'I analyzed your data but could not generate a response.'
   } catch (err) {
     console.error('AI chat failed, using local fallback:', err)
     return chatLocalFallback(userMessage, transactions, conversationHistory)

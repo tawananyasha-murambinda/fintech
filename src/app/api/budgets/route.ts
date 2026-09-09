@@ -2,40 +2,32 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { budgetStatuses, totalMonthlyCommitment } from '@/lib/budgets'
+import { canonicalCategory, BUDGETABLE_CATEGORIES } from '@/lib/categories'
+import { isBudgetPeriod } from '@/lib/budget-period'
+import { errorResponse } from '@/lib/errors'
+import { logger } from '@/lib/logger'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  try {
+    const budgets = await budgetStatuses(session.user.id)
 
-  const [budgets, transactions] = await Promise.all([
-    prisma.budget.findMany({ where: { userId: session.user.id }, orderBy: { category: 'asc' } }),
-    prisma.transaction.findMany({
-      where: {
-        userId: session.user.id,
-        direction: 'debit',
-        date: { gte: monthStart, lte: monthEnd },
+    return NextResponse.json(
+      {
+        budgets,
+        totalMonthlyCommitment: totalMonthlyCommitment(budgets),
+        categories: BUDGETABLE_CATEGORIES,
       },
-      select: { amount: true, merchantCategory: true },
-    }),
-  ])
-
-  const categoryTotals: Record<string, number> = {}
-  for (const t of transactions) {
-    const cat = (t.merchantCategory || 'Uncategorized').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-    categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(t.amount)
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
+  } catch (err) {
+    logger.error('Budget listing failed', { userId: session.user.id, error: err })
+    const { error, status } = errorResponse(err, 'We could not load your budgets right now.')
+    return NextResponse.json({ error }, { status })
   }
-
-  const budgetsWithSpent = budgets.map((b) => ({
-    ...b,
-    spent: categoryTotals[b.category.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())] || 0,
-    remaining: b.amount - (categoryTotals[b.category.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())] || 0),
-  }))
-
-  return NextResponse.json(budgetsWithSpent, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 export async function POST(req: NextRequest) {
@@ -54,10 +46,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Amount must be a non-negative number' }, { status: 400 })
   }
 
+  // Store the canonical form so a budget always matches the same transactions,
+  // however the category was spelled on the way in.
+  const canonical = canonicalCategory(category)
+  if (canonical === 'Uncategorized') {
+    return NextResponse.json(
+      { error: 'Choose a spending category to budget against.', categories: BUDGETABLE_CATEGORIES },
+      { status: 400 }
+    )
+  }
+
+  const resolvedPeriod = isBudgetPeriod(period) ? period : 'monthly'
+
   const budget = await prisma.budget.upsert({
-    where: { userId_category_period: { userId: session.user.id, category, period: period || 'monthly' } },
+    where: { userId_category_period: { userId: session.user.id, category: canonical, period: resolvedPeriod } },
     update: { amount: parsedAmount },
-    create: { userId: session.user.id, category, amount: parsedAmount, period: period || 'monthly' },
+    create: { userId: session.user.id, category: canonical, amount: parsedAmount, period: resolvedPeriod },
   })
 
   return NextResponse.json(budget)

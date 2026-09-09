@@ -21,27 +21,61 @@ module.exports = {
           950: '#131f4d',
         },
         ink: {
-          DEFAULT: '#10131a',
-          soft: '#1b1f2a',
+          DEFAULT: 'var(--ink)',
+          soft: 'var(--ink-soft)',
+          muted: 'var(--ink-muted)',
+          faint: 'var(--ink-faint)',
         },
         slate: {
           925: '#0a0c10',
         },
+        // Token-backed aliases so utilities can reach the same values the
+        // primitives use — `text-ink-muted`, `border-line`, `bg-surface`.
+        surface: {
+          DEFAULT: 'var(--surface)',
+          muted: 'var(--surface-muted)',
+          sunken: 'var(--surface-sunken)',
+        },
+        line: {
+          DEFAULT: 'var(--line)',
+          strong: 'var(--line-strong)',
+        },
+        accent: {
+          DEFAULT: 'var(--accent)',
+          hover: 'var(--accent-hover)',
+          wash: 'var(--accent-wash)',
+          ink: 'var(--accent-ink)',
+        },
+        positive: { DEFAULT: 'var(--positive)', wash: 'var(--positive-wash)' },
+        negative: { DEFAULT: 'var(--negative)', wash: 'var(--negative-wash)' },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        // Driven by the next/font variables set on <html>, so the loaded and
+        // declared faces cannot drift apart.
+        sans: ['var(--font-sans)', 'Manrope', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'Bricolage Grotesque', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'JetBrains Mono', 'ui-monospace', 'monospace'],
       },
       fontSize: {
-        '2xs': ['0.6875rem', { lineHeight: '1rem' }],
+        '2xs': ['0.6875rem', { lineHeight: '1rem', letterSpacing: '0.005em' }],
+        // Display sizes carry negative tracking; at this weight and size the
+        // default spacing reads as gappy.
+        'display-sm': ['1.75rem', { lineHeight: '1.1', letterSpacing: '-0.035em' }],
+        'display': ['2.5rem', { lineHeight: '1.05', letterSpacing: '-0.04em' }],
+        'display-lg': ['3.5rem', { lineHeight: '1', letterSpacing: '-0.045em' }],
       },
       borderRadius: {
         '2xl': '1rem',
         '3xl': '1.5rem',
       },
       boxShadow: {
-        card: '0 1px 2px rgb(16 19 26 / 0.04)',
-        pop: '0 12px 32px -12px rgb(16 19 26 / 0.18)',
+        card: 'var(--shadow-sm)',
+        raised: 'var(--shadow-md)',
+        pop: 'var(--shadow-lg)',
+      },
+      transitionTimingFunction: {
+        // Decelerating: fast to start, settles rather than stopping dead.
+        out: 'cubic-bezier(0.32, 0.72, 0, 1)',
       },
       animation: {
         'fade-up': 'fadeUp 0.3s ease-out',
