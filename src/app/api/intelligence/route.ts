@@ -27,10 +27,15 @@ export async function POST(req: NextRequest) {
     // Load location from DB if not provided in request
     const dbUser = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { city: true, country: true, currency: true },
+      select: { city: true, country: true, currency: true, latitude: true, longitude: true },
     })
     if (!userLocation && dbUser?.city) {
-      userLocation = { city: dbUser.city, country: dbUser.country }
+      userLocation = {
+        city: dbUser.city,
+        country: dbUser.country,
+        latitude: dbUser.latitude,
+        longitude: dbUser.longitude,
+      }
     }
     const userCurrency = dbUser?.currency || 'USD'
 

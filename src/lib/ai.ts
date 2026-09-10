@@ -90,7 +90,7 @@ function getClient(): Anthropic | null {
 interface AnalysisInput {
   transactions: Transaction[]
   period: 'week' | 'month' | 'quarter'
-  userLocation?: { city?: string; country?: string }
+  userLocation?: { city?: string; country?: string; latitude?: number | null; longitude?: number | null }
   prevPeriodCategories?: Record<string, number>
   currency?: string
 }
@@ -376,7 +376,7 @@ async function buildMerchantAlternatives(
     string,
     { total: number; count: number; category: string; city?: string; country?: string; first?: string; last?: string }
   >,
-  userLocation?: { city?: string; country?: string },
+  userLocation?: { city?: string; country?: string; latitude?: number | null; longitude?: number | null },
 ): Promise<MerchantAlternative[]> {
   const topMerchants = Object.entries(byMerchant)
     .sort((a, b) => b[1].total - a[1].total)
@@ -397,6 +397,9 @@ async function buildMerchantAlternatives(
         const result = await findLocalAlternatives(
           merchantCity, merchantCountry, data.category, merchantName,
           avgTx, userLocation?.city, data.count,
+          // Real coordinates when we have them, so distances are from where
+          // the user actually is rather than the middle of their city.
+          userLocation?.latitude ?? null, userLocation?.longitude ?? null,
         )
         alternatives = result.alternatives
         locationContext = result.locationContext || (userLocation?.city && !data.city
@@ -1644,7 +1647,7 @@ export async function chatWithData(
     budgets?: { category: string; amount: number; period: string; spent: number; remaining: number }[]
     goals?: { name: string; targetAmount: number; currentAmount: number; deadline: string | null }[]
     debts?: { strategy: string; extraPayment: number; liability: { name: string; balance: number; interestRate?: number | null } | null }[]
-    userLocation?: { city?: string; country?: string }
+    userLocation?: { city?: string; country?: string; latitude?: number | null; longitude?: number | null }
     currency?: string
   }
 ): Promise<string> {

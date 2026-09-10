@@ -105,12 +105,34 @@ async function findNearbyBusStops(city: string, country?: string | null): Promis
   return results.filter(r => r.type === 'bus_stop').map(r => ({ name: r.name, lat: r.lat, lon: r.lon }))
 }
 
-async function findNearbySupermarkets(city: string, country?: string | null): Promise<{ name: string; lat: number; lon: number }[]> {
-  const discounters = ['aldi', 'lidl', 'dirk', 'plus', 'spar', 'netto']
-  const all = await searchPlaces('supermarket', city, country, 10)
-  const sorted = all.filter(r => discounters.some(d => r.name.toLowerCase().includes(d)))
-  const others = all.filter(r => !discounters.some(d => r.name.toLowerCase().includes(d)))
-  return [...sorted, ...others].slice(0, 3).map(r => ({ name: r.name, lat: r.lat, lon: r.lon }))
+// Ordered by how far away they actually are, discounters first among equals.
+//
+// This used to return whichever discounter the search happened to list first,
+// which is why ALDI came up every time — not because it was nearest or
+// cheapest, but because it sat at the front of a hardcoded array.
+async function findNearbySupermarkets(
+  city: string,
+  country?: string | null,
+  origin?: { lat: number; lon: number } | null,
+): Promise<{ name: string; lat: number; lon: number; km: number | null; isDiscounter: boolean }[]> {
+  const discounters = ['aldi', 'lidl', 'dirk', 'plus', 'spar', 'netto', 'jumbo', 'coop']
+  const all = await searchPlaces('supermarket', city, country, 12)
+
+  return all
+    .map((r) => ({
+      name: r.name,
+      lat: r.lat,
+      lon: r.lon,
+      km: origin ? haversine(origin.lat, origin.lon, r.lat, r.lon) : null,
+      isDiscounter: discounters.some((d) => r.name.toLowerCase().includes(d)),
+    }))
+    .sort((a, b) => {
+      // Distance decides. A discounter three towns over is not a better
+      // suggestion than the one at the end of the road.
+      if (a.km !== null && b.km !== null && Math.abs(a.km - b.km) > 0.3) return a.km - b.km
+      return Number(b.isDiscounter) - Number(a.isDiscounter)
+    })
+    .slice(0, 3)
 }
 
 type Ingredient = { name: string; price: number }
@@ -169,6 +191,8 @@ export async function findLocalAlternatives(
   avgTransaction?: number,
   userCity?: string,
   _visitCount?: number,
+  userLat?: number | null,
+  userLon?: number | null,
 ): Promise<{
   locationContext?: string
   error?: string
@@ -188,7 +212,26 @@ export async function findLocalAlternatives(
   const userHome = userCity || city
   const avgTx = avgTransaction || 15
   const isUserHome = city.toLowerCase() === userHome.toLowerCase()
-  const geo = await tryApiOrFallback(() => geocodeCity(userHome, country), null)
+  const cityGeo = await tryApiOrFallback(() => geocodeCity(userHome, country), null)
+
+  // Distances were all measured from the city centroid, which is why a place
+  // that happens to sit in the middle of town read as "0.0 km away". Use the
+  // user's own coordinates when they have shared them, and say which origin a
+  // distance is measured from so "1.0 km" is never mistaken for 1 km from them.
+  const hasPreciseOrigin = typeof userLat === 'number' && typeof userLon === 'number'
+  const geo = hasPreciseOrigin ? { lat: userLat as number, lon: userLon as number } : cityGeo
+
+  const distanceLabel = (km: number): string =>
+    hasPreciseOrigin ? `${km.toFixed(1)} km away` : `${km.toFixed(1)} km from ${userHome} centre`
+
+  // Anything that leaves here has to be worth doing. Cooking a €12 McDonald's
+  // at home came out at €13.72 and was still presented as "Save €-2 per meal",
+  // which is worse than saying nothing. One gate, applied to every branch, so
+  // no future branch can reintroduce it.
+  const MIN_SAVING = 1
+  const worthwhile = <T extends { estimatedSavings: number }>(list: T[]): T[] =>
+    list.filter((a) => a.estimatedSavings >= MIN_SAVING)
+
   const locPhrase = isUserHome ? `You live in ${userHome}` : `In ${city}`
   const locCtx = isUserHome
     ? `You live in ${userHome}. ${geo ? '' : 'Location lookup unavailable.'} `
@@ -218,10 +261,49 @@ export async function findLocalAlternatives(
         const walkTime = Math.round(tripKm * 12)
         alts.push({ name: 'Walk it', estimatedSavings: Math.round(avgTx), originalCost: Math.round(avgTx), alternativeCost: 0, reason: `${tripKm} km is walkable in ~${walkTime} min. Free and saves ${fmtCurrency(Math.round(avgTx), 0)}.`, type: 'secondary' as const, source: 'local' as const, detail: `${walkTime} min walk` })
       }
-      return { locationContext: locCtx, alternatives: alts }
+      return { locationContext: locCtx, alternatives: worthwhile(alts) }
     } catch (e) {
       return makeSimpleAlt(avgTx, merchantName, userHome, 'Take public transit or cycle', 'Use fuel rewards apps', locCtx, `Location lookup failed for ${userHome}: ${e instanceof Error ? e.message : 'Unknown error'}. Showing estimates.`)
     }
+  }
+
+  // --- DRINKS ---
+  // Checked before food. A coffee shop matches the food regex on "cafe", so
+  // Starbucks was being handed a chicken-and-rice recipe against a €4.33 latte.
+  const DRINK_MERCHANTS =
+    /starbucks|costa|caff[eè] nero|pret|dunkin|tim hortons|peet|coffee|caf[eé]|espresso|barista|juice|smoothie|boba|bubble tea|tea house/i
+  if (DRINK_MERCHANTS.test(merchantName) || /coffee|tea/.test(cleanCat)) {
+    const homeCupCost = 0.4
+    const perCup = Math.round((avgTx - homeCupCost) * 100) / 100
+    const alts: any[] = []
+
+    if (perCup >= MIN_SAVING) {
+      alts.push({
+        name: 'Make it at home',
+        estimatedSavings: Math.round(perCup),
+        originalCost: Math.round(avgTx),
+        alternativeCost: homeCupCost,
+        reason: `A ${fmtCurrency(avgTx)} drink at ${merchantName}. Beans and milk at home run about ${fmtCurrency(homeCupCost)} a cup, so each one you make is roughly ${fmtCurrency(perCup)} back.`,
+        type: 'primary' as const,
+        source: 'local' as const,
+        detail: `≈${fmtCurrency(homeCupCost)} a cup at home`,
+      })
+    }
+
+    // A reusable cup is a real, checkable discount rather than a guess.
+    if (avgTx >= 3) {
+      alts.push({
+        name: 'Bring a reusable cup',
+        estimatedSavings: Math.max(MIN_SAVING, Math.round(avgTx * 0.1)),
+        originalCost: Math.round(avgTx),
+        alternativeCost: Math.round(avgTx * 0.9),
+        reason: `Most chains take 10–25p off for a reusable cup, and ${merchantName} is likely to. Small, but it applies to every visit.`,
+        type: 'secondary' as const,
+        source: 'local' as const,
+      })
+    }
+
+    return { locationContext: locCtx, alternatives: worthwhile(alts) }
   }
 
   // --- FOOD & DINING ---
@@ -232,15 +314,44 @@ export async function findLocalAlternatives(
       const savings = Math.round(avgTx - homeCost)
       const alts: any[] = []
 
-      const markets = await findNearbySupermarkets(userHome, country)
-      if (markets.length > 0 && geo) {
-        const m = markets[0]
-        const dist = haversine(geo.lat, geo.lon, m.lat, m.lon)
-        const items = breakdown.items.map(i => `${i.name} (${fmtCurrency(i.price)})`).join(' + ')
-        alts.push({ name: `Cook at home (${m.name})`, estimatedSavings: savings, originalCost: Math.round(avgTx), alternativeCost: homeCost, reason: `${locPhrase}. A ${fmtCurrency(avgTx)} meal at ${merchantName}. Instead, buy at ${m.name} (${dist.toFixed(1)} km): ${items} = ${fmtCurrency(homeCost)} total. Save ${fmtCurrency(savings, 0)} per meal.`, distance: `${dist.toFixed(1)} km`, type: 'primary' as const, source: 'local' as const, detail: `${m.name} · ${items}` })
+      const markets = await findNearbySupermarkets(userHome, country, geo)
+
+      // Prices come from a reference table keyed by supermarket, which is not
+      // necessarily the shop the map turned up. Naming both — where the price
+      // is from, and where you could actually walk to — avoids quoting a Lidl
+      // price under an ALDI heading, which is what it did before.
+      const pricedAt = [...new Set(breakdown.items.map((i) => i.supermarket))].join(' / ')
+      const items = breakdown.items.map((i) => `${i.name} ${fmtCurrency(i.price)}`).join(' + ')
+      const nearest = markets[0]
+      const alsoNearby = markets
+        .slice(1)
+        .map((m) => (m.km !== null ? `${m.name} (${m.km.toFixed(1)} km)` : m.name))
+        .join(', ')
+
+      if (nearest && geo) {
+        const dist = nearest.km ?? haversine(geo.lat, geo.lon, nearest.lat, nearest.lon)
+        alts.push({
+          name: `Cook it instead`,
+          estimatedSavings: savings,
+          originalCost: Math.round(avgTx),
+          alternativeCost: homeCost,
+          reason: `A ${fmtCurrency(avgTx)} meal at ${merchantName} against ${fmtCurrency(homeCost)} of ingredients: ${items}. Those are typical ${pricedAt} prices. Your nearest supermarket is ${nearest.name}, ${distanceLabel(dist)}${alsoNearby ? ` — also close: ${alsoNearby}` : ''}.`,
+          distance: distanceLabel(dist),
+          type: 'primary' as const,
+          source: 'local' as const,
+          detail: `${fmtCurrency(homeCost)} of ingredients · ${nearest.name} ${distanceLabel(dist)}`,
+        })
       } else {
-        const items = breakdown.items.map(i => `${i.name} (${fmtCurrency(i.price)})`).join(' + ')
-        alts.push({ name: 'Cook at home', estimatedSavings: savings, originalCost: Math.round(avgTx), alternativeCost: homeCost, reason: `${locPhrase}. A ${fmtCurrency(avgTx)} meal at ${merchantName}. Home cooking: ${items} = ${fmtCurrency(homeCost)}. Save ${fmtCurrency(savings, 0)} per meal.`, type: 'primary' as const, source: 'local' as const, detail: `${items} = ${fmtCurrency(homeCost)}` })
+        alts.push({
+          name: 'Cook it instead',
+          estimatedSavings: savings,
+          originalCost: Math.round(avgTx),
+          alternativeCost: homeCost,
+          reason: `A ${fmtCurrency(avgTx)} meal at ${merchantName} against ${fmtCurrency(homeCost)} of ingredients: ${items}. Those are typical ${pricedAt} prices.`,
+          type: 'primary' as const,
+          source: 'local' as const,
+          detail: `${fmtCurrency(homeCost)} of ingredients`,
+        })
       }
 
       const cheapEats = await tryApiOrFallback(() => searchPlaces('restaurant', userHome, country, 6), [])
@@ -248,11 +359,25 @@ export async function findLocalAlternatives(
       if (others.length > 0 && geo) {
         const ce = others[0]
         const ceDist = haversine(geo.lat, geo.lon, ce.lat, ce.lon)
+        // We have this place's name and position and nothing else. The old
+        // copy asserted "estimated ~€8 vs €12.00" — that was avgTx * 0.7
+        // presented as a known price. It is offered as somewhere to compare,
+        // with the guesswork stated rather than hidden.
         const cheapCost = Math.round(avgTx * 0.7)
-        alts.push({ name: `${ce.name} (nearby)`, estimatedSavings: Math.round(avgTx - cheapCost), originalCost: Math.round(avgTx), alternativeCost: cheapCost, reason: `Try ${ce.name} instead — ${ceDist.toFixed(1)} km away, estimated ~${fmtCurrency(cheapCost, 0)} vs ${fmtCurrency(avgTx)} at ${merchantName}.`, distance: `${ceDist.toFixed(1)} km`, type: 'secondary' as const, source: 'local' as const, detail: `~${fmtCurrency(cheapCost, 0)}/meal · ${ceDist.toFixed(1)} km` })
+        alts.push({
+          name: `${ce.name}`,
+          estimatedSavings: Math.round(avgTx - cheapCost),
+          originalCost: Math.round(avgTx),
+          alternativeCost: cheapCost,
+          reason: `${ce.name} is ${distanceLabel(ceDist)}. Independents usually undercut ${merchantName}, but we do not have their prices — worth a look rather than a promise.`,
+          distance: distanceLabel(ceDist),
+          type: 'secondary' as const,
+          source: 'local' as const,
+          detail: `${distanceLabel(ceDist)} · price unknown`,
+        })
       }
       alts.push({ name: 'Pack lunch / meal prep', estimatedSavings: Math.round(avgTx * 0.7), originalCost: Math.round(avgTx), alternativeCost: Math.round(avgTx * 0.3), reason: `Packing lunch costs ~${fmtCurrency(Math.round(avgTx * 0.3), 0)} vs ${fmtCurrency(avgTx)} at ${merchantName}. Over 22 workdays: save ~${fmtCurrency(Math.round(avgTx * 0.7 * 22), 0)}/mo.`, type: 'secondary' as const, source: 'local' as const })
-      return { locationContext: locCtx, alternatives: alts }
+      return { locationContext: locCtx, alternatives: worthwhile(alts) }
     } catch (e) {
       return makeSimpleAlt(avgTx, merchantName, userHome, 'Cook at home', 'Pack lunch / meal prep', locCtx, `Location lookup failed for ${userHome}: ${e instanceof Error ? e.message : 'Unknown error'}. Showing estimates.`)
     }
@@ -265,7 +390,7 @@ export async function findLocalAlternatives(
       alternatives: [{
         name: 'Brew at home', estimatedSavings: Math.round(avgTx - 0.30), originalCost: Math.round(avgTx), alternativeCost: 0.30,
         reason: `A ${fmtCurrency(avgTx)} coffee at ${merchantName}. Home-brewed: ~${fmtCurrency(0.3)} per cup. Save ${fmtCurrency(Math.round(avgTx - 0.30), 0)} per cup.`,
-        type: 'primary' as const, source: 'local' as const, detail: '~${fmtCurrency(0.3)} per cup at home',
+        type: 'primary' as const, source: 'local' as const, detail: `~${fmtCurrency(0.3)} per cup at home`,
       }],
     }
   }
