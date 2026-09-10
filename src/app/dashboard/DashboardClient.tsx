@@ -83,6 +83,7 @@ export function DashboardClient({
           stats={stats}
           categories={categories}
           recentTransactions={recentTransactions}
+          cashflow={cashflow}
           hasData={hasData}
           userName={userName}
         />

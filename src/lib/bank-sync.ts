@@ -1,6 +1,6 @@
 import { prisma } from './prisma'
 import { decrypt } from './encryption'
-import { getTransactions } from './plaid'
+import { getTransactions, getAccounts } from './plaid'
 import { logger } from './logger'
 import { applyRules, type CategorizationRule } from './categorize'
 import { canonicalCategory } from './categories'
@@ -106,9 +106,33 @@ export async function syncLinkedBank(bank: LinkedBankWithToken): Promise<{ impor
       hasMore = result.hasMore
     }
 
+    // Refresh the reported balance alongside the transactions. Best-effort:
+    // a balance call failing must not discard a successful transaction sync.
+    let balanceUpdate: {
+      currentBalance?: number | null
+      availableBalance?: number | null
+      balanceUpdatedAt?: Date
+    } = {}
+    try {
+      const { accounts } = await getAccounts(accessToken)
+      const match = accounts.find((a) => a.account_id === bank.plaidAccountId)
+      if (match) {
+        balanceUpdate = {
+          currentBalance: match.balances.current ?? null,
+          availableBalance: match.balances.available ?? null,
+          balanceUpdatedAt: new Date(),
+        }
+      }
+    } catch (err) {
+      logger.warn('Balance refresh failed during sync', {
+        bankId: bank.id,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+
     await prisma.linkedBank.update({
       where: { id: bank.id },
-      data: { lastSynced: new Date() },
+      data: { lastSynced: new Date(), ...balanceUpdate },
     })
 
     return { imported }

@@ -95,6 +95,9 @@ export async function POST(req: NextRequest) {
           accountType: account.type,
           accountName: account.name,
           currency: account.balances.iso_currency_code || 'USD',
+          currentBalance: account.balances.current ?? null,
+          availableBalance: account.balances.available ?? null,
+          balanceUpdatedAt: new Date(),
           accessToken: encryptedToken,
         },
       })

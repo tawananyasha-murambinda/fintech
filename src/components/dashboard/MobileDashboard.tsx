@@ -1,16 +1,23 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { TransactionRow } from '@/components/ui/TransactionRow'
 import { LinkBankButton } from '@/components/bank/LinkBankButton'
 import { useCurrency } from '@/hooks/useCurrency'
-import { splitAmount } from '@/lib/currency'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { useHaptics } from '@/hooks/useHaptics'
-import { ACCOUNT_THEMES, resolveTheme, setAccountThemeKey, type AccountTheme } from '@/lib/accountTheme'
+import type { CashflowPoint } from '@/types'
+
+// Mobile home.
+//
+// The previous version was a gradient hero with glow orbs, a centred balance
+// and a row of circular actions — which is Revolut's home screen, closely. This
+// takes the opposite approach and borrows from the ledger-style apps instead
+// (Copilot, Mercury, Lunch Money): left-aligned editorial type, hairline rules
+// rather than a stack of floating cards, colour reserved for meaning, and one
+// genuinely informative graphic instead of decoration.
 
 interface Account {
   id: string
@@ -19,7 +26,9 @@ interface Account {
   accountName: string
   currency: string
   lastSynced: string | null
-  balance: number
+  balance: number | null
+  netFlow: number
+  hasRealBalance: boolean
 }
 
 interface MobileDashboardProps {
@@ -29,53 +38,121 @@ interface MobileDashboardProps {
     netCashflow: number
     savingsRate: number
     linkedAccounts: number
+    expenseChange?: number
   }
   categories: { category: string; total: number; percentage: number }[]
   recentTransactions: any[]
+  cashflow?: CashflowPoint[]
   hasData: boolean
   userName: string
 }
 
-function SkeletonBlock({ className }: { className?: string }) {
-  return <div className={`skeleton ${className || ''}`} />
-}
-
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6 pt-2">
-      <div className="h-72 rounded-b-3xl skeleton" />
-      <div className="px-4 space-y-4">
-        <SkeletonBlock className="h-40 rounded-3xl" />
-      </div>
+    <div className="px-5 pt-6 space-y-6">
+      <div className="skeleton h-4 w-32 rounded" />
+      <div className="skeleton h-12 w-52 rounded" />
+      <div className="skeleton h-20 w-full rounded-xl" />
+      <div className="skeleton h-48 w-full rounded-xl" />
     </div>
   )
 }
 
-// Large split balance — symbol leads or trails per locale, cents shown
-// smaller and only when the amount isn't whole.
-function BalanceDisplay({ value }: { value: number }) {
-  const { currency } = useCurrency()
-  const p = splitAmount(value, currency)
+/**
+ * Daily spending across the month.
+ *
+ * Replaces the two income/expense progress bars, which compared this month
+ * only against itself. The rhythm of when money leaves is the thing you can
+ * actually recognise about your own habits — the big Saturday, the quiet week.
+ */
+function SpendRhythm({ points, accent }: { points: CashflowPoint[]; accent: string }) {
+  const { format: fmt } = useCurrency()
+  const [selected, setSelected] = useState<number | null>(null)
+
+  const days = points.slice(-31)
+  const max = Math.max(...days.map((d) => d.expenses), 1)
+  const active = selected !== null ? days[selected] : null
+
+  if (days.length < 3) return null
+
   return (
-    <div className="flex items-start justify-center text-white">
-      {p.sign && <span className="text-[52px] leading-none font-semibold stat-number mr-0.5">−</span>}
-      {p.symbolLeading && (
-        <span className="text-[34px] leading-none font-semibold mt-1 mr-0.5 opacity-95">{p.symbol}</span>
-      )}
-      <span className="text-[52px] leading-none font-semibold tracking-tight stat-number">{p.int}</span>
-      {p.hasCents && (
-        <span className="text-[24px] leading-none font-semibold mt-1 ml-0.5 stat-number opacity-90">
-          {p.decimal}{p.cents}
-        </span>
-      )}
-      {!p.symbolLeading && (
-        <span className="text-[24px] leading-none font-semibold mt-1 ml-1.5 opacity-90">{p.symbol}</span>
-      )}
-    </div>
+    <section className="px-5 py-5">
+      <div className="flex items-baseline justify-between mb-4">
+        <h2 className="text-sm font-semibold text-[var(--ink)]">Daily spend</h2>
+        <p className="text-xs text-[var(--ink-faint)] tabular-nums">
+          {active
+            ? `${new Date(active.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} · ${fmt(active.expenses)}`
+            : `${days.length} days`}
+        </p>
+      </div>
+
+      <div className="flex items-end gap-[3px] h-16" role="img" aria-label="Daily spending for the last month">
+        {days.map((d, i) => {
+          const height = Math.max(2, (d.expenses / max) * 100)
+          const isActive = selected === i
+          return (
+            <button
+              key={d.date}
+              type="button"
+              onClick={() => setSelected(isActive ? null : i)}
+              aria-label={`${new Date(d.date).toLocaleDateString()}: ${fmt(d.expenses)}`}
+              className="flex-1 rounded-[2px] transition-opacity"
+              style={{
+                height: `${height}%`,
+                background: isActive ? accent : 'var(--line-strong)',
+                opacity: selected === null || isActive ? 1 : 0.4,
+                minWidth: 3,
+              }}
+            />
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
-export function MobileDashboard({ stats, categories, recentTransactions, hasData, userName }: MobileDashboardProps) {
+/** Money in and out, as two figures rather than two competing bars. */
+function FlowRow({
+  income,
+  expenses,
+  change,
+}: {
+  income: number
+  expenses: number
+  change?: number
+}) {
+  const { format: fmt } = useCurrency()
+
+  return (
+    <section className="grid grid-cols-2 divide-x" style={{ borderColor: 'var(--line)' }}>
+      <div className="px-5 py-4">
+        <p className="text-xs text-[var(--ink-faint)] mb-1">In</p>
+        <p className="stat-number text-lg text-[var(--positive)]">{fmt(income)}</p>
+      </div>
+      <div className="px-5 py-4" style={{ borderColor: 'var(--line)' }}>
+        <p className="text-xs text-[var(--ink-faint)] mb-1">Out</p>
+        <p className="stat-number text-lg text-[var(--ink)]">{fmt(expenses)}</p>
+        {typeof change === 'number' && Math.abs(change) >= 1 && (
+          <p
+            className="text-xs mt-0.5"
+            style={{ color: change > 0 ? 'var(--negative)' : 'var(--positive)' }}
+          >
+            {change > 0 ? '↑' : '↓'} {Math.abs(Math.round(change))}% on last month
+          </p>
+        )}
+      </div>
+    </section>
+  )
+}
+
+export function MobileDashboard({
+  stats,
+  categories,
+  recentTransactions,
+  cashflow = [],
+  hasData,
+  userName,
+}: MobileDashboardProps) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const { format: fmt, toDisplay } = useCurrency()
@@ -84,31 +161,32 @@ export function MobileDashboard({ stats, categories, recentTransactions, hasData
   const haptics = useHaptics()
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showAccounts, setShowAccounts] = useState(false)
-  const [showTheme, setShowTheme] = useState(false)
-  const [themeTick, setThemeTick] = useState(0)
   const [quickAddForm, setQuickAddForm] = useState({ description: '', amount: '', direction: 'debit' })
   const [quickAddError, setQuickAddError] = useState('')
   const [quickAddSaving, setQuickAddSaving] = useState(false)
 
-  const fetchAccounts = useCallback(async () => {
-    const res = await fetch('/api/plaid/accounts')
-    const data = await res.json()
-    setAccounts(data.banks || [])
-    setLoading(false)
-  }, [])
+  const accent = 'var(--accent)'
 
-  useEffect(() => { fetchAccounts() }, [fetchAccounts])
+  const fetchAccounts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/plaid/accounts')
+      const data = await res.json()
+      setAccounts(data.banks || [])
+    } catch {
+      setAccounts([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    const h = () => setThemeTick((t) => t + 1)
-    window.addEventListener('acct-theme-change', h)
-    return () => window.removeEventListener('acct-theme-change', h)
-  }, [])
+    fetchAccounts()
+  }, [fetchAccounts])
 
   const handleRefresh = useCallback(async () => {
     await fetchAccounts()
-    await new Promise((r) => setTimeout(r, 200))
-  }, [fetchAccounts])
+    router.refresh()
+  }, [fetchAccounts, router])
 
   const { containerRef, pullDistance, refreshing, pullIndicator } = usePullToRefresh({
     onRefresh: handleRefresh,
@@ -117,17 +195,22 @@ export function MobileDashboard({ stats, categories, recentTransactions, hasData
 
   const selectedAccountId = searchParams.get('account')
   const activeAccount = selectedAccountId ? accounts.find((a) => a.id === selectedAccountId) : null
-  const balance = activeAccount
-    ? toDisplay(activeAccount.balance, activeAccount.currency)
-    : accounts.reduce((s, a) => s + toDisplay(a.balance, a.currency), 0)
-  const accountLabel = activeAccount ? (activeAccount.accountName || activeAccount.institutionName) : 'All accounts'
-  const accountSubLabel = activeAccount
-    ? `${activeAccount.accountName || activeAccount.institutionName} · ${activeAccount.currency}`
-    : `All accounts${accounts[0]?.currency ? ` · ${accounts[0].currency}` : ''}`
 
-  const theme: AccountTheme = useMemo(
-    () => resolveTheme(selectedAccountId, activeAccount?.institutionName),
-    [selectedAccountId, activeAccount, themeTick]
+  // Only accounts with a balance Plaid actually reported are summed. Mixing in
+  // the ones without would produce a total that silently understates.
+  const priced = (activeAccount ? [activeAccount] : accounts).filter((a) => a.hasRealBalance)
+  const balance = priced.reduce((s, a) => s + toDisplay(a.balance ?? 0, a.currency), 0)
+  const missingBalances = (activeAccount ? [activeAccount] : accounts).length - priced.length
+
+  const accountLabel = activeAccount
+    ? activeAccount.accountName || activeAccount.institutionName
+    : accounts.length === 1
+      ? accounts[0].accountName || accounts[0].institutionName
+      : `${accounts.length} accounts`
+
+  const today = useMemo(
+    () => new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }),
+    []
   )
 
   function selectAccount(accountId: string | null) {
@@ -144,231 +227,269 @@ export function MobileDashboard({ stats, categories, recentTransactions, hasData
   const empty = accounts.length === 0 && !hasData
 
   return (
-    <div ref={containerRef} className="flex flex-col min-h-full -mx-4 -mt-4">
-      {/* ── Brand header ─────────────────────────────────── */}
-      <div
-        className="relative px-4 pt-3 pb-6 rounded-b-[32px] overflow-hidden"
-        style={{
-          background: `linear-gradient(180deg, ${theme.wash[0]} 0%, ${theme.wash[1]} 62%, var(--wash-base) 100%)`,
-        }}
-      >
-        <div aria-hidden="true" className="ft-orb ft-orb-a" style={{ background: theme.glow[0] }} />
-        <div aria-hidden="true" className="ft-orb ft-orb-b" style={{ background: theme.glow[1] }} />
-        <div className="relative">
-        {pullIndicator && (
-          <div className="flex items-center justify-center py-2">
-            {refreshing
-              ? <div className="w-5 h-5 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
-              : <div className="w-5 h-5 text-white/70" style={{ transform: `rotate(${Math.min(pullDistance * 2, 180)}deg)` }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12l7 7 7-7" /></svg>
-                </div>}
-          </div>
-        )}
+    <div ref={containerRef} className="flex flex-col min-h-full -mx-4 -mt-4 pb-24">
+      {pullIndicator && (
+        <div className="flex items-center justify-center h-10">
+          {refreshing ? (
+            <div className="w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <div
+              className="w-4 h-4 text-[var(--ink-faint)]"
+              style={{ transform: `rotate(${Math.min(pullDistance * 2, 180)}deg)` }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M12 5v14M5 12l7 7 7-7" />
+              </svg>
+            </div>
+          )}
+        </div>
+      )}
 
-        {/* Top row: avatar · search · icons */}
-        <div className="flex items-center gap-2.5 mb-8">
-          <Link href="/dashboard/settings" aria-label="Profile"
-            className="w-9 h-9 rounded-full bg-white/20 text-white flex items-center justify-center text-sm font-semibold shrink-0 press">
+      {/* Header. Left-aligned and typographic — the balance is a statement,
+          not a banner, and there is no gradient to compete with it. */}
+      <header className="px-5 pt-4 pb-6">
+        <div className="flex items-start justify-between gap-3 mb-7">
+          <div>
+            <p className="text-sm text-[var(--ink-muted)]">{firstName(userName)}</p>
+            <p className="text-xs text-[var(--ink-faint)] mt-0.5">{today}</p>
+          </div>
+          <Link
+            href="/dashboard/settings"
+            aria-label="Settings"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 press"
+            style={{ background: 'var(--surface-sunken)', color: 'var(--ink-soft)' }}
+          >
             {firstName(userName).charAt(0).toUpperCase()}
           </Link>
-          <button
-            onClick={() => router.push('/dashboard/transactions')}
-            className="flex-1 h-9 rounded-full flex items-center gap-2 px-3.5 text-white/70 text-sm press"
-            style={{ background: theme.chip }}
-          >
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="7" cy="7" r="5" /><path d="m11 11 3 3" strokeLinecap="round" /></svg>
-            Search
-          </button>
-          <Link href="/dashboard/intelligence" aria-label="Insights"
-            className="w-9 h-9 rounded-full flex items-center justify-center text-white press" style={{ background: theme.chip }}>
-            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M5 13V9M10 13V6M15 13v-2" /></svg>
-          </Link>
-          <Link href="/dashboard/accounts" aria-label="Cards"
-            className="w-9 h-9 rounded-full flex items-center justify-center text-white press" style={{ background: theme.chip }}>
-            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="2.5" y="4.5" width="15" height="11" rx="2" /><path d="M2.5 8h15" /></svg>
-          </Link>
         </div>
 
-        {/* Balance */}
-        <div className="text-center">
-          <p className="text-[15px] text-white/70 mb-2">{accountSubLabel}</p>
-          <BalanceDisplay value={balance} />
-          <button
-            onClick={() => { haptics.light(); setShowAccounts(true) }}
-            className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-white text-sm font-medium press"
-            style={{ background: theme.chip }}
-          >
-            {activeAccount ? accountLabel : 'Accounts'}
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="m3 5 3 3 3-3" /></svg>
-          </button>
-        </div>
+        {!empty && (
+          <>
+            <button
+              onClick={() => {
+                haptics.light()
+                setShowAccounts(true)
+              }}
+              className="inline-flex items-center gap-1 text-xs font-medium text-[var(--ink-muted)] mb-2 press"
+            >
+              {accountLabel}
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="m3 5 3 3 3-3" />
+              </svg>
+            </button>
 
-        {/* Quick actions */}
-        <div className="flex items-start justify-center gap-6 mt-8">
-          <CircleAction label="Add money" onClick={() => { haptics.medium(); setShowQuickAdd(true) }} accent={theme.accent}
-            icon={<path d="M11 5v12M5 11h12" strokeLinecap="round" />} />
-          <CircleAction label="Move" href="/dashboard/vault" accent={theme.accent}
-            icon={<path d="M11 5v12M6 12l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />} />
-          <CircleAction label="Details" href="/dashboard/accounts" accent={theme.accent}
-            icon={<><circle cx="11" cy="11" r="7.5" /><path d="M11 10v5M11 7.5v.5" strokeLinecap="round" /></>} />
-          <CircleAction label="More" onClick={() => { haptics.light(); setShowTheme(true) }} accent={theme.accent}
-            icon={<><circle cx="6" cy="11" r="1.2" fill="currentColor" stroke="none" /><circle cx="11" cy="11" r="1.2" fill="currentColor" stroke="none" /><circle cx="16" cy="11" r="1.2" fill="currentColor" stroke="none" /></>} />
-        </div>
-        </div>
-      </div>
+            {priced.length > 0 ? (
+              <p className="display-number text-[2.75rem] text-[var(--ink)]">{fmt(balance)}</p>
+            ) : (
+              <>
+                <p className="display-number text-[2rem] text-[var(--ink-faint)]">Not available</p>
+                <p className="text-xs text-[var(--ink-faint)] mt-1.5 max-w-[16rem] leading-relaxed">
+                  Your bank has not reported a balance yet. Pull down to refresh, or open an
+                  account for its recent activity.
+                </p>
+              </>
+            )}
 
-      {/* ── Body ─────────────────────────────────────────── */}
-      <div className="px-4 pt-5 pb-24 space-y-4">
-        {empty && (
-          <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 p-7 text-center">
-            <p className="text-lg font-semibold mb-1.5 text-slate-900 dark:text-white">Add your first account</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-xs mx-auto">
+            {missingBalances > 0 && priced.length > 0 && (
+              <p className="text-xs text-[var(--ink-faint)] mt-1.5">
+                Excludes {missingBalances} account{missingBalances > 1 ? 's' : ''} with no reported balance
+              </p>
+            )}
+
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => {
+                  haptics.medium()
+                  setShowQuickAdd(true)
+                }}
+                className="btn-primary text-sm py-2 px-4"
+              >
+                Add transaction
+              </button>
+              <Link href="/dashboard/transactions" className="btn-secondary text-sm py-2 px-4">
+                All activity
+              </Link>
+            </div>
+          </>
+        )}
+      </header>
+
+      {empty && (
+        <div className="px-5">
+          <div className="card p-6 text-center">
+            <p className="text-base font-semibold mb-1.5 text-[var(--ink)]">Add your first account</p>
+            <p className="text-sm text-[var(--ink-muted)] mb-6">
               Connect a bank to see balances and spending in one place.
             </p>
             <LinkBankButton />
           </div>
-        )}
+        </div>
+      )}
 
-        {!empty && (
-          <>
-            {/* This month */}
-            <div className="rounded-3xl bg-white dark:bg-[#15181f] border border-slate-200/70 dark:border-white/5 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <p className="section-title">This month</p>
-                <p className="text-sm font-semibold tabular-nums" style={{ color: stats.netCashflow >= 0 ? theme.accent : '#f87171' }}>
-                  {stats.netCashflow >= 0 ? '+' : '−'}{fmt(Math.abs(stats.netCashflow))}
-                </p>
-              </div>
-              <div className="space-y-4">
-                <BarRow label="Money in" value={stats.monthlyIncome} max={Math.max(stats.monthlyIncome, stats.monthlyExpenses)} color={theme.accent} />
-                <BarRow label="Money out" value={stats.monthlyExpenses} max={Math.max(stats.monthlyIncome, stats.monthlyExpenses)} color="#94a3b8" />
-              </div>
-            </div>
+      {!empty && (
+        <>
+          <div className="divider" />
+          <FlowRow
+            income={stats.monthlyIncome}
+            expenses={stats.monthlyExpenses}
+            change={stats.expenseChange}
+          />
 
-            {/* Recent activity */}
-            {recentTransactions.length > 0 && (
-              <div className="rounded-3xl bg-white dark:bg-[#15181f] border border-slate-200/70 dark:border-white/5 px-4 py-2">
-                <div className="flex items-center justify-between px-1 pt-2 pb-1">
-                  <p className="section-title">Recent activity</p>
-                </div>
-                <div className="divide-y divide-slate-100 dark:divide-white/5">
-                  {recentTransactions.slice(0, 5).map((tx) => (
-                    <TransactionRow key={tx.id} transaction={tx} />
-                  ))}
-                </div>
-                <Link href="/dashboard/transactions" className="block text-center py-3 text-sm font-medium text-slate-500 dark:text-slate-300 press">
-                  See all
-                </Link>
-              </div>
-            )}
+          {cashflow.length >= 3 && (
+            <>
+              <div className="divider" />
+              <SpendRhythm points={cashflow} accent={accent} />
+            </>
+          )}
 
-            {/* Top spending */}
-            {categories.length > 0 && (
-              <div className="rounded-3xl bg-white dark:bg-[#15181f] border border-slate-200/70 dark:border-white/5 p-5">
-                <p className="section-title mb-4">Top spending</p>
-                <div className="space-y-3">
-                  {categories.slice(0, 5).map((cat) => (
-                    <div key={cat.category}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-sm text-slate-700 dark:text-slate-300">{cleanLabel(cat.category)}</span>
-                        <span className="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">{fmt(cat.total)}</span>
-                      </div>
-                      <div className="h-1.5 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${Math.min(cat.percentage, 100)}%`, background: theme.accent }} />
-                      </div>
+          {categories.length > 0 && (
+            <>
+              <div className="divider" />
+              <section className="px-5 py-5">
+                <h2 className="text-sm font-semibold text-[var(--ink)] mb-4">Where it went</h2>
+                <div className="space-y-3.5">
+                  {categories.slice(0, 5).map((cat, i) => (
+                    <div key={cat.category} className="flex items-center gap-3">
+                      <span
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ background: accent, opacity: 1 - i * 0.15 }}
+                      />
+                      <span className="text-sm text-[var(--ink-soft)] flex-1 min-w-0 truncate">
+                        {cleanLabel(cat.category)}
+                      </span>
+                      <span className="text-xs text-[var(--ink-faint)] tabular-nums w-10 text-right">
+                        {Math.round(cat.percentage)}%
+                      </span>
+                      <span className="stat-number text-sm text-[var(--ink)] w-20 text-right">
+                        {fmt(cat.total)}
+                      </span>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+              </section>
+            </>
+          )}
 
-      {/* ── Accounts sheet ───────────────────────────────── */}
+          {recentTransactions.length > 0 && (
+            <>
+              <div className="divider" />
+              <section className="py-5">
+                <div className="flex items-baseline justify-between px-5 mb-1">
+                  <h2 className="text-sm font-semibold text-[var(--ink)]">Recent</h2>
+                  <Link href="/dashboard/transactions" className="text-xs text-[var(--accent)] font-medium">
+                    See all
+                  </Link>
+                </div>
+                <LedgerList transactions={recentTransactions.slice(0, 8)} />
+              </section>
+            </>
+          )}
+        </>
+      )}
+
       <BottomSheet open={showAccounts} onClose={() => setShowAccounts(false)} title="Accounts">
         <div className="space-y-1">
-          <AccountItem active={!selectedAccountId} name="All accounts" sub={`${accounts.length} ${accounts.length === 1 ? 'account' : 'accounts'}`} amount={fmt(accounts.reduce((s, a) => s + toDisplay(a.balance, a.currency), 0))} onClick={() => selectAccount(null)} />
+          <AccountItem
+            active={!selectedAccountId}
+            name="All accounts"
+            sub={`${accounts.length} ${accounts.length === 1 ? 'account' : 'accounts'}`}
+            amount={priced.length > 0 ? fmt(balance) : '—'}
+            onClick={() => selectAccount(null)}
+          />
           {accounts.map((a) => (
-            <AccountItem key={a.id} active={selectedAccountId === a.id} name={a.accountName || a.institutionName} sub={`${a.accountType} · ${a.currency}`} amount={fmt(toDisplay(a.balance, a.currency))} onClick={() => selectAccount(a.id)} />
+            <AccountItem
+              key={a.id}
+              active={selectedAccountId === a.id}
+              name={a.accountName || a.institutionName}
+              sub={`${a.accountType} · ${a.currency}`}
+              amount={a.hasRealBalance ? fmt(toDisplay(a.balance ?? 0, a.currency)) : '—'}
+              onClick={() => selectAccount(a.id)}
+            />
           ))}
         </div>
       </BottomSheet>
 
-      {/* ── Theme sheet ──────────────────────────────────── */}
-      <BottomSheet open={showTheme} onClose={() => setShowTheme(false)} title="Card colour">
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-          Pick a colour for {activeAccount ? accountLabel : 'all accounts'}.
-        </p>
-        <div className="grid grid-cols-3 gap-3">
-          {ACCOUNT_THEMES.map((t) => {
-            const selected = t.key === theme.key
-            return (
-              <button
-                key={t.key}
-                onClick={() => { haptics.light(); setAccountThemeKey(selectedAccountId, t.key) }}
-                className={`rounded-2xl p-4 flex flex-col items-center gap-2 border-2 press ${selected ? 'border-slate-900 dark:border-white' : 'border-transparent'}`}
-              >
-                <span className="w-10 h-10 rounded-full" style={{ background: `linear-gradient(135deg, ${t.glow[0]}, ${t.glow[1]})` }} />
-                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{t.name}</span>
-              </button>
-            )
-          })}
-        </div>
-      </BottomSheet>
-
-      {/* ── Add transaction sheet ────────────────────────── */}
-      <BottomSheet open={showQuickAdd} onClose={() => setShowQuickAdd(false)} title="Add money">
+      <BottomSheet open={showQuickAdd} onClose={() => setShowQuickAdd(false)} title="Add transaction">
         <form
           onSubmit={async (e) => {
             e.preventDefault()
             setQuickAddError('')
             if (!quickAddForm.description || !quickAddForm.amount) {
-              haptics.error(); setQuickAddError('Add a description and amount to continue.'); return
+              haptics.error()
+              setQuickAddError('Add a description and amount to continue.')
+              return
             }
             setQuickAddSaving(true)
             try {
               const res = await fetch('/api/manual-transactions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ description: quickAddForm.description, amount: parseFloat(quickAddForm.amount), direction: quickAddForm.direction, date: new Date().toISOString() }),
+                body: JSON.stringify({
+                  description: quickAddForm.description,
+                  amount: parseFloat(quickAddForm.amount),
+                  direction: quickAddForm.direction,
+                  date: new Date().toISOString(),
+                }),
               })
-              if (!res.ok) throw new Error('Failed')
+              if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                throw new Error(data.error || 'Could not save that.')
+              }
               haptics.success()
               setShowQuickAdd(false)
               setQuickAddForm({ description: '', amount: '', direction: 'debit' })
               router.refresh()
-            } catch {
-              haptics.error(); setQuickAddError('That did not save. Try again.')
+            } catch (err) {
+              haptics.error()
+              setQuickAddError(err instanceof Error ? err.message : 'Could not save that.')
+            } finally {
+              setQuickAddSaving(false)
             }
-            setQuickAddSaving(false)
           }}
-          className="space-y-4"
+          className="space-y-3"
         >
-          <div>
-            <label className="label">Description</label>
-            <input type="text" placeholder="e.g. Coffee shop" value={quickAddForm.description} onChange={(e) => setQuickAddForm({ ...quickAddForm, description: e.target.value })} className="input" autoFocus />
-          </div>
-          <div>
-            <label className="label">Amount</label>
-            <input type="number" step="0.01" min="0" placeholder="0.00" value={quickAddForm.amount} onChange={(e) => setQuickAddForm({ ...quickAddForm, amount: e.target.value })} className="input" />
-          </div>
-          <div>
-            <label className="label">Type</label>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setQuickAddForm({ ...quickAddForm, direction: 'debit' })}
-                className={`flex-1 py-3 rounded-xl text-sm font-semibold transition-colors ${quickAddForm.direction === 'debit' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
-                Money out
+          <div className="grid grid-cols-2 gap-2">
+            {(['debit', 'credit'] as const).map((dir) => (
+              <button
+                key={dir}
+                type="button"
+                onClick={() => setQuickAddForm((f) => ({ ...f, direction: dir }))}
+                className="py-2.5 rounded-xl text-sm font-medium border transition-colors"
+                style={{
+                  borderColor: quickAddForm.direction === dir ? 'var(--accent)' : 'var(--line)',
+                  background: quickAddForm.direction === dir ? 'var(--accent-wash)' : 'transparent',
+                  color: quickAddForm.direction === dir ? 'var(--accent-ink)' : 'var(--ink-muted)',
+                }}
+              >
+                {dir === 'debit' ? 'Money out' : 'Money in'}
               </button>
-              <button type="button" onClick={() => setQuickAddForm({ ...quickAddForm, direction: 'credit' })}
-                className={`flex-1 py-3 rounded-xl text-sm font-semibold transition-colors ${quickAddForm.direction === 'credit' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
-                Money in
-              </button>
-            </div>
+            ))}
           </div>
-          {quickAddError && <p className="text-[13px] text-rose-500">{quickAddError}</p>}
+          <input
+            type="text"
+            inputMode="text"
+            value={quickAddForm.description}
+            onChange={(e) => setQuickAddForm((f) => ({ ...f, description: e.target.value }))}
+            placeholder="What was it?"
+            className="input"
+          />
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            inputMode="decimal"
+            value={quickAddForm.amount}
+            onChange={(e) => setQuickAddForm((f) => ({ ...f, amount: e.target.value }))}
+            placeholder="0.00"
+            className="input stat-number text-lg"
+          />
+          {quickAddError && (
+            <p role="alert" className="text-xs text-[var(--negative)]">
+              {quickAddError}
+            </p>
+          )}
           <button type="submit" disabled={quickAddSaving} className="btn-primary w-full disabled:opacity-50">
-            {quickAddSaving ? 'Saving…' : 'Add transaction'}
+            {quickAddSaving ? 'Saving…' : 'Add'}
           </button>
         </form>
       </BottomSheet>
@@ -376,50 +497,109 @@ export function MobileDashboard({ stats, categories, recentTransactions, hasData
   )
 }
 
-function CircleAction({ label, icon, accent, href, onClick }: { label: string; icon: React.ReactNode; accent: string; href?: string; onClick?: () => void }) {
-  const circle = (
-    <span className="w-[52px] h-[52px] rounded-full flex items-center justify-center text-white press" style={{ background: 'rgba(255,255,255,0.16)' }}>
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.7">{icon}</svg>
-    </span>
-  )
-  const content = (
-    <div className="flex flex-col items-center gap-2">
-      {circle}
-      <span className="text-[12px] text-white/90 font-medium">{label}</span>
+/**
+ * Transactions grouped under the day they happened, with the date as a quiet
+ * rail down the left. A flat list of rows loses the sense of "that was all one
+ * Saturday", which is how people actually remember spending.
+ */
+function LedgerList({ transactions }: { transactions: any[] }) {
+  const { format: fmt } = useCurrency()
+
+  const groups = useMemo(() => {
+    const map = new Map<string, any[]>()
+    for (const t of transactions) {
+      const key = new Date(t.date).toDateString()
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(t)
+    }
+    return [...map.entries()]
+  }, [transactions])
+
+  return (
+    <div>
+      {groups.map(([day, items]) => (
+        <div key={day}>
+          <p className="px-5 pt-4 pb-1.5 text-2xs font-semibold uppercase tracking-wide text-[var(--ink-faint)]">
+            {relativeDay(day)}
+          </p>
+          {items.map((t) => {
+            const isCredit = t.direction === 'credit'
+            return (
+              <div key={t.id} className="flex items-center gap-3 px-5 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-[var(--ink)] truncate">
+                    {t.merchantName || t.description}
+                  </p>
+                  {t.merchantCategory && (
+                    <p className="text-xs text-[var(--ink-faint)] truncate">
+                      {cleanLabel(t.merchantCategory)}
+                    </p>
+                  )}
+                </div>
+                <span
+                  className="stat-number text-sm shrink-0"
+                  style={{ color: isCredit ? 'var(--positive)' : 'var(--ink)' }}
+                >
+                  {isCredit ? '+' : '−'}
+                  {fmt(Math.abs(t.amount))}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      ))}
     </div>
   )
-  if (href) return <Link href={href}>{content}</Link>
-  return <button type="button" onClick={onClick}>{content}</button>
 }
 
-function AccountItem({ active, name, sub, amount, onClick }: { active: boolean; name: string; sub: string; amount: string; onClick: () => void }) {
+function AccountItem({
+  active,
+  name,
+  sub,
+  amount,
+  onClick,
+}: {
+  active: boolean
+  name: string
+  sub: string
+  amount: string
+  onClick: () => void
+}) {
   return (
-    <button onClick={onClick} className={`w-full flex items-center gap-3 p-3 rounded-2xl text-left press ${active ? 'bg-slate-100 dark:bg-white/10' : ''}`}>
-      <span className="w-10 h-10 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center text-sm font-semibold text-slate-700 dark:text-slate-200">{name.charAt(0).toUpperCase()}</span>
-      <span className="flex-1 min-w-0">
-        <span className="block text-sm font-medium text-slate-900 dark:text-white truncate">{name}</span>
-        <span className="block text-[13px] text-slate-400 dark:text-slate-500">{sub}</span>
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 p-3 rounded-xl text-left press"
+      style={{ background: active ? 'var(--surface-sunken)' : 'transparent' }}
+    >
+      <span
+        className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold shrink-0"
+        style={{ background: 'var(--surface-sunken)', color: 'var(--ink-soft)' }}
+      >
+        {name.charAt(0).toUpperCase()}
       </span>
-      <span className="text-sm font-semibold tabular-nums text-slate-900 dark:text-white">{amount}</span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm font-medium text-[var(--ink)] truncate">{name}</span>
+        <span className="block text-xs text-[var(--ink-faint)]">{sub}</span>
+      </span>
+      <span className="stat-number text-sm text-[var(--ink)]">{amount}</span>
     </button>
   )
 }
 
-function BarRow({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
-  const { format: fmt } = useCurrency()
-  const pct = max > 0 ? (value / max) * 100 : 0
-  return (
-    <div>
-      <div className="flex justify-between text-sm mb-1.5">
-        <span className="text-slate-600 dark:text-slate-400">{label}</span>
-        <span className="font-semibold tabular-nums text-slate-900 dark:text-slate-100">{fmt(value)}</span>
-      </div>
-      <div className="h-2 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
-      </div>
-    </div>
-  )
+function firstName(name: string) {
+  return name?.split(' ')[0] || 'there'
 }
 
-function firstName(name: string) { return name.split(' ')[0] }
-function cleanLabel(cat: string) { return cat.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }
+function cleanLabel(cat: string) {
+  return cat.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function relativeDay(day: string): string {
+  const date = new Date(day)
+  const today = new Date()
+  const yesterday = new Date(today.getTime() - 86_400_000)
+
+  if (date.toDateString() === today.toDateString()) return 'Today'
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+}

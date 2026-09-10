@@ -22,6 +22,9 @@ export async function GET() {
         currency: true,
         lastSynced: true,
         createdAt: true,
+        currentBalance: true,
+        availableBalance: true,
+        balanceUpdatedAt: true,
         transactions: {
           select: { amount: true, direction: true },
         },
@@ -29,11 +32,24 @@ export async function GET() {
     })
 
     const banksWithBalance = banks.map((b) => {
-      const balance = b.transactions.reduce((sum, t) => {
-        return sum + (t.direction === 'credit' ? Math.abs(t.amount) : -Math.abs(t.amount))
-      }, 0)
-      const { transactions, ...rest } = b
-      return { ...rest, balance: Math.round(balance * 100) / 100 }
+      // Credits minus debits over the imported window. This is net cashflow,
+      // not a balance — it was previously returned as `balance`, so the home
+      // screen showed 90 days of net movement where the account balance
+      // should be. Kept, correctly named, because it is still useful.
+      const netFlow = b.transactions.reduce(
+        (sum, t) => sum + (t.direction === 'credit' ? Math.abs(t.amount) : -Math.abs(t.amount)),
+        0
+      )
+      const { transactions, currentBalance, ...rest } = b
+
+      return {
+        ...rest,
+        // Null rather than a stand-in when Plaid has not reported one, so the
+        // UI can say "not available" instead of showing a confident wrong number.
+        balance: currentBalance,
+        netFlow: Math.round(netFlow * 100) / 100,
+        hasRealBalance: currentBalance !== null,
+      }
     })
 
     return NextResponse.json({ banks: banksWithBalance })
