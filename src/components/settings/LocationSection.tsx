@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { SettingsCard, SettingsRow } from './SettingsCard'
-import { detectUserLocation, saveUserLocation, getUserLocation } from '@/lib/location'
+import {
+  detectAndSaveLocation,
+  saveUserLocation,
+  getUserLocation,
+  LOCATION_MESSAGES,
+} from '@/lib/location'
 
 export function LocationSection() {
   const [mounted, setMounted] = useState(false)
@@ -10,11 +15,18 @@ export function LocationSection() {
   const [city, setCity] = useState('')
   const [country, setCountry] = useState('')
   const [locating, setLocating] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  // Manual entry, which is the fallback whenever the browser will not say
+  // where it is — previously there was no way to set a city at all.
+  const [manualCity, setManualCity] = useState('')
+  const [manualCountry, setManualCountry] = useState('')
+  const [savingManual, setSavingManual] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    const enabled = localStorage.getItem('location_tracking') === 'true'
-    setTracking(enabled)
+    setTracking(localStorage.getItem('location_tracking') === 'true')
     getUserLocation().then((loc) => {
       if (loc) {
         setCity(loc.city || '')
@@ -25,13 +37,54 @@ export function LocationSection() {
 
   async function handleDetect() {
     setLocating(true)
-    const loc = await detectUserLocation()
-    if (loc) {
-      await saveUserLocation(loc)
-      setCity(loc.city || '')
-      setCountry(loc.country || '')
+    setError('')
+    setNotice('')
+
+    const result = await detectAndSaveLocation()
+
+    if (!result.ok) {
+      // Every one of these used to be swallowed, which is why the button
+      // looked like it did nothing.
+      setError(LOCATION_MESSAGES[result.reason])
+      setLocating(false)
+      return
     }
+
+    if (result.city) {
+      setCity(result.city)
+      setCountry(result.country || '')
+      setNotice(`Location set to ${result.city}${result.country ? `, ${result.country}` : ''}.`)
+    } else {
+      setError(LOCATION_MESSAGES['lookup-failed'])
+    }
+
     setLocating(false)
+  }
+
+  async function handleManualSave(e: React.FormEvent) {
+    e.preventDefault()
+    if (!manualCity.trim()) return
+
+    setSavingManual(true)
+    setError('')
+    setNotice('')
+
+    const ok = await saveUserLocation({
+      city: manualCity.trim(),
+      country: manualCountry.trim() || undefined,
+    })
+
+    if (ok) {
+      setCity(manualCity.trim())
+      setCountry(manualCountry.trim())
+      setManualCity('')
+      setManualCountry('')
+      setNotice('Location saved.')
+    } else {
+      setError(LOCATION_MESSAGES['save-failed'])
+    }
+
+    setSavingManual(false)
   }
 
   function toggleTracking(val: boolean) {
@@ -51,38 +104,96 @@ export function LocationSection() {
   }
 
   return (
-    <SettingsCard title="Location" description="Your location helps find local merchant alternatives and personalised savings tips.">
+    <SettingsCard
+      title="Location"
+      description="Your city is what lets us find real nearby alternatives instead of generic advice. It is never shared."
+    >
+      {error && (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-300"
+        >
+          {error}
+        </div>
+      )}
+      {notice && !error && (
+        <div
+          role="status"
+          className="rounded-xl border border-teal-100 bg-teal-50 px-3 py-2.5 text-xs text-teal-800 dark:border-teal-900/40 dark:bg-teal-950/40 dark:text-teal-200"
+        >
+          {notice}
+        </div>
+      )}
+
       <SettingsRow
         label="Location tracking"
-        description="Detect your location to enable area-specific spending insights and nearby alternatives."
+        description="Lets the app look up shops and fares near you."
       >
         <label className="inline-flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
             checked={tracking}
-            onChange={e => toggleTracking(e.target.checked)}
+            onChange={(e) => toggleTracking(e.target.checked)}
             className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
           />
           <span className="text-sm text-slate-700 dark:text-slate-300">Enabled</span>
         </label>
       </SettingsRow>
 
-      {city && (
-        <SettingsRow label="Current location" description="Your detected city and country.">
+      <SettingsRow
+        label="Current location"
+        description={city ? 'Used for local alternatives.' : 'Not set — suggestions will stay generic.'}
+      >
+        {city ? (
           <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-            {city}{country ? `, ${country}` : ''}
+            {city}
+            {country ? `, ${country}` : ''}
           </p>
-        </SettingsRow>
-      )}
+        ) : (
+          <p className="text-sm text-slate-400">None</p>
+        )}
+      </SettingsRow>
 
-      <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+      <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
         <button
           onClick={handleDetect}
           disabled={locating}
-          className="text-sm font-medium text-teal-700 hover:text-teal-800 disabled:opacity-50 transition-colors dark:text-teal-400"
+          className="btn-secondary text-sm disabled:opacity-50"
         >
-          {locating ? 'Detecting…' : city ? 'Update location' : 'Detect my location'}
+          {locating ? 'Detecting…' : city ? 'Detect again' : 'Detect my location'}
         </button>
+
+        <form onSubmit={handleManualSave} className="space-y-2">
+          <label className="label" htmlFor="manual-city">
+            Or set it yourself
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              id="manual-city"
+              type="text"
+              value={manualCity}
+              onChange={(e) => setManualCity(e.target.value)}
+              placeholder="City"
+              className="input flex-1"
+              autoComplete="address-level2"
+            />
+            <input
+              type="text"
+              value={manualCountry}
+              onChange={(e) => setManualCountry(e.target.value)}
+              placeholder="Country (optional)"
+              className="input flex-1"
+              autoComplete="country-name"
+            />
+            <button
+              type="submit"
+              disabled={savingManual || !manualCity.trim()}
+              className="btn-primary text-sm shrink-0 disabled:opacity-50"
+            >
+              {savingManual ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </form>
       </div>
     </SettingsCard>
   )

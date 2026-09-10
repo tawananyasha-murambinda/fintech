@@ -63,8 +63,23 @@ function estimateTripKm(amount: number): number {
   return Math.max(1, Math.round((amount * 0.7) / 1.5))
 }
 
-function fmtCurrency(n: number): string {
-  return n.toFixed(2)
+// Currency for the strings this module builds. Every amount used to be
+// hard-coded with a euro sign, so a dollar or sterling account was shown euro
+// figures for its own spending. ai.ts imports this file, so the value is pushed
+// in rather than imported back out.
+let LOCAL_CURRENCY = 'USD'
+
+const SYMBOLS: Record<string, string> = {
+  USD: '$', EUR: '€', GBP: '£', CAD: 'CA$', AUD: 'A$', JPY: '¥',
+}
+
+export function setGeocodeCurrency(code?: string | null) {
+  LOCAL_CURRENCY = code && SYMBOLS[code] ? code : 'USD'
+}
+
+function fmtCurrency(n: number, decimals: 0 | 2 = 2): string {
+  const symbol = SYMBOLS[LOCAL_CURRENCY] || '$'
+  return `${symbol}${n.toFixed(decimals)}`
 }
 
 function localTransitInfo(city: string): { operator: string; note: string } {
@@ -166,6 +181,7 @@ export async function findLocalAlternatives(
     distance?: string
     type: 'primary' | 'secondary'
     detail?: string
+    source: 'local' | 'general'
   }[]
 }> {
   const cleanCat = category.toLowerCase().replace(/_/g, ' ').trim()
@@ -190,17 +206,17 @@ export async function findLocalAlternatives(
       const stops = await findNearbyBusStops(userHome, country)
       if (stops.length > 0) {
         const stopNames = [...new Set(stops.map(s => s.name))].slice(0, 3).join(', ')
-        alts.push({ name: `${transit.operator} bus (${stopNames})`, estimatedSavings: savings, originalCost: Math.round(avgTx), alternativeCost: transitFare, reason: `${locPhrase}. Your ${merchantName} trip (est. ${tripKm} km) costs ~€${fmtCurrency(avgTx)}. ${transit.note}Nearest stops: ${stopNames}. A bus for ${tripKm} km is ~€${transitFare} — saving you €${savings} per trip.`, type: 'primary' as const, detail: `~€${transitFare} · stops: ${stopNames}` })
+        alts.push({ name: `${transit.operator} bus (${stopNames})`, estimatedSavings: savings, originalCost: Math.round(avgTx), alternativeCost: transitFare, reason: `${locPhrase}. Your ${merchantName} trip (est. ${tripKm} km) costs ~${fmtCurrency(avgTx)}. ${transit.note}Nearest stops: ${stopNames}. A bus for ${tripKm} km is ~${fmtCurrency(transitFare, 0)} — saving you ${fmtCurrency(savings, 0)} per trip.`, type: 'primary' as const, source: 'local' as const, detail: `~${fmtCurrency(transitFare, 0)} · stops: ${stopNames}` })
       } else {
-        alts.push({ name: `${transit.operator} bus/tram`, estimatedSavings: savings, originalCost: Math.round(avgTx), alternativeCost: transitFare, reason: `${locPhrase}. Your ${merchantName} trip (est. ${tripKm} km) costs ~€${fmtCurrency(avgTx)}. ${transit.note}A bus for ${tripKm} km is ~€${transitFare} — saving you €${savings} per trip.`, type: 'primary' as const, detail: `~€${transitFare} · ${tripKm} km trip` })
+        alts.push({ name: `${transit.operator} bus/tram`, estimatedSavings: savings, originalCost: Math.round(avgTx), alternativeCost: transitFare, reason: `${locPhrase}. Your ${merchantName} trip (est. ${tripKm} km) costs ~${fmtCurrency(avgTx)}. ${transit.note}A bus for ${tripKm} km is ~${fmtCurrency(transitFare, 0)} — saving you ${fmtCurrency(savings, 0)} per trip.`, type: 'primary' as const, source: 'local' as const, detail: `~${fmtCurrency(transitFare, 0)} · ${tripKm} km trip` })
       }
       if (tripKm <= 10) {
         const cycleTime = Math.round(tripKm * 4)
-        alts.push({ name: 'Cycle instead', estimatedSavings: Math.round(avgTx - tripKm * 0.05), originalCost: Math.round(avgTx), alternativeCost: Math.round(tripKm * 0.05), reason: `Same ${tripKm} km by bike costs ~€${fmtCurrency(tripKm * 0.05)} in maintenance. Takes ~${cycleTime} min and saves €${Math.round(avgTx - tripKm * 0.05)}.`, type: 'secondary' as const, detail: `${tripKm} km · ~${cycleTime} min cycle` })
+        alts.push({ name: 'Cycle instead', estimatedSavings: Math.round(avgTx - tripKm * 0.05), originalCost: Math.round(avgTx), alternativeCost: Math.round(tripKm * 0.05), reason: `Same ${tripKm} km by bike costs ~${fmtCurrency(tripKm * 0.05)} in maintenance. Takes ~${cycleTime} min and saves ${fmtCurrency(Math.round(avgTx - tripKm * 0.05), 0)}.`, type: 'secondary' as const, source: 'local' as const, detail: `${tripKm} km · ~${cycleTime} min cycle` })
       }
       if (tripKm <= 3) {
         const walkTime = Math.round(tripKm * 12)
-        alts.push({ name: 'Walk it', estimatedSavings: Math.round(avgTx), originalCost: Math.round(avgTx), alternativeCost: 0, reason: `${tripKm} km is walkable in ~${walkTime} min. Free and saves €${Math.round(avgTx)}.`, type: 'secondary' as const, detail: `${walkTime} min walk` })
+        alts.push({ name: 'Walk it', estimatedSavings: Math.round(avgTx), originalCost: Math.round(avgTx), alternativeCost: 0, reason: `${tripKm} km is walkable in ~${walkTime} min. Free and saves ${fmtCurrency(Math.round(avgTx), 0)}.`, type: 'secondary' as const, source: 'local' as const, detail: `${walkTime} min walk` })
       }
       return { locationContext: locCtx, alternatives: alts }
     } catch (e) {
@@ -220,11 +236,11 @@ export async function findLocalAlternatives(
       if (markets.length > 0 && geo) {
         const m = markets[0]
         const dist = haversine(geo.lat, geo.lon, m.lat, m.lon)
-        const items = breakdown.items.map(i => `${i.name} (€${i.price.toFixed(2)})`).join(' + ')
-        alts.push({ name: `Cook at home (${m.name})`, estimatedSavings: savings, originalCost: Math.round(avgTx), alternativeCost: homeCost, reason: `${locPhrase}. A €${fmtCurrency(avgTx)} meal at ${merchantName}. Instead, buy at ${m.name} (${dist.toFixed(1)} km): ${items} = €${homeCost.toFixed(2)} total. Save €${savings} per meal.`, distance: `${dist.toFixed(1)} km`, type: 'primary' as const, detail: `${m.name} · ${items}` })
+        const items = breakdown.items.map(i => `${i.name} (${fmtCurrency(i.price)})`).join(' + ')
+        alts.push({ name: `Cook at home (${m.name})`, estimatedSavings: savings, originalCost: Math.round(avgTx), alternativeCost: homeCost, reason: `${locPhrase}. A ${fmtCurrency(avgTx)} meal at ${merchantName}. Instead, buy at ${m.name} (${dist.toFixed(1)} km): ${items} = ${fmtCurrency(homeCost)} total. Save ${fmtCurrency(savings, 0)} per meal.`, distance: `${dist.toFixed(1)} km`, type: 'primary' as const, source: 'local' as const, detail: `${m.name} · ${items}` })
       } else {
-        const items = breakdown.items.map(i => `${i.name} (€${i.price.toFixed(2)})`).join(' + ')
-        alts.push({ name: 'Cook at home', estimatedSavings: savings, originalCost: Math.round(avgTx), alternativeCost: homeCost, reason: `${locPhrase}. A €${fmtCurrency(avgTx)} meal at ${merchantName}. Home cooking: ${items} = €${homeCost.toFixed(2)}. Save €${savings} per meal.`, type: 'primary' as const, detail: `${items} = €${homeCost.toFixed(2)}` })
+        const items = breakdown.items.map(i => `${i.name} (${fmtCurrency(i.price)})`).join(' + ')
+        alts.push({ name: 'Cook at home', estimatedSavings: savings, originalCost: Math.round(avgTx), alternativeCost: homeCost, reason: `${locPhrase}. A ${fmtCurrency(avgTx)} meal at ${merchantName}. Home cooking: ${items} = ${fmtCurrency(homeCost)}. Save ${fmtCurrency(savings, 0)} per meal.`, type: 'primary' as const, source: 'local' as const, detail: `${items} = ${fmtCurrency(homeCost)}` })
       }
 
       const cheapEats = await tryApiOrFallback(() => searchPlaces('restaurant', userHome, country, 6), [])
@@ -233,9 +249,9 @@ export async function findLocalAlternatives(
         const ce = others[0]
         const ceDist = haversine(geo.lat, geo.lon, ce.lat, ce.lon)
         const cheapCost = Math.round(avgTx * 0.7)
-        alts.push({ name: `${ce.name} (nearby)`, estimatedSavings: Math.round(avgTx - cheapCost), originalCost: Math.round(avgTx), alternativeCost: cheapCost, reason: `Try ${ce.name} instead — ${ceDist.toFixed(1)} km away, estimated ~€${cheapCost} vs €${fmtCurrency(avgTx)} at ${merchantName}.`, distance: `${ceDist.toFixed(1)} km`, type: 'secondary' as const, detail: `~€${cheapCost}/meal · ${ceDist.toFixed(1)} km` })
+        alts.push({ name: `${ce.name} (nearby)`, estimatedSavings: Math.round(avgTx - cheapCost), originalCost: Math.round(avgTx), alternativeCost: cheapCost, reason: `Try ${ce.name} instead — ${ceDist.toFixed(1)} km away, estimated ~${fmtCurrency(cheapCost, 0)} vs ${fmtCurrency(avgTx)} at ${merchantName}.`, distance: `${ceDist.toFixed(1)} km`, type: 'secondary' as const, source: 'local' as const, detail: `~${fmtCurrency(cheapCost, 0)}/meal · ${ceDist.toFixed(1)} km` })
       }
-      alts.push({ name: 'Pack lunch / meal prep', estimatedSavings: Math.round(avgTx * 0.7), originalCost: Math.round(avgTx), alternativeCost: Math.round(avgTx * 0.3), reason: `Packing lunch costs ~€${Math.round(avgTx * 0.3)} vs €${fmtCurrency(avgTx)} at ${merchantName}. Over 22 workdays: save ~€${Math.round(avgTx * 0.7 * 22)}/mo.`, type: 'secondary' as const })
+      alts.push({ name: 'Pack lunch / meal prep', estimatedSavings: Math.round(avgTx * 0.7), originalCost: Math.round(avgTx), alternativeCost: Math.round(avgTx * 0.3), reason: `Packing lunch costs ~${fmtCurrency(Math.round(avgTx * 0.3), 0)} vs ${fmtCurrency(avgTx)} at ${merchantName}. Over 22 workdays: save ~${fmtCurrency(Math.round(avgTx * 0.7 * 22), 0)}/mo.`, type: 'secondary' as const, source: 'local' as const })
       return { locationContext: locCtx, alternatives: alts }
     } catch (e) {
       return makeSimpleAlt(avgTx, merchantName, userHome, 'Cook at home', 'Pack lunch / meal prep', locCtx, `Location lookup failed for ${userHome}: ${e instanceof Error ? e.message : 'Unknown error'}. Showing estimates.`)
@@ -248,8 +264,8 @@ export async function findLocalAlternatives(
       locationContext: locCtx,
       alternatives: [{
         name: 'Brew at home', estimatedSavings: Math.round(avgTx - 0.30), originalCost: Math.round(avgTx), alternativeCost: 0.30,
-        reason: `A €${fmtCurrency(avgTx)} coffee at ${merchantName}. Home-brewed: ~€0.30 per cup. Save €${Math.round(avgTx - 0.30)} per cup.`,
-        type: 'primary' as const, detail: '~€0.30 per cup at home',
+        reason: `A ${fmtCurrency(avgTx)} coffee at ${merchantName}. Home-brewed: ~${fmtCurrency(0.3)} per cup. Save ${fmtCurrency(Math.round(avgTx - 0.30), 0)} per cup.`,
+        type: 'primary' as const, source: 'local' as const, detail: '~${fmtCurrency(0.3)} per cup at home',
       }],
     }
   }
@@ -261,11 +277,11 @@ export async function findLocalAlternatives(
       alternatives: [{
         name: 'Second-hand / thrift stores', estimatedSavings: Math.round(avgTx * 0.5), originalCost: Math.round(avgTx), alternativeCost: Math.round(avgTx * 0.5),
         reason: `Second-hand alternatives in ${userHome} typically save ~50% on items you'd buy new at ${merchantName}. Check local thrift shops.`,
-        type: 'primary' as const, detail: `~€${Math.round(avgTx * 0.5)} saved per visit`,
+        type: 'primary' as const, source: 'local' as const, detail: `~${fmtCurrency(Math.round(avgTx * 0.5), 0)} saved per visit`,
       }, {
         name: 'Wait 48h before buying', estimatedSavings: Math.round(avgTx * 0.2), originalCost: Math.round(avgTx), alternativeCost: Math.round(avgTx * 0.8),
-        reason: `${merchantName} spend averages €${fmtCurrency(avgTx)}/visit. A 48h cooling period reduces impulse purchases by ~20%.`,
-        type: 'secondary' as const,
+        reason: `${merchantName} spend averages ${fmtCurrency(avgTx)}/visit. A 48h cooling period reduces impulse purchases by ~20%.`,
+        type: 'secondary' as const, source: 'local' as const,
       }],
     }
   }
@@ -276,12 +292,12 @@ export async function findLocalAlternatives(
       locationContext: locCtx,
       alternatives: [{
         name: 'Annual billing', estimatedSavings: Math.round(avgTx * 0.15), originalCost: Math.round(avgTx), alternativeCost: Math.round(avgTx * 0.85),
-        reason: `${merchantName} likely offers 15-20% off with annual billing — saving ~€${Math.round(avgTx * 0.15)}/mo.`,
-        type: 'primary' as const,
+        reason: `${merchantName} likely offers 15-20% off with annual billing — saving ~${fmtCurrency(Math.round(avgTx * 0.15), 0)}/mo.`,
+        type: 'primary' as const, source: 'local' as const,
       }, {
         name: 'Ad-supported / family plan', estimatedSavings: Math.round(avgTx * 0.25), originalCost: Math.round(avgTx), alternativeCost: Math.round(avgTx * 0.75),
         reason: 'Downgrading to ad-supported tiers or splitting a family plan cuts costs significantly.',
-        type: 'secondary' as const,
+        type: 'secondary' as const, source: 'local' as const,
       }],
     }
   }
@@ -292,12 +308,12 @@ export async function findLocalAlternatives(
       locationContext: locCtx,
       alternatives: [{
         name: 'Negotiate / switch providers', estimatedSavings: Math.round(avgTx * 0.12), originalCost: Math.round(avgTx), alternativeCost: Math.round(avgTx * 0.88),
-        reason: `Your €${fmtCurrency(avgTx)} payment to ${merchantName} may be negotiable. Switching internet/utility providers or asking for a loyalty discount typically saves 10-15%.`,
-        type: 'primary' as const,
+        reason: `Your ${fmtCurrency(avgTx)} payment to ${merchantName} may be negotiable. Switching internet/utility providers or asking for a loyalty discount typically saves 10-15%.`,
+        type: 'primary' as const, source: 'local' as const,
       }, {
         name: 'Usage audit', estimatedSavings: Math.round(avgTx * 0.08), originalCost: Math.round(avgTx), alternativeCost: Math.round(avgTx * 0.92),
         reason: 'Reviewing your actual usage vs plan could uncover savings. Many households overpay by 8-12% on utilities.',
-        type: 'secondary' as const,
+        type: 'secondary' as const, source: 'local' as const,
       }],
     }
   }
@@ -308,12 +324,12 @@ export async function findLocalAlternatives(
       locationContext: locCtx,
       alternatives: [{
         name: 'Compare rates / refinance', estimatedSavings: Math.round(avgTx * 0.18), originalCost: Math.round(avgTx), alternativeCost: Math.round(avgTx * 0.82),
-        reason: `${merchantName} charges ~€${fmtCurrency(avgTx)}. Comparing rates or refinancing could save ~18%. Check Bunq, Revolut, or Wise for better terms.`,
-        type: 'primary' as const,
+        reason: `${merchantName} charges ~${fmtCurrency(avgTx)}. Comparing rates or refinancing could save ~18%. Check Bunq, Revolut, or Wise for better terms.`,
+        type: 'primary' as const, source: 'local' as const,
       }, {
         name: 'Automate & consolidate', estimatedSavings: Math.round(avgTx * 0.08), originalCost: Math.round(avgTx), alternativeCost: Math.round(avgTx * 0.92),
         reason: 'Consolidating payments and automating transfers reduces late fees and keeps your finances organised.',
-        type: 'secondary' as const,
+        type: 'secondary' as const, source: 'local' as const,
       }],
     }
   }
@@ -322,6 +338,9 @@ export async function findLocalAlternatives(
   return makeSimpleAlt(avgTx, merchantName, userHome, 'Compare 2-3 alternatives', 'Loyalty / bulk discounts', locCtx)
 }
 
+// The path taken when a place lookup fails. Nothing here came from a map, so
+// it is marked `general` — presenting it as local advice is precisely the
+// thing that makes the whole feature untrustworthy.
 function makeSimpleAlt(avgTx: number, merchantName: string, _userHome: string, primaryName: string, secondaryName: string, locCtx: string, error?: string) {
   return {
     locationContext: locCtx,
@@ -331,15 +350,15 @@ function makeSimpleAlt(avgTx: number, merchantName: string, _userHome: string, p
       estimatedSavings: Math.round(avgTx * 0.15),
       originalCost: Math.round(avgTx),
       alternativeCost: Math.round(avgTx * 0.85),
-      reason: `At ${merchantName} you spend ~€${fmtCurrency(avgTx)} per visit. ${primaryName} could save ~€${Math.round(avgTx * 0.15)} each time.`,
-      type: 'primary' as const,
+      reason: `At ${merchantName} you spend about ${fmtCurrency(avgTx)} per visit. ${primaryName} could save around ${fmtCurrency(avgTx * 0.15)} each time.`,
+      type: 'primary' as const, source: 'general' as const,
     }, {
       name: secondaryName,
       estimatedSavings: Math.round(avgTx * 0.1),
       originalCost: Math.round(avgTx),
       alternativeCost: Math.round(avgTx * 0.9),
-      reason: `Check if ${secondaryName.toLowerCase()} applies to your ${merchantName} spending.`,
-      type: 'secondary' as const,
+      reason: `Check whether ${secondaryName.toLowerCase()} applies to your ${merchantName} spending.`,
+      type: 'secondary' as const, source: 'general' as const,
     }],
   }
 }

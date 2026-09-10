@@ -1,5 +1,5 @@
 {
-  "buildCommand": "node scripts/db-preflight.mjs && prisma generate && prisma db push --accept-data-loss && node scripts/db-backfill.mjs && next build",
+  "buildCommand": "prisma generate && next build",
   "installCommand": "npm install",
   "framework": "nextjs",
   "crons": [

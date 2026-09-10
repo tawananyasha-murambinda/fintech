@@ -70,6 +70,16 @@ export async function PUT(req: NextRequest) {
       select: { id: true, name: true, email: true, image: true, currency: true },
     })
 
+    // Cached analyses have the currency symbol written into their prose, so a
+    // change here has to discard them. Without this the app shows figures in
+    // the new currency while the AI's sentences keep quoting the old one for
+    // up to an hour.
+    if (parsed.data.currency !== undefined) {
+      await prisma.aiInsight
+        .deleteMany({ where: { userId: session.user.id } })
+        .catch(() => undefined)
+    }
+
     return NextResponse.json({ user })
   } catch (err) {
     console.error('Profile PUT error:', err)

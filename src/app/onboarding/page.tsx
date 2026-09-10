@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LinkBankButton } from "@/components/bank/LinkBankButton";
-import { detectUserLocation, saveUserLocation } from "@/lib/location";
+import { detectAndSaveLocation, saveUserLocation } from "@/lib/location";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -13,9 +13,10 @@ export default function OnboardingPage() {
 
   async function handleSetLocation() {
     setLocating(true);
-    const loc = await detectUserLocation();
-    if (loc) {
-      await saveUserLocation(loc);
+    // Already persisted server-side; only a named city counts as done, since
+    // coordinates alone leave local suggestions generic.
+    const loc = await detectAndSaveLocation();
+    if (loc.ok && loc.city) {
       setLocationDone(true);
     }
     setLocating(false);

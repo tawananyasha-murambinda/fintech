@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useCurrency } from '@/hooks/useCurrency'
-import { detectUserLocation, saveUserLocation, getUserLocation } from '@/lib/location'
+import { detectAndSaveLocation, saveUserLocation, getUserLocation } from '@/lib/location'
 import { GradientHeader } from '@/components/layout/GradientHeader'
 import { Disclosure } from '@/components/ui/Disclosure'
 import type { AiAnalysis } from '@/types'
+import Link from 'next/link'
 
 const PERIODS = [
   { value: 'week', label: '7 days' },
@@ -154,12 +155,13 @@ export default function IntelligencePage() {
         setUserLocation(loc)
       } else {
         setLocationPrompt('detecting')
-        const detected = await detectUserLocation()
-        if (detected) {
-          await saveUserLocation(detected)
-          setUserLocation(detected)
+        const detected = await detectAndSaveLocation()
+        if (detected.ok && detected.city) {
+          setUserLocation({ city: detected.city, country: detected.country })
           setLocationPrompt('done')
         } else {
+          // Saving happens server-side now, so there is nothing to retry here;
+          // without a city the analysis stays generic and says so.
           setLocationPrompt('off')
         }
       }
@@ -202,6 +204,12 @@ export default function IntelligencePage() {
       label: cat.category,
     }))
   }, [analysis])
+
+  // True only when a real place lookup named somewhere nearby. Generic advice
+  // must never be presented under a "local" heading.
+  const hasLocalAlternatives = (analysis?.merchantAlternatives ?? []).some((m) =>
+    m.alternatives.some((a) => a.source === 'local')
+  )
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-up">
@@ -298,10 +306,9 @@ export default function IntelligencePage() {
               <div className="flex items-center gap-2 mt-3">
                 <button onClick={async () => {
                   setLocationPrompt('detecting')
-                  const loc = await detectUserLocation()
-                  if (loc) {
-                    await saveUserLocation(loc)
-                    setUserLocation(loc)
+                  const loc = await detectAndSaveLocation()
+                  if (loc.ok && loc.city) {
+                    setUserLocation({ city: loc.city, country: loc.country })
                     localStorage.setItem('location_tracking', 'true')
                     setLocationPrompt('done')
                   } else { setLocationPrompt('off') }
@@ -536,15 +543,38 @@ export default function IntelligencePage() {
           </div>
 
           {/* ─── MERCHANT ALTERNATIVES ─── */}
+          {/* True only when a real place lookup produced something. Everything
+              else is a rule of thumb and is labelled as one. */}
           {analysis.merchantAlternatives.length > 0 && (
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
               <div className="flex items-center gap-2 mb-1">
                 <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-emerald-600 dark:text-emerald-400"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </div>
-                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Location-smart alternatives</h2>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {hasLocalAlternatives ? 'Local alternatives' : 'Ways to spend less'}
+                </h2>
               </div>
-              <p className="text-xs text-slate-400 mb-4 ml-8 dark:text-slate-500">Personalized recommendations based on your city and local merchants.</p>
+              <p className="text-xs text-slate-400 mb-4 ml-8 dark:text-slate-500">
+                {hasLocalAlternatives
+                  ? 'Nearby places found from your city, with the distance and what they would cost.'
+                  : 'General rules of thumb applied to your own numbers — not based on your location.'}
+              </p>
+
+              {/* Says why these are generic, and offers the fix, instead of
+                  presenting boilerplate as local knowledge. */}
+              {!hasLocalAlternatives && (
+                <div className="mb-4 ml-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 px-3 py-2.5">
+                  <p className="text-2xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                    We could not work out where you are, so these are general suggestions rather
+                    than real nearby options.{' '}
+                    <Link href="/dashboard/settings" className="font-medium underline">
+                      Add your city in settings
+                    </Link>{' '}
+                    and we will look up actual shops and fares near you instead.
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {analysis.merchantAlternatives.map((merchant) => {
                   const primary = merchant.alternatives.find(a => a.type === 'primary')
@@ -556,6 +586,7 @@ export default function IntelligencePage() {
                           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{merchant.merchantName}</p>
                           <p className="text-2xs text-slate-400 mt-0.5 dark:text-slate-500">
                             {cleanCategory(merchant.category)} · {merchant.visitCount} visit{merchant.visitCount !== 1 ? 's' : ''} · avg {fmt(merchant.avgTransaction)}
+                            {merchant.cadence && <span className="ml-1"> · {merchant.cadence.label}</span>}
                             {merchant.locationContext && <span className="ml-1.5 text-emerald-500">· {merchant.locationContext.replace('You live in ', '')}</span>}
                           </p>
                         </div>

@@ -47,6 +47,14 @@ export interface MerchantAlternative {
   avgTransaction: number
   locationContext?: string
   error?: string
+  /**
+   * Observed cadence, or null when there are too few visits to claim one.
+   * A single purchase is not a weekly habit, and saying so was the worst thing
+   * this feature did — it stated something untrue about the user's own data.
+   */
+  cadence?: { perMonth: number; label: string } | null
+  /** Days between the first and last transaction the figures are drawn from. */
+  windowDays?: number
   alternatives: {
     name: string
     estimatedSavings: number
@@ -56,6 +64,12 @@ export interface MerchantAlternative {
     distance?: string
     type: 'primary' | 'secondary'
     detail?: string
+    /**
+     * `local` means a real nearby place was looked up and named. `general` is
+     * generic advice that happens to be applied to this merchant. The UI must
+     * not present the second as the first.
+     */
+    source: 'local' | 'general'
   }[]
 }
 

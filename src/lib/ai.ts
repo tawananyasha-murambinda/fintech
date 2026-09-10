@@ -11,7 +11,7 @@ import type {
   CashflowForecast,
   SpendingPattern,
 } from '@/types'
-import { findLocalAlternatives } from './geocode'
+import { findLocalAlternatives, setGeocodeCurrency } from './geocode'
 import { redactPII, redactTransactions, redactHistory } from './pii'
 import { canonicalCategory } from './categories'
 
@@ -28,6 +28,8 @@ const CURRENCY_LOCALES: Record<string, string> = {
 let AI_CURRENCY = 'USD'
 export function setAiCurrency(code?: string | null) {
   AI_CURRENCY = code && CURRENCY_SYMBOLS[code] ? code : 'USD'
+  // geocode.ts builds its own strings and cannot import back from here.
+  setGeocodeCurrency(AI_CURRENCY)
 }
 
 // Format a number as money in the active AI currency. Used everywhere the
@@ -207,7 +209,10 @@ function aggregateDebits(transactions: Transaction[]) {
     byCategory[cat].count++
   }
 
-  const byMerchant: Record<string, { total: number; count: number; category: string; city?: string; country?: string }> = {}
+  const byMerchant: Record<
+    string,
+    { total: number; count: number; category: string; city?: string; country?: string; first?: string; last?: string }
+  > = {}
   for (const t of debits) {
     const name = t.merchantName || t.description
     if (!byMerchant[name]) {
@@ -219,8 +224,12 @@ function aggregateDebits(transactions: Transaction[]) {
         country: t.merchantCountry || undefined,
       }
     }
-    byMerchant[name].total += Math.abs(t.amount)
-    byMerchant[name].count++
+    const entry = byMerchant[name]
+    entry.total += Math.abs(t.amount)
+    entry.count++
+    // ISO dates sort lexicographically, so min/max need no parsing.
+    if (!entry.first || t.date < entry.first) entry.first = t.date
+    if (!entry.last || t.date > entry.last) entry.last = t.date
   }
 
   const byLocation: Record<string, { total: number; categories: Record<string, number> }> = {}
@@ -363,7 +372,10 @@ function generateLocationSuggestions(
 }
 
 async function buildMerchantAlternatives(
-  byMerchant: Record<string, { total: number; count: number; category: string; city?: string; country?: string }>,
+  byMerchant: Record<
+    string,
+    { total: number; count: number; category: string; city?: string; country?: string; first?: string; last?: string }
+  >,
   userLocation?: { city?: string; country?: string },
 ): Promise<MerchantAlternative[]> {
   const topMerchants = Object.entries(byMerchant)
@@ -394,10 +406,22 @@ async function buildMerchantAlternatives(
       } catch {}
     }
 
+    // The real span the figures cover, so a monthly projection is a projection
+    // and not a relabelling of whatever window happened to be analysed.
+    const windowDays =
+      data.first && data.last
+        ? Math.max(
+            1,
+            Math.round(
+              (new Date(data.last).getTime() - new Date(data.first).getTime()) / 86_400_000
+            ) + 1
+          )
+        : 30
+
     if (alternatives.length === 0) {
       alternatives = generateDataDrivenAlternatives(
         merchantName, data.category, data.total, data.count,
-        avgTx,
+        avgTx, windowDays,
       )
     }
 
@@ -409,6 +433,8 @@ async function buildMerchantAlternatives(
       avgTransaction: avgTx,
       locationContext,
       error: altError,
+      cadence: observedCadence(data.count, windowDays),
+      windowDays,
       alternatives,
     })
   }
@@ -416,123 +442,142 @@ async function buildMerchantAlternatives(
   return results
 }
 
+/**
+ * Cadence observed from the data, or null when there is not enough to claim one.
+ *
+ * The old version computed `Math.max(1, Math.round(visitCount / 4.3))`, which
+ * turned a single purchase into "~1x/week". Stating an invented pattern back to
+ * someone about their own spending is worse than saying nothing.
+ */
+export function observedCadence(
+  visitCount: number,
+  windowDays: number
+): { perMonth: number; label: string } | null {
+  // Three visits is the fewest that can show an interval rather than a gap.
+  if (visitCount < 3 || windowDays < 14) return null
+
+  const perMonth = (visitCount / windowDays) * 30
+  if (perMonth >= 20) return { perMonth, label: 'most days' }
+  if (perMonth >= 3.5) return { perMonth, label: `about ${Math.round(perMonth / 4.3)}x a week` }
+  if (perMonth >= 1.5) return { perMonth, label: `about ${Math.round(perMonth)}x a month` }
+  return { perMonth, label: 'occasionally' }
+}
+
+// Below this, a suggestion costs more attention than it returns. Telling
+// someone they could save £2 a month on coffee is noise.
+const MIN_MONTHLY_SAVING = 8
+
 function generateDataDrivenAlternatives(
   merchantName: string,
   category: string,
   totalSpent: number,
   visitCount: number,
   avgTransaction: number,
+  windowDays = 30,
 ): MerchantAlternative['alternatives'] {
   const cat = category.toLowerCase()
   const alt: MerchantAlternative['alternatives'] = []
-  const monthly = totalSpent
-  const avgTx = avgTransaction || monthly / Math.max(1, visitCount)
+  const avgTx = avgTransaction || totalSpent / Math.max(1, visitCount)
 
-  function add(name: string, sv: number, oc: number, ac: number, reason: string, type: 'primary' | 'secondary', detail?: string) {
-    alt.push({ name, estimatedSavings: sv, originalCost: oc, alternativeCost: ac, reason, type, detail })
+  // Normalised to a real month using the actual span the data covers. The old
+  // code called the raw window total "monthly" whatever period it came from,
+  // so a one-off £89 purchase was projected as £89 every month.
+  const monthly = windowDays > 0 ? (totalSpent / windowDays) * 30 : totalSpent
+  const cadence = observedCadence(visitCount, windowDays)
+
+  // How the merchant is described depends on what is actually known. With one
+  // visit there is no habit to describe, only a purchase.
+  const habit = cadence
+    ? `You spend at ${merchantName} ${cadence.label} (${money(avgTx)} a time)`
+    : visitCount === 1
+      ? `A single ${money(avgTx)} purchase at ${merchantName}`
+      : `${visitCount} purchases at ${merchantName} averaging ${money(avgTx)}`
+
+  function add(
+    name: string,
+    sv: number,
+    oc: number,
+    ac: number,
+    reason: string,
+    type: 'primary' | 'secondary',
+    detail?: string,
+  ) {
+    // Materiality gate. Everything here is a rule of thumb applied to the
+    // user's number, so a small result is a small guess about a small number.
+    if (sv < MIN_MONTHLY_SAVING) return
+    alt.push({
+      name,
+      estimatedSavings: Math.round(sv),
+      originalCost: Math.round(oc),
+      alternativeCost: Math.round(ac),
+      reason,
+      type,
+      detail,
+      source: 'general',
+    })
   }
 
-  if (cat.includes('food') || cat.includes('drink') || cat.includes('dining') || cat.includes('restaurant') || cat.includes('coffee')) {
-    const freq = Math.max(1, Math.round(visitCount / 4.3))
+  if (cat.includes('food') || cat.includes('drink') || cat.includes('dining') || cat.includes('coffee')) {
     add(
-      'Meal prep / cook at home',
-      Math.round(monthly * 0.5), Math.round(avgTx), Math.round(avgTx * 0.3),
-      `You visit ${merchantName} ~${freq}x/week (${money(avgTx)}/visit). Home cooking could cut that by ~50%, saving ~${money((monthly * 0.5), { decimals: 0 })}.`,
+      'Cook more of these at home',
+      monthly * 0.5, monthly, monthly * 0.5,
+      `${habit}. Cooking at home typically runs about half that, so halving these would free up roughly ${money(monthly * 0.5, { decimals: 0 })} a month.`,
       'primary',
-      `~${money(Math.round(avgTx * 0.3), { decimals: 0 })}/meal at home`,
-    )
-    if (monthly > 100) {
-      add(
-        'Set a dining budget',
-        Math.round(monthly * 0.25), Math.round(monthly), Math.round(monthly * 0.75),
-        `Capping ${merchantName} at 75% of current spend (${money((monthly * 0.75), { decimals: 0 })}) saves ${money((monthly * 0.25), { decimals: 0 })} while still letting you eat out.`,
-        'secondary',
-      )
-    }
-  }
-
-  if (cat.includes('transport') || cat.includes('gas') || cat.includes('fuel') || cat.includes('rideshare')) {
-    add(
-      'Public transit / carpool',
-      Math.round(monthly * 0.35), Math.round(monthly), Math.round(monthly * 0.65),
-      `At ${money(monthly, { decimals: 0 })}/mo on ${merchantName}, even 2 days/week on transit saves ~${money((monthly * 0.35), { decimals: 0 })}.`,
-      'primary',
+      `≈${money(avgTx * 0.3, { decimals: 0 })} a meal at home`,
     )
     add(
-      'Fuel rewards / gas apps',
-      Math.round(monthly * 0.1), Math.round(monthly), Math.round(monthly * 0.9),
-      `Gas rewards apps and loyalty programs save ~10% — worth ~${money((monthly * 0.1), { decimals: 0 })}/mo on your current spend.`,
+      'Cap it with a budget',
+      monthly * 0.25, monthly, monthly * 0.75,
+      `Setting a ${money(monthly * 0.75, { decimals: 0 })} monthly limit on ${merchantName} keeps most of it and saves ${money(monthly * 0.25, { decimals: 0 })}.`,
       'secondary',
+    )
+  }
+
+  if (cat.includes('transport') || cat.includes('gas') || cat.includes('fuel')) {
+    add(
+      'Swap some trips for transit',
+      monthly * 0.35, monthly, monthly * 0.65,
+      `${habit}. Two days a week on public transport instead would save around ${money(monthly * 0.35, { decimals: 0 })} a month.`,
+      'primary',
     )
   }
 
   if (cat.includes('entertainment') || cat.includes('streaming') || cat.includes('subscription')) {
     add(
-      'Annual billing',
-      Math.round(monthly * 0.15), Math.round(monthly), Math.round(monthly * 0.85),
-      `${merchantName} likely offers 15–20% off with annual billing — saving ~${money((monthly * 0.15), { decimals: 0 })}/mo.`,
+      'Switch to annual billing',
+      monthly * 0.15, monthly, monthly * 0.85,
+      `Most subscriptions discount 15–20% for paying yearly. On ${money(monthly, { decimals: 0 })} a month that is about ${money(monthly * 0.15, { decimals: 0 })}.`,
       'primary',
     )
     add(
-      'Ad-supported / family plan',
-      Math.round(monthly * 0.25), Math.round(monthly), Math.round(monthly * 0.75),
-      'Downgrading to ad-supported tiers or splitting a family plan cuts costs significantly.',
+      'Ad-supported or shared plan',
+      monthly * 0.25, monthly, monthly * 0.75,
+      `A cheaper tier or a shared family plan would cut this by roughly ${money(monthly * 0.25, { decimals: 0 })} a month.`,
       'secondary',
     )
   }
 
   if (cat.includes('shopping') || cat.includes('retail') || cat.includes('merchandise')) {
-    const freq = Math.max(1, Math.round(visitCount / 4.3))
     add(
-      '24-hour purchase rule',
-      Math.round(monthly * 0.2), Math.round(monthly), Math.round(monthly * 0.8),
-      `At ~${freq}x/week visits to ${merchantName} averaging ${money(avgTx)} each, waiting 24h before buying could cut impulse spend by ~20%.`,
+      'Sleep on it for a day',
+      monthly * 0.2, monthly, monthly * 0.8,
+      `${habit}. Waiting a day before non-essential purchases tends to remove about a fifth of them — roughly ${money(monthly * 0.2, { decimals: 0 })} a month here.`,
       'primary',
     )
     add(
-      'Cashback / price tracker',
-      Math.round(monthly * 0.12), Math.round(monthly), Math.round(monthly * 0.88),
-      `Using cashback apps and price tracking on your ${money(monthly, { decimals: 0 })}/${merchantName.split(' ')[0] || ''} spend recovers ~${money((monthly * 0.12), { decimals: 0 })}.`,
+      'Cashback and price tracking',
+      monthly * 0.12, monthly, monthly * 0.88,
+      `Cashback and price-drop alerts on this kind of spend recover around ${money(monthly * 0.12, { decimals: 0 })} a month.`,
       'secondary',
     )
   }
 
   if (cat.includes('health') || cat.includes('pharmacy') || cat.includes('fitness') || cat.includes('gym')) {
-    if (cat.includes('fitness') || cat.includes('gym')) {
-      add(
-        'Off-peak / annual membership',
-        Math.round(monthly * 0.2), Math.round(monthly), Math.round(monthly * 0.8),
-        `${money(monthly, { decimals: 0 })} at ${merchantName} — many gyms offer 20% off annual or off-peak plans.`,
-        'primary',
-      )
-      add(
-        'Community / employer wellness',
-        Math.round(monthly * 0.3), Math.round(monthly), Math.round(monthly * 0.7),
-        'Your employer or insurance may subsidize gym memberships or offer free alternatives.',
-        'secondary',
-      )
-    } else {
-      add(
-        'Generic / in-network alternatives',
-        Math.round(monthly * 0.3), Math.round(monthly), Math.round(monthly * 0.7),
-        `Generic brands and in-network pharmacies typically save 30% on your ${money(monthly, { decimals: 0 })} health spend.`,
-        'primary',
-      )
-    }
-  }
-
-  if (alt.length === 0) {
     add(
-      'Loyalty / bulk discounts',
-      Math.round(monthly * 0.15), Math.round(monthly), Math.round(monthly * 0.85),
-      `You spend ${money(monthly, { decimals: 0 })} at ${merchantName}. Check if they offer loyalty rewards or bulk pricing.`,
+      'Check for loyalty or bulk pricing',
+      monthly * 0.15, monthly, monthly * 0.85,
+      `You spend about ${money(monthly, { decimals: 0 })} a month at ${merchantName}. Loyalty schemes and larger pack sizes are usually worth ${money(monthly * 0.15, { decimals: 0 })}.`,
       'primary',
-    )
-    add(
-      'Compare 2-3 alternatives',
-      Math.round(monthly * 0.1), Math.round(monthly), Math.round(monthly * 0.9),
-      `Shopping around for what you buy at ${merchantName} typically saves 10%.`,
-      'secondary',
     )
   }
 
