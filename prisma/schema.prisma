@@ -81,6 +81,8 @@ model User {
   VaultContribution   VaultContribution[]
   recoveryCodes       TwoFactorRecoveryCode[]
   netWorthSnapshots   NetWorthSnapshot[]
+  transactionSplits   TransactionSplit[]
+  goalContributions   GoalContribution[]
 
   @@index([stripeCustomerId])
 }
@@ -163,9 +165,10 @@ model Transaction {
   runningBalance     Decimal? @db.Decimal(14, 2)
   createdAt          DateTime @default(now())
 
-  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  linkedBank    LinkedBank          @relation(fields: [linkedBankId], references: [id], onDelete: Cascade)
-  contributions VaultContribution[]
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedBank       LinkedBank          @relation(fields: [linkedBankId], references: [id], onDelete: Cascade)
+  contributions    VaultContribution[]
+  TransactionSplit TransactionSplit[]
 
   @@index([userId, date])
   @@index([userId, merchantCategory])
@@ -212,7 +215,8 @@ model Goal {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  GoalContribution GoalContribution[]
 
   @@index([userId])
 }
@@ -220,6 +224,9 @@ model Goal {
 model Bill {
   id           String    @id @default(cuid())
   userId       String
+  // When set, every member of the household sees and is reminded about this
+  // bill. Households could previously be created but shared nothing at all.
+  householdId  String?
   name         String
   amount       Decimal   @db.Decimal(14, 2)
   dueDate      Int // day of month (1-31); weekday 0-6 for weekly bills with no anchor
@@ -234,9 +241,11 @@ model Bill {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([householdId])
 }
 
 model ChatMessage {
@@ -264,8 +273,9 @@ model ManualTransaction {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  receipt Receipt? @relation(fields: [receiptId], references: [id], onDelete: SetNull)
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  receipt          Receipt?           @relation(fields: [receiptId], references: [id], onDelete: SetNull)
+  TransactionSplit TransactionSplit[]
 
   @@index([userId, date])
 }
@@ -423,6 +433,7 @@ model Household {
   updatedAt DateTime @updatedAt
 
   members HouseholdMember[]
+  Bill    Bill[]
 }
 
 model HouseholdMember {
@@ -649,4 +660,46 @@ model NetWorthSnapshot {
 
   @@unique([userId, date])
   @@index([userId, date])
+}
+
+// Part of a transaction assigned to a different category — the £80 supermarket
+// run that was £30 of work supplies. Without this the tax organiser has to
+// treat every transaction as wholly one thing or wholly another.
+model TransactionSplit {
+  id            String   @id @default(cuid())
+  userId        String
+  transactionId String?
+  manualId      String?
+  amount        Decimal  @db.Decimal(14, 2)
+  category      String
+  note          String?
+  // Marks the portion as business spend for the tax organiser.
+  deductible    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transaction Transaction?       @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  manual      ManualTransaction? @relation(fields: [manualId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([transactionId])
+  @@index([manualId])
+}
+
+// Money put towards a goal, and where it came from. Goals previously held only
+// a running total, so progress could not be explained or undone.
+model GoalContribution {
+  id        String   @id @default(cuid())
+  userId    String
+  goalId    String
+  amount    Decimal  @db.Decimal(14, 2)
+  source    String   @default("manual") // "manual" | "auto" | "roundup"
+  note      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([goalId, createdAt])
 }

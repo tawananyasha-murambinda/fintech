@@ -1,5 +1,6 @@
 import { format, parseISO } from 'date-fns'
 import { useCurrency } from '@/hooks/useCurrency'
+import { MerchantMark } from '@/components/ui/MerchantMark'
 
 interface TransactionRowProps {
   transaction: {
@@ -19,9 +20,6 @@ function cleanCategory(cat: string) {
   return cat.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-function getInitial(name: string) {
-  return (name.trim().charAt(0) || '?').toUpperCase()
-}
 
 // Muted, consistent avatar tones — no rainbow, no emoji.
 const TONES = [
@@ -32,24 +30,18 @@ const TONES = [
   'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
 ]
 
-function toneFor(name: string) {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
-  return TONES[h % TONES.length]
-}
 
 export function TransactionRow({ transaction: tx }: TransactionRowProps) {
   const { convertFormat } = useCurrency()
   const name = tx.merchantName || tx.description
   const isCredit = tx.direction === 'credit'
   const amountText = isCredit ? `+${convertFormat(tx.amount, tx.currency)}` : `-${convertFormat(tx.amount, tx.currency)}`
-  const initial = getInitial(name)
 
   return (
     <div className="flex items-center gap-3 py-3 px-1 group">
-      <div className={`w-11 h-11 rounded-full ${toneFor(name)} flex items-center justify-center text-sm font-semibold shrink-0`}>
-        {initial}
-      </div>
+      {/* Deterministic colour and initials from the merchant name, so the
+          same shop looks the same everywhere without a logo request. */}
+      <MerchantMark name={name} size={44} />
       <div className="flex-1 min-w-0">
         <p className="text-[15px] font-medium text-slate-900 truncate dark:text-slate-100">{name}</p>
         <p className="text-[13px] text-slate-400 dark:text-slate-500 truncate">

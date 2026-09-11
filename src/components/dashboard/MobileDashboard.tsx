@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { LinkBankButton } from '@/components/bank/LinkBankButton'
 import { useCurrency } from '@/hooks/useCurrency'
 import { BottomSheet } from '@/components/ui/BottomSheet'
+import { MerchantMark } from '@/components/ui/MerchantMark'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { useHaptics } from '@/hooks/useHaptics'
 import type { CashflowPoint } from '@/types'
@@ -526,6 +527,7 @@ function LedgerList({ transactions }: { transactions: any[] }) {
             const isCredit = t.direction === 'credit'
             return (
               <div key={t.id} className="flex items-center gap-3 px-5 py-2.5">
+                <MerchantMark name={t.merchantName || t.description} size={34} />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-[var(--ink)] truncate">
                     {t.merchantName || t.description}

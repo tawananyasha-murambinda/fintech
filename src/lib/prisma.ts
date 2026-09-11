@@ -67,6 +67,8 @@ function createPrismaClient() {
         currentAmount: required('currentAmount'),
       },
       vaultContribution: { amount: required('amount') },
+      transactionSplit: { amount: required('amount') },
+      goalContribution: { amount: required('amount') },
       netWorthSnapshot: {
         assets: required('assets'),
         liabilities: required('liabilities'),

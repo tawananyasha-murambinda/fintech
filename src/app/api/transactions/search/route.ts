@@ -3,6 +3,18 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseLimit } from '@/lib/pagination'
+import { parseSearchQuery } from '@/lib/search-query'
+import { sum } from '@/lib/money'
+import { errorResponse } from '@/lib/errors'
+import { logger } from '@/lib/logger'
+
+// GET /api/transactions/search?q=coffee over £5 last month
+//
+// The previous version collected every understood part of the query into one
+// OR, so "coffee over 5" returned everything containing "coffee" *plus*
+// everything over £5 — the more precise the query, the more results came back.
+// Each understood part is now a constraint that narrows, which is what a search
+// box is for.
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -10,79 +22,71 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const q = searchParams.get('q') || ''
-  const limit = parseLimit(searchParams.get('limit'), 10, 50)
+  const limit = parseLimit(searchParams.get('limit'), 25, 100)
 
-  if (q.length < 2) return NextResponse.json({ transactions: [] })
+  if (q.trim().length < 2) {
+    return NextResponse.json({ transactions: [], parsed: null, total: 0 })
+  }
 
-  const where: any = { userId: session.user.id }
+  try {
+    const parsed = parseSearchQuery(q)
 
-  const conditions: any[] = [
-    { description: { contains: q, mode: 'insensitive' } },
-    { merchantName: { contains: q, mode: 'insensitive' } },
-    { merchantCategory: { contains: q, mode: 'insensitive' } },
-  ]
+    // Every clause is an AND. Free text still searches across merchant,
+    // description and category, because the user does not know which field
+    // holds the word they remember.
+    const and: any[] = [{ userId: session.user.id }]
 
-  const amountMatch = q.match(/\$?(\d+(?:\.\d{1,2})?)/)
-  if (amountMatch) {
-    const amt = parseFloat(amountMatch[1])
-    if (amt > 0) {
-      if (q.includes('>') || q.includes('over') || q.includes('more') || q.includes('above')) {
-        conditions.push({ amount: { gte: amt } })
-      } else if (q.includes('<') || q.includes('under') || q.includes('less') || q.includes('below')) {
-        conditions.push({ amount: { lte: amt } })
-      } else {
-        conditions.push({ amount: { gte: amt - 5, lte: amt + 5 } })
-      }
+    if (parsed.text) {
+      and.push({
+        OR: [
+          { description: { contains: parsed.text, mode: 'insensitive' } },
+          { merchantName: { contains: parsed.text, mode: 'insensitive' } },
+        ],
+      })
     }
+    if (parsed.category) and.push({ merchantCategory: parsed.category })
+    if (parsed.direction) and.push({ direction: parsed.direction })
+    if (parsed.from) and.push({ date: { gte: parsed.from } })
+    if (parsed.to) and.push({ date: { lt: parsed.to } })
+
+    // Amounts are stored with the sign convention of their direction, so the
+    // comparison is on magnitude.
+    if (parsed.minAmount !== null) {
+      and.push({ OR: [{ amount: { gte: parsed.minAmount } }, { amount: { lte: -parsed.minAmount } }] })
+    }
+    if (parsed.maxAmount !== null) {
+      and.push({ amount: { gte: -parsed.maxAmount, lte: parsed.maxAmount } })
+    }
+
+    const [transactions, total] = await Promise.all([
+      prisma.transaction.findMany({
+        where: { AND: and },
+        orderBy: { date: 'desc' },
+        take: limit,
+      }),
+      prisma.transaction.count({ where: { AND: and } }),
+    ])
+
+    return NextResponse.json({
+      transactions,
+      total,
+      // Echoed back so the UI can show what was understood as removable chips —
+      // the user can see why a result set is narrow instead of guessing.
+      parsed: {
+        text: parsed.text,
+        category: parsed.category,
+        direction: parsed.direction,
+        minAmount: parsed.minAmount,
+        maxAmount: parsed.maxAmount,
+        from: parsed.from?.toISOString() ?? null,
+        to: parsed.to?.toISOString() ?? null,
+        matched: parsed.matched,
+      },
+      matchedTotal: sum(transactions.map((t) => Math.abs(t.amount))),
+    })
+  } catch (err) {
+    logger.error('Transaction search failed', { userId: session.user.id, error: err })
+    const { error, status } = errorResponse(err, 'We could not run that search.')
+    return NextResponse.json({ error }, { status })
   }
-
-  // Date range parsing
-  if (/\b(last|past)\s+month\b/i.test(q)) {
-    const d = new Date()
-    d.setMonth(d.getMonth() - 1)
-    conditions.push({ date: { gte: d } })
-  } else if (/\b(this|current)\s+month\b/i.test(q)) {
-    const d = new Date()
-    d.setDate(1)
-    conditions.push({ date: { gte: d } })
-  } else if (/\b(last|past)\s+week\b/i.test(q)) {
-    const d = new Date()
-    d.setDate(d.getDate() - 7)
-    conditions.push({ date: { gte: d } })
-  } else if (/\b(last|past)\s+(quarter|3\s*months?)\b/i.test(q)) {
-    const d = new Date()
-    d.setMonth(d.getMonth() - 3)
-    conditions.push({ date: { gte: d } })
-  }
-
-  // Direction parsing
-  if (/\b(income|earned|deposit|credit|received|got\s+paid)\b/i.test(q)) {
-    conditions.push({ direction: 'credit' })
-  } else if (/\b(spent|expense|debit|paid|bought|purchase|charge)\b/i.test(q)) {
-    conditions.push({ direction: 'debit' })
-  }
-
-  where.OR = conditions
-
-  const transactions = await prisma.transaction.findMany({
-    where,
-    orderBy: { date: 'desc' },
-    take: limit,
-    select: {
-      id: true,
-      date: true,
-      amount: true,
-      direction: true,
-      description: true,
-      merchantName: true,
-      merchantCategory: true,
-    },
-  })
-
-  return NextResponse.json({
-    transactions: transactions.map(t => ({
-      ...t,
-      date: t.date.toISOString(),
-    })),
-  })
 }

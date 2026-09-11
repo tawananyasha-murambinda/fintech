@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { sharedScope, isMember } from '@/lib/households'
 import { nextDueDate, followingDueDate, daysUntilDue, monthlyEquivalent, isBillFrequency } from '@/lib/bills'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Includes bills other household members have shared, not just your own.
   const bills = await prisma.bill.findMany({
-    where: { userId: session.user.id },
+    where: await sharedScope(session.user.id),
     orderBy: { dueDate: 'asc' },
   })
 
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { name, amount, dueDate, frequency, category, reminderDays, anchorDate } = body
+    const { name, amount, dueDate, frequency, category, reminderDays, anchorDate, householdId } = body
 
     if (!name || amount === undefined || amount === null || amount === '' || dueDate === undefined) {
       return NextResponse.json({ error: 'Name, amount, and due date are required' }, { status: 400 })
@@ -60,6 +62,16 @@ export async function POST(req: NextRequest) {
     if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
       return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 })
     }
+    // Sharing is only allowed into a household the user actually belongs to;
+    // otherwise anyone holding an id could push a bill into someone's home.
+    let sharedWith: string | null = null
+    if (typeof householdId === 'string' && householdId) {
+      if (!(await isMember(session.user.id, householdId))) {
+        return NextResponse.json({ error: 'You are not a member of that household.' }, { status: 403 })
+      }
+      sharedWith = householdId
+    }
+
     const resolvedFrequency = isBillFrequency(frequency) ? frequency : 'monthly'
 
     // Weekly bills are keyed on a weekday (0 = Sunday), everything else on a
@@ -93,6 +105,7 @@ export async function POST(req: NextRequest) {
         dueDate: parsedDueDate,
         frequency: resolvedFrequency,
         anchorDate: parsedAnchor,
+        householdId: sharedWith,
         category: category || null,
         reminderDays: parsedReminder,
       },
