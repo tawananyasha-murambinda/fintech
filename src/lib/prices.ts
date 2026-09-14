@@ -148,6 +148,49 @@ const INGREDIENT_TO_REFERENCE: Record<string, string> = {
   'coffee': 'coffee', 'koffie': 'coffee',
 }
 
+/**
+ * The quantity written into an ingredient or pack name.
+ *
+ * Reference prices are *pack* prices — "Chicken breast (500g)", "cheese per
+ * kg" — while recipes ask for a portion, "Cheese (100g)". Without reading both
+ * the basket was charged a whole kilo of cheese for 100g of it, ten times over.
+ *
+ * Returns a comparable magnitude plus the family of unit, so grams are never
+ * divided by millilitres.
+ */
+export function parseQuantity(name: string): { amount: number; unit: 'mass' | 'volume' | 'count' } | null {
+  const lower = name.toLowerCase()
+
+  // "per kg" / "per litre" — a unit price rather than a pack.
+  if (/per\s*kg/.test(lower)) return { amount: 1000, unit: 'mass' }
+  if (/per\s*l\b|per\s*litre|per\s*liter/.test(lower)) return { amount: 1000, unit: 'volume' }
+
+  const match = lower.match(/\(([^)]+)\)/)
+  if (!match) return null
+  const inside = match[1].trim()
+
+  const measured = inside.match(/^([\d.]+)\s*(kg|g|l|ml)$/)
+  if (measured) {
+    const value = parseFloat(measured[1])
+    if (!Number.isFinite(value)) return null
+    switch (measured[2]) {
+      case 'kg': return { amount: value * 1000, unit: 'mass' }
+      case 'g': return { amount: value, unit: 'mass' }
+      case 'l': return { amount: value * 1000, unit: 'volume' }
+      case 'ml': return { amount: value, unit: 'volume' }
+    }
+  }
+
+  // A bare number is a count: "Eggs (10)", "Bread rolls (4)".
+  const counted = inside.match(/^([\d.]+)$/)
+  if (counted) {
+    const value = parseFloat(counted[1])
+    return Number.isFinite(value) ? { amount: value, unit: 'count' } : null
+  }
+
+  return null
+}
+
 export function getReferencePrice(ingredientName: string, discountSupermarket = true): { price: number; source: string; supermarket: string } {
   const lower = ingredientName.toLowerCase()
   let key = ''
@@ -158,7 +201,24 @@ export function getReferencePrice(ingredientName: string, discountSupermarket = 
   const refs = REFERENCE_PRICES[key] || REFERENCE_PRICES.pasta
   const sorted = [...refs].sort((a, b) => a.price - b.price)
   const pick = discountSupermarket ? sorted[0] : sorted[sorted.length - 1]
-  return { price: pick.price, source: pick.source, supermarket: pick.supermarket }
+
+  // Scale the pack price down to the amount the recipe actually calls for.
+  // The rest of the pack gets used for something else, so charging the whole
+  // thing against one meal overstates what cooking costs.
+  const wanted = parseQuantity(ingredientName)
+  const packed = parseQuantity(pick.name)
+
+  let price = pick.price
+  if (wanted && packed && wanted.unit === packed.unit && packed.amount > 0) {
+    const scaled = pick.price * (wanted.amount / packed.amount)
+    // Never scale *up* past the pack price: needing 800g of a 500g pack means
+    // buying two, but charging the meal for more than one pack of anything
+    // overstates it again. Rounded to the nearest cent, floored at 1c so a
+    // pinch of something is not free.
+    price = Math.max(0.01, Math.round(Math.min(scaled, pick.price) * 100) / 100)
+  }
+
+  return { price, source: pick.source, supermarket: pick.supermarket }
 }
 
 export async function searchProducts(query: string, preferSupermarket?: string): Promise<PriceResult> {

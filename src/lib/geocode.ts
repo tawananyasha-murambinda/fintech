@@ -137,46 +137,78 @@ async function findNearbySupermarkets(
 
 type Ingredient = { name: string; price: number }
 
-const MEAL_INGREDIENTS: { match: RegExp; meal: string; ingredientNames: string[] }[] = [
+// Each basket is a *shop*, not a portion: 400g of mince and four rolls make
+// four burgers, not one. Without `servings` the comparison was a weekly shop
+// against a single meal out, which made cooking look more expensive than
+// McDonald's and quietly suppressed the suggestion entirely.
+const MEAL_INGREDIENTS: {
+  match: RegExp
+  meal: string
+  ingredientNames: string[]
+  servings: number
+}[] = [
   { match: /kfc|popeyes|fried.?chicken|chicken.?shop/i, meal: 'Fried chicken meal',
-    ingredientNames: ['Chicken breast (200g)', 'Pasta (500g)', 'Tomato sauce'] },
+    ingredientNames: ['Chicken breast (200g)', 'Pasta (500g)', 'Tomato sauce'], servings: 2 },
   { match: /chicken|nando|stros|henk/i, meal: 'Grilled chicken meal',
-    ingredientNames: ['Chicken thigh (300g)', 'Rice (500g)', 'Mixed vegetables'] },
+    ingredientNames: ['Chicken thigh (300g)', 'Rice (500g)', 'Mixed vegetables'], servings: 2 },
   { match: /mcdonald|burger.?king|wendy|burger|fast.?food|quick/i, meal: 'Burger meal',
-    ingredientNames: ['Ground beef (400g)', 'Bread rolls (4)', 'Cheese (100g)', 'Tomatoes'] },
+    ingredientNames: ['Ground beef (400g)', 'Bread rolls (4)', 'Cheese (100g)', 'Tomatoes'], servings: 4 },
   { match: /pizza|domino|new.?york.?pizza/i, meal: 'Homemade pizza',
-    ingredientNames: ['Pizza dough mix', 'Mozzarella (200g)', 'Tomatoes', 'Mixed vegetables'] },
+    ingredientNames: ['Pizza dough mix', 'Mozzarella (200g)', 'Tomatoes', 'Mixed vegetables'], servings: 2 },
   { match: /italian|pasta|spaghetti|lasagna|mama|olive.?garden/i, meal: 'Pasta meal',
-    ingredientNames: ['Pasta (500g)', 'Tomato sauce', 'Ground beef (300g)', 'Cheese (100g)'] },
+    ingredientNames: ['Pasta (500g)', 'Tomato sauce', 'Ground beef (300g)', 'Cheese (100g)'], servings: 4 },
   { match: /sushi|asian|chinese|thai|japanese|vietnam|indonesian|bami|nasi/i, meal: 'Stir-fry meal',
-    ingredientNames: ['Chicken breast (200g)', 'Rice (500g)', 'Mixed vegetables', 'Eggs (2)'] },
+    ingredientNames: ['Chicken breast (200g)', 'Rice (500g)', 'Mixed vegetables', 'Eggs (2)'], servings: 3 },
   { match: /mexican|taco|burrito|quesadilla/i, meal: 'Taco meal',
-    ingredientNames: ['Ground beef (400g)', 'Mixed vegetables', 'Cheese (100g)'] },
+    ingredientNames: ['Ground beef (400g)', 'Mixed vegetables', 'Cheese (100g)'], servings: 4 },
   { match: /subway|sandwich|sub.?way|baguette|brood/i, meal: 'Homemade sandwich',
-    ingredientNames: ['Bread rolls (2)', 'Chicken breast (200g)', 'Cheese (100g)', 'Tomatoes'] },
+    ingredientNames: ['Bread rolls (2)', 'Chicken breast (200g)', 'Cheese (100g)', 'Tomatoes'], servings: 2 },
   { match: /fish|seafood|vishandel/i, meal: 'Fish meal',
-    ingredientNames: ['Fish fillet (300g)', 'Potatoes (1kg)', 'Mixed vegetables'] },
+    ingredientNames: ['Fish fillet (300g)', 'Potatoes (1kg)', 'Mixed vegetables'], servings: 2 },
   { match: /indian|curry|tandoor|bombay|korma/i, meal: 'Curry meal',
-    ingredientNames: ['Chicken thigh (300g)', 'Rice (500g)', 'Mixed vegetables'] },
+    ingredientNames: ['Chicken thigh (300g)', 'Rice (500g)', 'Mixed vegetables'], servings: 3 },
   { match: /breakfast|brunch|pancake|waffle|omelet/i, meal: 'Homemade breakfast',
-    ingredientNames: ['Eggs (6)', 'Bread rolls (2)', 'Milk (1L)'] },
+    ingredientNames: ['Eggs (6)', 'Bread rolls (2)', 'Milk (1L)'], servings: 3 },
   { match: /takeout|take.?away|chinees|chin/i, meal: 'Takeout-style meal',
-    ingredientNames: ['Chicken breast (200g)', 'Rice (500g)', 'Mixed vegetables'] },
+    ingredientNames: ['Chicken breast (200g)', 'Rice (500g)', 'Mixed vegetables'], servings: 3 },
   { match: /steak|grill|loin|ribeye|entrecote/i, meal: 'Pan-seared steak meal',
-    ingredientNames: ['Beef steak (250g)', 'Potatoes (1kg)', 'Mixed vegetables'] },
+    ingredientNames: ['Beef steak (250g)', 'Potatoes (1kg)', 'Mixed vegetables'], servings: 2 },
   { match: /restaurant|cafe|bistro|eatery|diner|tavern|bar|grill|kitchen/i, meal: 'Home-cooked meal',
-    ingredientNames: ['Chicken breast (200g)', 'Rice (500g)', 'Mixed vegetables'] },
+    ingredientNames: ['Chicken breast (200g)', 'Rice (500g)', 'Mixed vegetables'], servings: 3 },
 ]
 
-async function getIngredientBreakdown(merchantName: string, mealCost: number): Promise<{ meal: string; items: { name: string; price: number; supermarket: string; source: string }[]; total: number }> {
-  const matched = MEAL_INGREDIENTS.find(b => b.match.test(merchantName))
-  if (matched) {
-    const { items, total } = await getIngredientPrices(matched.ingredientNames)
-    return { meal: matched.meal, items, total }
+async function getIngredientBreakdown(
+  merchantName: string,
+  _mealCost: number
+): Promise<{
+  meal: string
+  items: { name: string; price: number; supermarket: string; source: string }[]
+  /** What the whole shop costs. */
+  total: number
+  servings: number
+  /** What one portion of it costs — the figure to compare against a meal out. */
+  perServing: number
+}> {
+  const matched = MEAL_INGREDIENTS.find((b) => b.match.test(merchantName))
+
+  const { items, total, servings } = matched
+    ? { ...(await getIngredientPrices(matched.ingredientNames)), servings: matched.servings }
+    : {
+        ...(await getIngredientPrices([
+          'Chicken breast (200g)',
+          'Rice (500g)',
+          'Mixed vegetables',
+        ])),
+        servings: 3,
+      }
+
+  return {
+    meal: matched?.meal ?? 'Home-cooked meal',
+    items,
+    total,
+    servings,
+    perServing: Math.round((total / Math.max(1, servings)) * 100) / 100,
   }
-  const genericTotal = Math.round(mealCost * 0.25 * 100) / 100
-  const prices = await getIngredientPrices(['Chicken breast (200g)', 'Rice (500g)', 'Mixed vegetables'])
-  return { meal: 'Home-cooked meal', items: prices.items, total: prices.total }
 }
 
 async function tryApiOrFallback<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
@@ -277,16 +309,29 @@ export async function findLocalAlternatives(
     const perCup = Math.round((avgTx - homeCupCost) * 100) / 100
     const alts: any[] = []
 
+    // Where to actually buy the beans. The drinks branch named no shop at all,
+    // which made it the one category with no local content in a section
+    // headed "local alternatives".
+    const shops = await findNearbySupermarkets(userHome, country, geo)
+    const nearestShop = shops[0]
+
     if (perCup >= MIN_SAVING) {
       alts.push({
         name: 'Make it at home',
         estimatedSavings: Math.round(perCup),
         originalCost: Math.round(avgTx),
         alternativeCost: homeCupCost,
-        reason: `A ${fmtCurrency(avgTx)} drink at ${merchantName}. Beans and milk at home run about ${fmtCurrency(homeCupCost)} a cup, so each one you make is roughly ${fmtCurrency(perCup)} back.`,
+        reason: `A ${fmtCurrency(avgTx)} drink at ${merchantName}. Beans and milk at home run about ${fmtCurrency(homeCupCost)} a cup, so each one you make is roughly ${fmtCurrency(perCup)} back.${
+          nearestShop
+            ? ` ${nearestShop.name} is ${distanceLabel(nearestShop.km ?? 0)}.`
+            : ''
+        }`,
+        distance: nearestShop?.km !== null && nearestShop?.km !== undefined ? distanceLabel(nearestShop.km) : undefined,
         type: 'primary' as const,
         source: 'local' as const,
-        detail: `≈${fmtCurrency(homeCupCost)} a cup at home`,
+        detail: nearestShop
+          ? `≈${fmtCurrency(homeCupCost)} a cup · ${nearestShop.name}`
+          : `≈${fmtCurrency(homeCupCost)} a cup at home`,
       })
     }
 
@@ -297,7 +342,7 @@ export async function findLocalAlternatives(
         estimatedSavings: Math.max(MIN_SAVING, Math.round(avgTx * 0.1)),
         originalCost: Math.round(avgTx),
         alternativeCost: Math.round(avgTx * 0.9),
-        reason: `Most chains take 10–25p off for a reusable cup, and ${merchantName} is likely to. Small, but it applies to every visit.`,
+        reason: `Most chains knock something off for a reusable cup — usually around ${fmtCurrency(0.25)} — and ${merchantName} is likely to. Small, but it applies to every visit.`,
         type: 'secondary' as const,
         source: 'local' as const,
       })
@@ -310,7 +355,9 @@ export async function findLocalAlternatives(
   if (/food|drink|restaurant|dining|groceries|meal|fast.?food|kfc|mcdonald|pizza|burger|takeout|bistro|cafe|snack|lunch|dinner/.test(cleanCat)) {
     try {
       const breakdown = await getIngredientBreakdown(merchantName, Math.round(avgTx))
-      const homeCost = breakdown.total
+      // Compared per portion, not per shop. The basket feeds several people;
+      // the meal out fed one.
+      const homeCost = breakdown.perServing
       const savings = Math.round(avgTx - homeCost)
       const alts: any[] = []
 
@@ -335,11 +382,11 @@ export async function findLocalAlternatives(
           estimatedSavings: savings,
           originalCost: Math.round(avgTx),
           alternativeCost: homeCost,
-          reason: `A ${fmtCurrency(avgTx)} meal at ${merchantName} against ${fmtCurrency(homeCost)} of ingredients: ${items}. Those are typical ${pricedAt} prices. Your nearest supermarket is ${nearest.name}, ${distanceLabel(dist)}${alsoNearby ? ` — also close: ${alsoNearby}` : ''}.`,
+          reason: `${items} comes to ${fmtCurrency(breakdown.total)} and makes about ${breakdown.servings} — roughly ${fmtCurrency(homeCost)} each, against ${fmtCurrency(avgTx)} at ${merchantName}. Those are typical ${pricedAt} prices. Your nearest supermarket is ${nearest.name}, ${distanceLabel(dist)}${alsoNearby ? ` — also close: ${alsoNearby}` : ''}.`,
           distance: distanceLabel(dist),
           type: 'primary' as const,
           source: 'local' as const,
-          detail: `${fmtCurrency(homeCost)} of ingredients · ${nearest.name} ${distanceLabel(dist)}`,
+          detail: `≈${fmtCurrency(homeCost)} a portion · ${nearest.name} ${distanceLabel(dist)}`,
         })
       } else {
         alts.push({
@@ -347,10 +394,10 @@ export async function findLocalAlternatives(
           estimatedSavings: savings,
           originalCost: Math.round(avgTx),
           alternativeCost: homeCost,
-          reason: `A ${fmtCurrency(avgTx)} meal at ${merchantName} against ${fmtCurrency(homeCost)} of ingredients: ${items}. Those are typical ${pricedAt} prices.`,
+          reason: `${items} comes to ${fmtCurrency(breakdown.total)} and makes about ${breakdown.servings} — roughly ${fmtCurrency(homeCost)} each, against ${fmtCurrency(avgTx)} at ${merchantName}. Those are typical ${pricedAt} prices.`,
           type: 'primary' as const,
           source: 'local' as const,
-          detail: `${fmtCurrency(homeCost)} of ingredients`,
+          detail: `≈${fmtCurrency(homeCost)} a portion`,
         })
       }
 
