@@ -50,8 +50,11 @@ export function useTranslation() {
 
     // Saved to the account as well, so the choice follows to another device.
     // Best-effort: the change has already taken effect locally.
+    // PUT, not PATCH: that is what the profile route exports and what every
+    // other caller uses. Sending PATCH returned 405 and the choice was never
+    // saved to the account, so it silently failed to follow to another device.
     fetch('/api/auth/profile', {
-      method: 'PATCH',
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ locale: next }),
     }).catch(() => undefined)
