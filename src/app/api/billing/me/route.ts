@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getUserBilling, billingConfigured } from '@/lib/stripe'
-import { PLAN_DISPLAY } from '@/lib/plans'
+import { PLAN_DISPLAY, developerModeConfigured } from '@/lib/plans'
 import { errorResponse } from '@/lib/errors'
 import { logger } from '@/lib/logger'
 import { getAiUsage } from '@/lib/ai-budget'
@@ -29,6 +29,11 @@ export async function GET() {
       cancelAtPeriodEnd: billing.cancelAtPeriodEnd,
       manageable: billing.hasStripeCustomer && billingConfigured(),
       checkoutAvailable: billingConfigured(),
+      // Surfaced so the page can explain why upgrading is unavailable rather
+      // than silently rendering plan cards with no button on them.
+      billingConfigured: billingConfigured(),
+      isDeveloper: billing.isDeveloper,
+      developerModeConfigured: developerModeConfigured(),
       entitlements: billing.entitlements,
       usage: {
         linkedBanks,

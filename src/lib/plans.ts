@@ -91,6 +91,74 @@ export function entitlementsFor(plan: string | null | undefined): Entitlements {
   return ENTITLEMENTS[isPlanId(plan) ? plan : 'free']
 }
 
+// ---------------------------------------------------------------------------
+// Developer mode
+// ---------------------------------------------------------------------------
+//
+// Lifts the plan limits for named accounts so the paid features can be tested
+// without a live Stripe subscription.
+//
+// The allow-list lives in an environment variable and nowhere else. It is
+// deliberately *not* a column on User: a flag in the database is one SQL
+// injection or one over-permissive update endpoint away from being a privilege
+// escalation, whereas this can only be changed by someone who can already
+// deploy the app. Nothing the client sends is ever consulted.
+
+export const DEVELOPER_PLAN = 'developer'
+
+/** Effectively unlimited, but finite — so arithmetic downstream stays sane. */
+export const DEVELOPER_ENTITLEMENTS: Entitlements = {
+  linkedBanks: 1000,
+  aiCallsPerDay: 10_000,
+  historyMonths: 1200,
+  householdMembers: 100,
+  exportFormats: ['json', 'csv', 'pdf'],
+  prioritySupport: true,
+}
+
+function developerEmails(): string[] {
+  return (process.env.DEVELOPER_EMAILS || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+}
+
+export function isDeveloperEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  const allowed = developerEmails()
+  if (allowed.length === 0) return false
+  return allowed.includes(email.trim().toLowerCase())
+}
+
+export function developerModeConfigured(): boolean {
+  return developerEmails().length > 0
+}
+
+/**
+ * The entitlements actually in force for an account.
+ *
+ * Every gate in the app resolves through here, so developer mode cannot be
+ * honoured in one place and forgotten in another.
+ */
+export function effectiveEntitlements(
+  plan: string | null | undefined,
+  email: string | null | undefined
+): { entitlements: Entitlements; isDeveloper: boolean; simulatedPlan: PlanId | null } {
+  if (!isDeveloperEmail(email)) {
+    return { entitlements: entitlementsFor(plan), isDeveloper: false, simulatedPlan: null }
+  }
+
+  // DEVELOPER_FORCE_PLAN lets a developer account behave as a real tier
+  // instead of an unlimited one — the only way to check that a limit actually
+  // bites without removing yourself from the allow-list and back again.
+  const forced = process.env.DEVELOPER_FORCE_PLAN?.trim().toLowerCase()
+  if (isPlanId(forced)) {
+    return { entitlements: ENTITLEMENTS[forced], isDeveloper: true, simulatedPlan: forced }
+  }
+
+  return { entitlements: DEVELOPER_ENTITLEMENTS, isDeveloper: true, simulatedPlan: null }
+}
+
 // Maps a Stripe price ID back to a plan. Set these to the price IDs from your
 // Stripe dashboard; an unmapped price falls back to `free` rather than
 // silently granting the top tier.

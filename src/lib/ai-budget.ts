@@ -1,5 +1,5 @@
 import { prisma } from './prisma'
-import { entitlementsFor, ENTITLEMENTS } from './plans'
+import { effectiveEntitlements, ENTITLEMENTS } from './plans'
 
 // Per-user daily AI usage budget. Enforces a hard cap per user per UTC day
 // so runaway prompts cannot rack up provider cost. The in-memory rate limiter
@@ -42,8 +42,11 @@ export async function recordAiUsage(userId: string, date = todayKey()): Promise<
 // hand out an unlimited allowance.
 export async function dailyAiLimitFor(userId: string): Promise<number> {
   try {
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } })
-    return entitlementsFor(user?.plan).aiCallsPerDay
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { plan: true, email: true },
+    })
+    return effectiveEntitlements(user?.plan, user?.email).entitlements.aiCallsPerDay
   } catch (err) {
     console.error(`AI limit lookup failed (${userId}):`, err)
     return ENTITLEMENTS.free.aiCallsPerDay

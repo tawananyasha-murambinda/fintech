@@ -275,6 +275,26 @@ webhook at `/api/billing/webhook` for `checkout.session.completed`,
 stripe listen --forward-to localhost:3000/api/billing/webhook
 ```
 
+## Developer mode
+
+Plan limits can be lifted for named accounts so the paid tiers can be exercised
+without a live Stripe subscription:
+
+```bash
+DEVELOPER_EMAILS="you@example.com"     # bypass all plan limits
+DEVELOPER_FORCE_PLAN="plus"            # optional: behave as this tier instead
+```
+
+The allow-list is an environment variable and nothing else. It is deliberately
+not a column on `User` — a flag in the database is one over-permissive update
+endpoint away from being a privilege escalation, whereas this can only be
+changed by someone who can already deploy. Nothing the client sends is
+consulted, an empty value grants nobody access, and the billing screen shows a
+banner so developer mode is never mistaken for a subscription.
+
+Both are resolved in one place (`effectiveEntitlements` in `src/lib/plans.ts`),
+so every gate in the app honours them or none does.
+
 ## Observability
 
 `src/lib/logger.ts` writes one JSON object per line to stdout (stderr for

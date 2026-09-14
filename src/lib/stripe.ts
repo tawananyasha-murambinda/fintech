@@ -1,6 +1,6 @@
 import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
-import { entitlementsFor, type Entitlements, type PlanId, isPlanId } from '@/lib/plans'
+import { effectiveEntitlements, type Entitlements, type PlanId, isPlanId } from '@/lib/plans'
 
 // Lazily constructed for the same reason as the encryption key: a missing
 // STRIPE_SECRET_KEY should fail the billing routes, not the whole app.
@@ -29,6 +29,10 @@ export function billingConfigured(): boolean {
 export type UserBilling = {
   plan: PlanId
   entitlements: Entitlements
+  /** True when the limits come from developer mode rather than a plan. */
+  isDeveloper: boolean
+  /** Set when developer mode is imitating a real tier instead of lifting limits. */
+  simulatedPlan: PlanId | null
   status: string | null
   currentPeriodEnd: Date | null
   cancelAtPeriodEnd: boolean
@@ -39,6 +43,7 @@ export async function getUserBilling(userId: string): Promise<UserBilling> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
+      email: true,
       plan: true,
       subscriptionStatus: true,
       currentPeriodEnd: true,
@@ -48,9 +53,13 @@ export async function getUserBilling(userId: string): Promise<UserBilling> {
   })
 
   const plan: PlanId = isPlanId(user?.plan) ? user.plan : 'free'
+  const { entitlements, isDeveloper, simulatedPlan } = effectiveEntitlements(plan, user?.email)
+
   return {
     plan,
-    entitlements: entitlementsFor(plan),
+    entitlements,
+    isDeveloper,
+    simulatedPlan,
     status: user?.subscriptionStatus ?? null,
     currentPeriodEnd: user?.currentPeriodEnd ?? null,
     cancelAtPeriodEnd: user?.cancelAtPeriodEnd ?? false,

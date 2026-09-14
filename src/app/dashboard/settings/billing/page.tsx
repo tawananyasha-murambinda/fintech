@@ -14,6 +14,9 @@ type BillingSummary = {
   cancelAtPeriodEnd: boolean
   manageable: boolean
   checkoutAvailable: boolean
+  billingConfigured: boolean
+  isDeveloper: boolean
+  developerModeConfigured: boolean
   entitlements: Entitlements
   usage: { linkedBanks: number; aiCallsToday: number }
   plans: PlanDisplay[]
@@ -172,9 +175,42 @@ function BillingPageContent() {
         </div>
       )}
 
+      {data.isDeveloper && (
+        <div
+          role="status"
+          className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/40"
+        >
+          <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+            Developer mode — limits lifted
+          </p>
+          <p className="text-xs text-amber-800 dark:text-amber-300/90 mt-1 leading-relaxed">
+            This account is on the <code className="font-mono">DEVELOPER_EMAILS</code> allow-list, so
+            plan limits are not enforced. This is not a subscription and nothing is being charged.
+            Remove the address from that environment variable to test the real limits.
+          </p>
+        </div>
+      )}
+
+      {!data.billingConfigured && (
+        <div
+          role="status"
+          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <p className="text-sm font-semibold text-[var(--ink)]">Upgrading is not available yet</p>
+          <p className="text-xs text-[var(--ink-muted)] mt-1 leading-relaxed">
+            Stripe is not configured on this deployment, so checkout cannot start. Set{' '}
+            <code className="font-mono">STRIPE_SECRET_KEY</code>,{' '}
+            <code className="font-mono">STRIPE_PRICE_PLUS</code> and{' '}
+            <code className="font-mono">STRIPE_PRICE_PRO</code> to enable it. Test-mode keys work —
+            card <code className="font-mono">4242 4242 4242 4242</code> completes a checkout without
+            a real charge.
+          </p>
+        </div>
+      )}
+
       <SettingsCard title="Current plan" description="What you are on today.">
         <SettingsRow
-          label={data.planName}
+          label={data.isDeveloper ? `${data.planName} · developer` : data.planName}
           description={
             data.cancelAtPeriodEnd && renewLabel
               ? `Cancels on ${renewLabel}.`
