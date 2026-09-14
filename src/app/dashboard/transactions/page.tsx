@@ -6,6 +6,7 @@ import { MobileTransactions } from '@/components/transactions/MobileTransactions
 import { SyncButton } from '@/components/ui/SyncButton'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Transaction } from '@/types'
+import { TransactionDetail } from '@/components/transactions/TransactionDetail'
 
 const PERIODS = [
   { value: 'week', label: '7 days' },
@@ -21,6 +22,7 @@ const DIRECTIONS = [
 ]
 
 export default function TransactionsPage() {
+  const [selected, setSelected] = useState<any | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [total, setTotal] = useState(0)
   const [pages, setPages] = useState(1)
@@ -97,7 +99,10 @@ export default function TransactionsPage() {
               <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">{total.toLocaleString()} transactions</p>
             </div>
           </div>
-          <SyncButton />
+          <div className="flex items-center gap-2">
+            <ExportButton />
+            <SyncButton />
+          </div>
         </div>
 
         {/* Summary row */}
@@ -198,13 +203,26 @@ export default function TransactionsPage() {
           ) : (
             <div className="divide-y divide-slate-50 dark:divide-slate-800">
               {transactions.map(tx => (
-                <div key={tx.id} className="px-2">
+                <button
+                  key={tx.id}
+                  type="button"
+                  onClick={() => setSelected(tx)}
+                  aria-label={`Open ${tx.merchantName || tx.description}`}
+                  className="w-full px-2 text-left hover:bg-[var(--surface-muted)] transition-colors"
+                >
                   <TransactionRow transaction={tx} />
-                </div>
+                </button>
               ))}
             </div>
           )}
         </div>
+
+        <TransactionDetail
+          transaction={selected}
+          open={selected !== null}
+          onClose={() => setSelected(null)}
+          onChanged={fetchTransactions}
+        />
 
         {/* Pagination */}
         {pages > 1 && (
@@ -232,5 +250,60 @@ export default function TransactionsPage() {
         )}
       </div>
     </>
+  )
+}
+
+/**
+ * Downloads the transaction history as a spreadsheet.
+ *
+ * A plain <a download> would be simpler, but the endpoint is authenticated and
+ * can fail (rate limit, server error) — fetching lets a failure surface as a
+ * message instead of the browser silently saving an error page as a .csv.
+ */
+function ExportButton() {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function download() {
+    setBusy(true)
+    setError('')
+    try {
+      const res = await fetch('/api/export/transactions')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Export failed.')
+      }
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download =
+        res.headers.get('Content-Disposition')?.match(/filename="(.+?)"/)?.[1] ??
+        'fintrack-transactions.csv'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      // Released on the next tick; revoking immediately can cancel the download
+      // in some browsers.
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button onClick={download} disabled={busy} className="btn-secondary text-xs py-2 px-3 disabled:opacity-50">
+        {busy ? 'Preparing…' : 'Export CSV'}
+      </button>
+      {error && (
+        <p role="alert" className="absolute right-0 top-full mt-1 text-2xs text-[var(--negative)] whitespace-nowrap">
+          {error}
+        </p>
+      )}
+    </div>
   )
 }

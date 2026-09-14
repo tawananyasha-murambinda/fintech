@@ -2,17 +2,19 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface Tab {
   href: string
-  label: string
+  /** Key into the nav section of the dictionary, resolved at render time. */
+  labelKey: 'home' | 'activity' | 'cards' | 'insights' | 'assistant'
   icon: (active: boolean) => React.ReactNode
 }
 
 const TABS: Tab[] = [
   {
     href: '/dashboard',
-    label: 'Home',
+    labelKey: 'home',
     icon: (a) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill={a ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
         <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1v-8.5Z" />
@@ -21,7 +23,7 @@ const TABS: Tab[] = [
   },
   {
     href: '/dashboard/transactions',
-    label: 'Activity',
+    labelKey: 'activity',
     icon: (a) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.2 : 1.6} strokeLinecap="round">
         <path d="M4 7h16M4 12h11M4 17h14" />
@@ -30,7 +32,7 @@ const TABS: Tab[] = [
   },
   {
     href: '/dashboard/accounts',
-    label: 'Cards',
+    labelKey: 'cards',
     icon: (a) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill={a ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6">
         <rect x="3" y="5" width="18" height="14" rx="2.5" />
@@ -40,7 +42,7 @@ const TABS: Tab[] = [
   },
   {
     href: '/dashboard/intelligence',
-    label: 'Insights',
+    labelKey: 'insights',
     icon: (a) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.2 : 1.6} strokeLinecap="round" strokeLinejoin="round">
         <path d="M5 15l4-5 3.5 3L19 6" />
@@ -50,7 +52,7 @@ const TABS: Tab[] = [
   },
   {
     href: '/dashboard/chat',
-    label: 'Assistant',
+    labelKey: 'assistant',
     icon: (a) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill={a ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
         <path d="M20 12a7 7 0 0 1-7 7H7l-3 3v-9a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7Z" />
@@ -61,6 +63,7 @@ const TABS: Tab[] = [
 
 export function MobileNav() {
   const pathname = usePathname()
+  const { t } = useTranslation()
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-slate-200/70 dark:border-slate-800 safe-area-bottom">
@@ -82,7 +85,7 @@ export function MobileNav() {
             >
               {tab.icon(active)}
               <span className={`text-[10px] tracking-tight ${active ? 'font-semibold' : 'font-medium'}`}>
-                {tab.label}
+                {t('nav', tab.labelKey)}
               </span>
             </Link>
           )

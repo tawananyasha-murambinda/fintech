@@ -25,8 +25,16 @@ export type Anomaly = {
   transactionId: string
   type: 'amount_outlier' | 'new_merchant_large' | 'duplicate_charge' | 'category_spike' | 'off_hours_foreign'
   severity: 'info' | 'warning' | 'critical'
-  title: string
-  message: string
+  /**
+   * Dictionary keys and their values rather than finished English.
+   *
+   * Detection happens in the nightly job, which does not know the reader's
+   * language until it looks up the account — so the sentence is assembled at
+   * the point where both the language and the currency are known.
+   */
+  titleKey: 'amountOutlierTitle' | 'newMerchantTitle' | 'duplicateTitle'
+  messageKey: 'amountOutlierMessage' | 'newMerchantMessage' | 'duplicateMessage'
+  params: Record<string, string | number>
   amount: number
   merchant: string
 }
@@ -120,8 +128,13 @@ export function detectAnomalies(
         transactionId: t.id,
         type: 'duplicate_charge',
         severity: 'warning',
-        title: `Possible duplicate charge`,
-        message: `${displayName(first)} charged ${Math.abs(first.amount).toFixed(2)} ${group.length} times on the same day. If it was a single purchase, this is worth disputing.`,
+        titleKey: 'duplicateTitle',
+        messageKey: 'duplicateMessage',
+        params: {
+          merchant: displayName(first),
+          amount: round(Math.abs(first.amount)),
+          count: group.length,
+        },
         amount: round(Math.abs(t.amount)),
         merchant: displayName(first),
       })
@@ -152,8 +165,9 @@ export function detectAnomalies(
           transactionId: t.id,
           type: 'amount_outlier',
           severity: amount > med * 5 ? 'critical' : 'warning',
-          title: `Unusually large ${category} charge`,
-          message: `${name} charged ${amount.toFixed(2)} — your typical ${category} spend is around ${med.toFixed(2)}.`,
+          titleKey: 'amountOutlierTitle',
+          messageKey: 'amountOutlierMessage',
+          params: { category, merchant: name, amount: round(amount), typical: round(med) },
           amount: round(amount),
           merchant: name,
         })
@@ -168,8 +182,9 @@ export function detectAnomalies(
         transactionId: t.id,
         type: 'new_merchant_large',
         severity: 'warning',
-        title: `Large charge at a new merchant`,
-        message: `${name} charged ${amount.toFixed(2)} and has not appeared in your history before. Worth confirming you recognise it.`,
+        titleKey: 'newMerchantTitle',
+        messageKey: 'newMerchantMessage',
+        params: { merchant: name, amount: round(amount) },
         amount: round(amount),
         merchant: name,
       })

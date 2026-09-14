@@ -7,8 +7,11 @@ import { LinkBankButton } from '@/components/bank/LinkBankButton'
 import { useCurrency } from '@/hooks/useCurrency'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import { MerchantMark } from '@/components/ui/MerchantMark'
+import { SafeToSpend } from '@/components/dashboard/SafeToSpend'
+import { TransactionDetail } from '@/components/transactions/TransactionDetail'
 import { usePullToRefresh } from '@/hooks/usePullToRefresh'
 import { useHaptics } from '@/hooks/useHaptics'
+import { useTranslation } from '@/hooks/useTranslation'
 import type { CashflowPoint } from '@/types'
 
 // Mobile home.
@@ -68,6 +71,7 @@ function DashboardSkeleton() {
  */
 function SpendRhythm({ points, accent }: { points: CashflowPoint[]; accent: string }) {
   const { format: fmt } = useCurrency()
+  const { t, formatDate } = useTranslation()
   const [selected, setSelected] = useState<number | null>(null)
 
   const days = points.slice(-31)
@@ -79,11 +83,11 @@ function SpendRhythm({ points, accent }: { points: CashflowPoint[]; accent: stri
   return (
     <section className="px-5 py-5">
       <div className="flex items-baseline justify-between mb-4">
-        <h2 className="text-sm font-semibold text-[var(--ink)]">Daily spend</h2>
+        <h2 className="text-sm font-semibold text-[var(--ink)]">{t('dashboard', 'dailySpend')}</h2>
         <p className="text-xs text-[var(--ink-faint)] tabular-nums">
           {active
-            ? `${new Date(active.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} · ${fmt(active.expenses)}`
-            : `${days.length} days`}
+            ? `${formatDate(active.date, { day: 'numeric', month: 'short' })} · ${fmt(active.expenses)}`
+            : t('dashboard', 'daysCount', { count: days.length })}
         </p>
       </div>
 
@@ -123,22 +127,23 @@ function FlowRow({
   change?: number
 }) {
   const { format: fmt } = useCurrency()
+  const { t } = useTranslation()
 
   return (
     <section className="grid grid-cols-2 divide-x" style={{ borderColor: 'var(--line)' }}>
       <div className="px-5 py-4">
-        <p className="text-xs text-[var(--ink-faint)] mb-1">In</p>
+        <p className="text-xs text-[var(--ink-faint)] mb-1">{t('dashboard', 'moneyIn')}</p>
         <p className="stat-number text-lg text-[var(--positive)]">{fmt(income)}</p>
       </div>
       <div className="px-5 py-4" style={{ borderColor: 'var(--line)' }}>
-        <p className="text-xs text-[var(--ink-faint)] mb-1">Out</p>
+        <p className="text-xs text-[var(--ink-faint)] mb-1">{t('dashboard', 'moneyOut')}</p>
         <p className="stat-number text-lg text-[var(--ink)]">{fmt(expenses)}</p>
         {typeof change === 'number' && Math.abs(change) >= 1 && (
           <p
             className="text-xs mt-0.5"
             style={{ color: change > 0 ? 'var(--negative)' : 'var(--positive)' }}
           >
-            {change > 0 ? '↑' : '↓'} {Math.abs(Math.round(change))}% on last month
+            {change > 0 ? '↑' : '↓'} {t('dashboard', 'onLastMonth', { percent: Math.abs(Math.round(change)) })}
           </p>
         )}
       </div>
@@ -160,11 +165,13 @@ export function MobileDashboard({
   const router = useRouter()
   const searchParams = useSearchParams()
   const haptics = useHaptics()
+  const { t } = useTranslation()
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showAccounts, setShowAccounts] = useState(false)
   const [quickAddForm, setQuickAddForm] = useState({ description: '', amount: '', direction: 'debit' })
   const [quickAddError, setQuickAddError] = useState('')
   const [quickAddSaving, setQuickAddSaving] = useState(false)
+  const [selectedTx, setSelectedTx] = useState<any | null>(null)
 
   const accent = 'var(--accent)'
 
@@ -283,7 +290,7 @@ export function MobileDashboard({
               <p className="display-number text-[2.75rem] text-[var(--ink)]">{fmt(balance)}</p>
             ) : (
               <>
-                <p className="display-number text-[2rem] text-[var(--ink-faint)]">Not available</p>
+                <p className="display-number text-[2rem] text-[var(--ink-faint)]">{t('common', 'notAvailable')}</p>
                 <p className="text-xs text-[var(--ink-faint)] mt-1.5 max-w-[16rem] leading-relaxed">
                   Your bank has not reported a balance yet. Pull down to refresh, or open an
                   account for its recent activity.
@@ -305,7 +312,7 @@ export function MobileDashboard({
                 }}
                 className="btn-primary text-sm py-2 px-4"
               >
-                Add transaction
+                {t('dashboard', 'addTransaction')}
               </button>
               <Link href="/dashboard/transactions" className="btn-secondary text-sm py-2 px-4">
                 All activity
@@ -318,9 +325,9 @@ export function MobileDashboard({
       {empty && (
         <div className="px-5">
           <div className="card p-6 text-center">
-            <p className="text-base font-semibold mb-1.5 text-[var(--ink)]">Add your first account</p>
+            <p className="text-base font-semibold mb-1.5 text-[var(--ink)]">{t('dashboard', 'addFirstAccount')}</p>
             <p className="text-sm text-[var(--ink-muted)] mb-6">
-              Connect a bank to see balances and spending in one place.
+              {t('dashboard', 'addFirstAccountBody')}
             </p>
             <LinkBankButton />
           </div>
@@ -329,6 +336,9 @@ export function MobileDashboard({
 
       {!empty && (
         <>
+          <div className="divider" />
+          <SafeToSpend compact />
+
           <div className="divider" />
           <FlowRow
             income={stats.monthlyIncome}
@@ -347,7 +357,7 @@ export function MobileDashboard({
             <>
               <div className="divider" />
               <section className="px-5 py-5">
-                <h2 className="text-sm font-semibold text-[var(--ink)] mb-4">Where it went</h2>
+                <h2 className="text-sm font-semibold text-[var(--ink)] mb-4">{t('dashboard', 'whereItWent')}</h2>
                 <div className="space-y-3.5">
                   {categories.slice(0, 5).map((cat, i) => (
                     <div key={cat.category} className="flex items-center gap-3">
@@ -376,17 +386,24 @@ export function MobileDashboard({
               <div className="divider" />
               <section className="py-5">
                 <div className="flex items-baseline justify-between px-5 mb-1">
-                  <h2 className="text-sm font-semibold text-[var(--ink)]">Recent</h2>
+                  <h2 className="text-sm font-semibold text-[var(--ink)]">{t('dashboard', 'recent')}</h2>
                   <Link href="/dashboard/transactions" className="text-xs text-[var(--accent)] font-medium">
-                    See all
+                    {t('common', 'seeAll')}
                   </Link>
                 </div>
-                <LedgerList transactions={recentTransactions.slice(0, 8)} />
+                <LedgerList transactions={recentTransactions.slice(0, 8)} onSelect={setSelectedTx} />
               </section>
             </>
           )}
         </>
       )}
+
+      <TransactionDetail
+        transaction={selectedTx}
+        open={selectedTx !== null}
+        onClose={() => setSelectedTx(null)}
+        onChanged={() => router.refresh()}
+      />
 
       <BottomSheet open={showAccounts} onClose={() => setShowAccounts(false)} title="Accounts">
         <div className="space-y-1">
@@ -503,7 +520,13 @@ export function MobileDashboard({
  * rail down the left. A flat list of rows loses the sense of "that was all one
  * Saturday", which is how people actually remember spending.
  */
-function LedgerList({ transactions }: { transactions: any[] }) {
+function LedgerList({
+  transactions,
+  onSelect,
+}: {
+  transactions: any[]
+  onSelect?: (t: any) => void
+}) {
   const { format: fmt } = useCurrency()
 
   const groups = useMemo(() => {
@@ -526,7 +549,13 @@ function LedgerList({ transactions }: { transactions: any[] }) {
           {items.map((t) => {
             const isCredit = t.direction === 'credit'
             return (
-              <div key={t.id} className="flex items-center gap-3 px-5 py-2.5">
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => onSelect?.(t)}
+                aria-label={`Open ${t.merchantName || t.description}`}
+                className="w-full flex items-center gap-3 px-5 py-2.5 text-left press"
+              >
                 <MerchantMark name={t.merchantName || t.description} size={34} />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-[var(--ink)] truncate">
@@ -545,7 +574,7 @@ function LedgerList({ transactions }: { transactions: any[] }) {
                   {isCredit ? '+' : '−'}
                   {fmt(Math.abs(t.amount))}
                 </span>
-              </div>
+              </button>
             )
           })}
         </div>

@@ -39,6 +39,11 @@ const MODELS = [
   'roundUpRule',
   'categorizationRule',
   'receipt',
+  'transactionSplit',
+  'goalContribution',
+  'netWorthSnapshot',
+  'household',
+  'householdMember',
 ] as const
 
 type ModelName = (typeof MODELS)[number]

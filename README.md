@@ -295,6 +295,37 @@ banner so developer mode is never mistaken for a subscription.
 Both are resolved in one place (`effectiveEntitlements` in `src/lib/plans.ts`),
 so every gate in the app honours them or none does.
 
+## Languages
+
+English, Dutch and Spanish. Language is a per-account setting (Settings →
+Language), not a route — this is an authenticated app, so there is nothing to
+link to or index, and routed locales would mean restructuring every page.
+
+`en.ts` exports its own shape as `Dictionary`, and the other two are typed
+against it, so **a missing translation is a compile error** rather than a screen
+that quietly falls back to English in production.
+
+Two different problems, handled two different ways:
+
+**Static interface strings** are translated at build time:
+
+```bash
+npm run i18n        # fill only the keys that are missing
+npm run i18n:all    # retranslate everything
+```
+
+Add a string to `en.ts`, run it, review the diff. Translation happens here
+rather than at runtime because a button label does not change between renders —
+paying latency and tokens to re-translate "Save" on every page load would be
+absurd, and it would put a network dependency in front of the interface. Any
+translation that loses or renames a `{placeholder}` is rejected rather than
+written, because a dropped placeholder renders a sentence with a hole in it.
+
+**Generated prose** — assistant replies, AI tips, spending narratives — can
+never sit in a dictionary, because it is written fresh each time. Those are
+produced in the user's language directly by the model (`setAiLocale`), which
+costs nothing extra and reads better than translating English output.
+
 ## Observability
 
 `src/lib/logger.ts` writes one JSON object per line to stdout (stderr for

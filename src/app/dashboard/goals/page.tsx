@@ -36,6 +36,10 @@ const BG_COLORS: Record<string, string> = {
 }
 
 export default function GoalsPage() {
+  const [contribInput, setContribInput] = useState<Record<string, string>>({})
+  const [contribSaving, setContribSaving] = useState<string | null>(null)
+  const [contribError, setContribError] = useState('')
+  const [celebrating, setCelebrating] = useState<string | null>(null)
   const { format: fmt } = useCurrency()
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
@@ -74,16 +78,29 @@ export default function GoalsPage() {
     fetchGoals()
   }
 
-  async function contribute(id: string, currentAmount: number, targetAmount: number) {
-    const amount = prompt('Amount to add?', '50')
-    if (!amount) return
-    const newAmount = Math.min(currentAmount + parseFloat(amount), targetAmount)
-    await fetch(`/api/goals/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ currentAmount: newAmount }),
-    })
-    fetchGoals()
+  // Goes through the contributions ledger rather than writing currentAmount
+  // directly: progress is then explainable and reversible, and the API detects
+  // the moment a goal is actually reached. The old version also capped silently
+  // at the target, so any overshoot vanished without a word.
+  async function contribute(id: string, amount: number, note?: string) {
+    setContribError('')
+    setContribSaving(id)
+    try {
+      const res = await fetch('/api/goals/contributions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goalId: id, amount, note }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Could not record that.')
+      if (data.justCompleted) setCelebrating(id)
+      setContribInput((prev) => ({ ...prev, [id]: '' }))
+      fetchGoals()
+    } catch (err) {
+      setContribError(err instanceof Error ? err.message : 'Could not record that.')
+    } finally {
+      setContribSaving(null)
+    }
   }
 
   async function deleteGoal(id: string) {
@@ -169,6 +186,11 @@ export default function GoalsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {contribError && (
+            <p role="alert" className="text-xs text-[var(--negative)] mb-2">
+              {contribError}
+            </p>
+          )}
           {goals.map((goal) => {
             const pct = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0
             const grad = GOAL_COLORS[goal.color] || GOAL_COLORS.teal
@@ -223,15 +245,57 @@ export default function GoalsPage() {
                   ) : (
                     <span className="text-slate-500">{fmt(remaining)} to go</span>
                   )}
-                  <div className="flex gap-2">
-                    {!isComplete && (
-                      <button onClick={() => contribute(goal.id, goal.currentAmount, goal.targetAmount)}
-                        className="text-xs font-medium text-teal-700 hover:underline dark:text-teal-400">
-                        Add funds
-                      </button>
-                    )}
-                  </div>
                 </div>
+
+                {/* Inline rather than a prompt() dialogue, and it takes a
+                    withdrawal as well — money does come back out of a pot. */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const value = parseFloat(contribInput[goal.id] || '')
+                    if (Number.isFinite(value) && value !== 0) contribute(goal.id, value)
+                  }}
+                  className="flex items-center gap-2 mt-3"
+                >
+                  <input
+                    type="number"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={contribInput[goal.id] ?? ''}
+                    onChange={(e) =>
+                      setContribInput((prev) => ({ ...prev, [goal.id]: e.target.value }))
+                    }
+                    placeholder="Amount"
+                    aria-label={`Amount to add to ${goal.name}`}
+                    className="input text-sm py-1.5 flex-1"
+                  />
+                  <button
+                    type="submit"
+                    disabled={contribSaving === goal.id}
+                    className="btn-primary text-xs py-1.5 px-3 disabled:opacity-50"
+                  >
+                    {contribSaving === goal.id ? '…' : 'Add'}
+                  </button>
+                  {goal.currentAmount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const value = parseFloat(contribInput[goal.id] || '')
+                        if (Number.isFinite(value) && value > 0) contribute(goal.id, -value)
+                      }}
+                      disabled={contribSaving === goal.id}
+                      className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-50"
+                    >
+                      Take out
+                    </button>
+                  )}
+                </form>
+
+                {celebrating === goal.id && (
+                  <p className="text-xs text-[var(--positive)] font-medium mt-2">
+                    That completes this goal — nicely done.
+                  </p>
+                )}
 
                 {daysUntilDeadline && daysUntilDeadline > 0 && (
                   <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">

@@ -24,10 +24,20 @@ function getClient(): Anthropic | null {
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5'
 const MAX_TURNS = 8
 
-function systemPrompt(currency: string, today: string): string {
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English',
+  nl: 'Dutch',
+  es: 'Spanish',
+}
+
+function systemPrompt(currency: string, today: string, locale: string): string {
+  const language = LANGUAGE_NAMES[locale] ?? 'English'
+
   return `You are the financial assistant inside FinTrack, a personal finance app. You are talking to the person whose money this is.
 
 Today is ${today}. Their currency is ${currency} — format every amount in it.
+
+Reply in ${language}. This is the language they chose for the app, so answer in it even when they write to you in another one — unless they explicitly ask you to switch. Use the words a bank in that country actually uses, not translated English. Amounts, dates and numbers follow that language's conventions too.
 
 ## How to answer
 
@@ -99,7 +109,7 @@ export async function askAssistant(
         max_tokens: 8192,
         thinking: { type: 'adaptive' },
         output_config: { effort: 'medium' },
-        system: systemPrompt(ctx.currency, ctx.now.toISOString().slice(0, 10)),
+        system: systemPrompt(ctx.currency, ctx.now.toISOString().slice(0, 10), ctx.locale),
         messages,
         tools: TOOL_DEFINITIONS as unknown as Anthropic.Tool[],
       })

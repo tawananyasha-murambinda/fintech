@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mockPrisma } from '@/test/setup'
 import { runTool, TOOL_DEFINITIONS, type ToolContext } from '@/lib/assistant/tools'
 
-const ctx: ToolContext = { userId: 'u1', currency: 'GBP', now: new Date('2026-06-15T12:00:00Z') }
+const ctx: ToolContext = { userId: 'u1', currency: 'GBP', locale: 'en', now: new Date('2026-06-15T12:00:00Z') }
 
 const tx = (amount: number, category: string, merchantName: string, daysAgo = 1, direction = 'debit') => ({
   id: `t${Math.random()}`,

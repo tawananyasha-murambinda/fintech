@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
   try {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { currency: true },
+      select: { currency: true, locale: true },
     })
 
     // The daily cap is checked before the question is stored, so a refused
@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
       {
         userId: session.user.id,
         currency: user?.currency || 'USD',
+        locale: user?.locale || 'en',
         now: new Date(),
       }
     )

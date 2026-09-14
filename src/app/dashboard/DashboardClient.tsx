@@ -14,6 +14,7 @@ import { DailyTipCard } from "@/components/dashboard/DailyTipCard";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { useCurrency } from "@/hooks/useCurrency";
 import type { CashflowPoint, SpendingCategory } from "@/types";
+import { SafeToSpend } from "@/components/dashboard/SafeToSpend";
 
 interface DashboardClientProps {
   data: {
@@ -111,6 +112,9 @@ export function DashboardClient({
 
         {/* Alert banner */}
         <AlertBanner />
+
+        {/* What is actually free to spend before the next payday. */}
+        <SafeToSpend />
 
         {/* Natural language transaction search */}
         <TransactionSearch />
@@ -573,22 +577,30 @@ function EmptyState() {
   );
 }
 
+type ParsedChip = { label: string; kind: string }
+
 function TransactionSearch() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<any[]>([])
+  const [parsed, setParsed] = useState<ParsedChip[]>([])
+  const [total, setTotal] = useState(0)
   const [showResults, setShowResults] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const { convertFormat } = useCurrency()
 
   useEffect(() => {
-    if (query.length < 2) { setResults([]); return }
+    if (query.length < 2) { setResults([]); setParsed([]); setTotal(0); return }
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/transactions/search?q=${encodeURIComponent(query)}&limit=6`)
         const data = await res.json()
         setResults(data.transactions || [])
+        // Shown back as chips so a narrow result set is explained rather than
+        // mysterious — the user can see which words became filters.
+        setParsed(data.parsed?.matched ?? [])
+        setTotal(data.total ?? 0)
         setShowResults(true)
-      } catch { setResults([]) }
+      } catch { setResults([]); setParsed([]) }
     }, 250)
     return () => clearTimeout(timer)
   }, [query])
@@ -615,7 +627,7 @@ function TransactionSearch() {
           onChange={e => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setShowResults(true)}
           onBlur={() => setTimeout(() => setShowResults(false), 200)}
-          placeholder="Search transactions... (e.g. 'Starbucks last month' or 'Amazon > $50')"
+          placeholder="Try 'coffee over 5 last month' or 'income this year'"
           className="input text-sm pl-9 py-2.5 w-full"
         />
         {query && (
@@ -624,6 +636,19 @@ function TransactionSearch() {
           </button>
         )}
       </div>
+      {parsed.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+          {parsed.map((chip) => (
+            <span key={`${chip.kind}-${chip.label}`} className="badge badge-accent">
+              {chip.label}
+            </span>
+          ))}
+          <span className="text-xs text-[var(--ink-faint)] ml-1">
+            {total} match{total === 1 ? '' : 'es'}
+          </span>
+        </div>
+      )}
+
       {showResults && results.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-lg overflow-hidden z-50">
           {results.map((tx: any) => (

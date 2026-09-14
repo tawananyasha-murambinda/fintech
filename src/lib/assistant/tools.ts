@@ -20,7 +20,13 @@ import { round, sum } from '@/lib/money'
 // asked, which is what makes the answers specific rather than a paraphrase of
 // one snapshot.
 
-export type ToolContext = { userId: string; currency: string; now: Date }
+export type ToolContext = {
+  userId: string
+  currency: string
+  now: Date
+  /** Interface language; the assistant answers in it. */
+  locale: string
+}
 
 function daysAgo(days: number, now: Date): Date {
   return new Date(now.getTime() - days * 86_400_000)
@@ -470,7 +476,9 @@ export async function runTool(
           severity: a.severity,
           merchant: a.merchant,
           amount: a.amount,
-          explanation: a.message,
+          // The assistant renders its own prose from these, in the user's
+          // language, so the raw signal is passed rather than a sentence.
+          detail: a.params,
         })),
       })
     }

@@ -8,6 +8,7 @@ import { analyzeSpending } from '@/lib/ai'
 import { consumeAiBudget } from '@/lib/ai-budget'
 import { redactPII } from '@/lib/pii'
 import { logger } from '@/lib/logger'
+import { setAiLocale } from '@/lib/ai'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
     // Load location from DB if not provided in request
     const dbUser = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { city: true, country: true, currency: true, latitude: true, longitude: true },
+      select: { city: true, country: true, currency: true, locale: true, latitude: true, longitude: true },
     })
     if (!userLocation && dbUser?.city) {
       userLocation = {
@@ -115,6 +116,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    setAiLocale(dbUser?.locale)
     const analysis = await analyzeSpending({ transactions, period, userLocation, prevPeriodCategories: prevCategories, currency: userCurrency })
 
     // Cache the result

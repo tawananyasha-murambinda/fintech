@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { rateLimit } from '@/lib/rate-limit'
 import { errorResponse } from '@/lib/errors'
-import { generateAiTip } from '@/lib/ai'
+import { generateAiTip, setAiLocale } from '@/lib/ai'
 import { consumeAiBudget } from '@/lib/ai-budget'
 import { logger } from '@/lib/logger'
 
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     const [user, transactions] = await Promise.all([
       prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { currency: true },
+        select: { currency: true, locale: true },
       }),
       prisma.transaction.findMany({
         where: { userId: session.user.id, date: { gte: since } },
@@ -35,6 +35,8 @@ export async function GET(req: NextRequest) {
     ])
 
     const hasBudget = await consumeAiBudget(session.user.id)
+
+    setAiLocale(user?.locale)
 
     const result = await generateAiTip(transactions as any, user?.currency, { allowAi: hasBudget })
 

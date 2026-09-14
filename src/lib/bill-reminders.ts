@@ -62,10 +62,13 @@ export async function runBillReminders(now: Date = new Date()): Promise<Reminder
 
     const days = daysUntilDue(nextDueDate(bill, now), now)
     try {
-      await notifyBillReminder(bill.userId, bill.name, bill.amount, days)
+      // notifyBillReminder composes the text in the account's language and
+      // currency; the push reuses it rather than repeating a second English
+      // copy with a hard-coded dollar sign.
+      const notification = await notifyBillReminder(bill.userId, bill.name, bill.amount, days)
       await sendPushNotification(bill.userId, {
-        title: days === 0 ? 'Bill due today' : `Bill due in ${days} day${days > 1 ? 's' : ''}`,
-        body: `${bill.name} — $${bill.amount.toFixed(2)}`,
+        title: notification.title,
+        body: notification.body,
         tag: `bill-${bill.id}`,
         url: '/dashboard/bills',
       })

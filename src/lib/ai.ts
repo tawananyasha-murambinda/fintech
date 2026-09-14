@@ -25,6 +25,27 @@ const CURRENCY_LOCALES: Record<string, string> = {
   USD: 'en-US', EUR: 'de-DE', GBP: 'en-GB', CAD: 'en-CA', AUD: 'en-AU', JPY: 'ja-JP',
 }
 
+const AI_LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English',
+  nl: 'Dutch',
+  es: 'Spanish',
+}
+
+// Everything this module generates is prose written fresh each time — savings
+// tips, narrative summaries, merchant suggestions. None of it can sit in a
+// static dictionary, so the language has to reach the model itself.
+let AI_LOCALE = 'en'
+
+export function setAiLocale(locale?: string | null) {
+  AI_LOCALE = locale && AI_LANGUAGE_NAMES[locale] ? locale : 'en'
+}
+
+/** A line for the prompt, or nothing at all when the language is English. */
+function languageInstruction(): string {
+  if (AI_LOCALE === 'en') return ''
+  return `\n\nWrite your entire response in ${AI_LANGUAGE_NAMES[AI_LOCALE]}. Use the vocabulary a bank in that country actually uses, not translated English. Follow that language's conventions for numbers and dates.`
+}
+
 let AI_CURRENCY = 'USD'
 export function setAiCurrency(code?: string | null) {
   AI_CURRENCY = code && CURRENCY_SYMBOLS[code] ? code : 'USD'
@@ -987,7 +1008,7 @@ export async function analyzeSpending(input: AnalysisInput): Promise<AiAnalysis>
   const topSubOverlaps = subscriptionOverlaps.slice(0, 3)
 
   const topLocations = locationInsights.slice(0, 3)
-  const prompt = `You are a personal finance analyst analyzing this user's spending. Be detailed, specific, and actionable. Reference exact amounts and merchants.
+  const promptBase = `You are a personal finance analyst analyzing this user's spending. Be detailed, specific, and actionable. Reference exact amounts and merchants.
 
 Period: ${period}
 Total income: ${money(totalIncome)}
@@ -1023,6 +1044,8 @@ Return ONLY a JSON object with this exact shape and no other text:
   "topInsight": "single most actionable, specific insight referencing real merchants and dollar amounts",
   "savingsSuggestions": ["3-4 specific savings tips with dollar amounts, e.g. 'Switching from Starbucks ($45/mo) to home coffee saves ~$540/yr'"]
 }`
+
+  const prompt = promptBase + languageInstruction()
 
   let summary = 'Your spending has been analyzed based on the selected period.'
   let topInsight = 'Review your top categories and locations to find the best opportunities to save.'
@@ -1174,7 +1197,7 @@ ${topCats.map((c) => `- ${c.category}: ${money(c.total)} (${c.percentage.toFixed
 Top merchants:
 ${topMerchants.map(([name, d]) => `- ${name}: ${money(d.total)} (${d.count} visits)`).join('\n')}
 
-Return ONLY the tip as plain text — no quotation marks, no label, no prefix.`
+Return ONLY the tip as plain text — no quotation marks, no label, no prefix.${languageInstruction()}`
 
   try {
     const client = getClient()

@@ -3,10 +3,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { LOCALES } from '@/lib/i18n'
 
 const updateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   currency: z.enum(['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY']).optional(),
+  locale: z.enum(LOCALES).optional(),
 })
 
 // GET /api/auth/profile — return current user profile
@@ -19,7 +21,7 @@ export async function GET() {
   try {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { id: true, name: true, email: true, image: true, createdAt: true, password: true, currency: true },
+      select: { id: true, name: true, email: true, image: true, createdAt: true, password: true, currency: true, locale: true },
     })
 
     if (!user) {
@@ -35,6 +37,7 @@ export async function GET() {
         createdAt: user.createdAt.toISOString(),
         hasPassword: !!user.password,
         currency: user.currency,
+        locale: user.locale,
       },
     })
   } catch (err) {
@@ -57,9 +60,10 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
 
-    const data: { name?: string; currency?: string } = {}
+    const data: { name?: string; currency?: string; locale?: string } = {}
     if (parsed.data.name !== undefined) data.name = parsed.data.name
     if (parsed.data.currency !== undefined) data.currency = parsed.data.currency
+    if (parsed.data.locale !== undefined) data.locale = parsed.data.locale
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
     }
@@ -67,7 +71,7 @@ export async function PUT(req: NextRequest) {
     const user = await prisma.user.update({
       where: { id: session.user.id },
       data,
-      select: { id: true, name: true, email: true, image: true, currency: true },
+      select: { id: true, name: true, email: true, image: true, currency: true, locale: true },
     })
 
     // Cached analyses have the currency symbol written into their prose, so a

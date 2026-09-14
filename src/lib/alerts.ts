@@ -5,6 +5,7 @@ import { budgetStatuses } from '@/lib/budgets'
 import { detectAnomalies } from '@/lib/anomalies'
 import { sendPushNotification } from '@/lib/push-notifications'
 import { logger } from '@/lib/logger'
+import { translate, formatMoney, isLocale, DEFAULT_LOCALE, type Locale, type Dictionary } from '@/lib/i18n'
 
 // Alert generation, shared by POST /api/alerts/generate (a signed-in user
 // opening the dashboard) and the nightly cron sweep. It used to live only in
@@ -13,6 +14,24 @@ import { logger } from '@/lib/logger'
 
 export async function generateAlertsForUser(userId: string): Promise<string[]> {
   const now = new Date()
+
+  // Alerts are written on the server, stored, and read later — so the language
+  // has to be resolved now rather than at render time like the rest of the UI.
+  const account = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { locale: true, currency: true },
+  })
+  const locale: Locale = isLocale(account?.locale) ? account.locale : DEFAULT_LOCALE
+  const currency = account?.currency || 'USD'
+  const money = (amount: number) => formatMoney(locale, currency, amount)
+  const say = {
+    alert: (key: keyof Dictionary['alerts'], vars?: Record<string, string | number>) =>
+      translate(locale, 'alerts', key, vars),
+    anomaly: (key: keyof Dictionary['anomalies'], vars?: Record<string, string | number>) =>
+      translate(locale, 'anomalies', key, vars),
+    period: (key: string) =>
+      translate(locale, 'periods', key as keyof Dictionary['periods']) || key,
+  }
   const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const prevMonthStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
 
@@ -50,13 +69,17 @@ export async function generateAlertsForUser(userId: string): Promise<string[]> {
   if (prevExpenses > 0) {
     const change = ((expenses - prevExpenses) / prevExpenses) * 100
     if (change > 25) {
-      const title = 'Spending increased significantly'
+      const title = say.alert('spendingUpTitle')
       if (!existingTitles.has(title)) {
         await raiseAlert({
           userId,
           type: 'overspend',
           title,
-          message: `Your spending is up ${change.toFixed(0)}% this month ($${prevExpenses.toFixed(0)} → $${expenses.toFixed(0)}). Review your top categories to find areas to cut back.`,
+          message: say.alert('spendingUpMessage', {
+            percent: change.toFixed(0),
+            previous: money(prevExpenses),
+            current: money(expenses),
+          }),
           severity: change > 50 ? 'critical' : 'warning',
           // Critical and warning interrupt; info waits to be found.
           push: true,
@@ -73,13 +96,19 @@ export async function generateAlertsForUser(userId: string): Promise<string[]> {
   // at monthly budgets.
   for (const budget of budgetStatus) {
     if (budget.isOver) {
-      const title = `Budget exceeded: ${budget.category}`
+      const title = say.alert('budgetExceededTitle', { category: budget.category })
       if (!existingTitles.has(title)) {
         await raiseAlert({
           userId,
           type: 'overspend',
           title,
-          message: `You've spent ${budget.spent.toFixed(0)} of your ${budget.amount.toFixed(0)} ${budget.period} budget for ${budget.category} (${budget.window.label}). Consider adjusting or pausing non-essential spend.`,
+          message: say.alert('budgetExceededMessage', {
+            spent: money(budget.spent),
+            budget: money(budget.amount),
+            period: say.period(budget.period),
+            category: budget.category,
+            window: budget.window.label,
+          }),
           severity: gt(budget.spent, multiply(budget.amount, 1.2)) ? 'critical' : 'warning',
           push: true,
         })
@@ -91,13 +120,19 @@ export async function generateAlertsForUser(userId: string): Promise<string[]> {
     // Not over yet, but spending far ahead of the period — the warning that is
     // actually actionable, because there is still time to change course.
     if (budget.isOnPace) {
-      const title = `On pace to exceed: ${budget.category}`
+      const title = say.alert('onPaceTitle', { category: budget.category })
       if (!existingTitles.has(title)) {
         await raiseAlert({
           userId,
           type: 'overspend',
           title,
-          message: `You've used ${Math.round(budget.used * 100)}% of your ${budget.category} budget with ${Math.round((1 - budget.elapsed) * 100)}% of ${budget.window.label} left. About $${budget.safeDailySpend.toFixed(2)} a day keeps you inside it.`,
+          message: say.alert('onPaceMessage', {
+            used: Math.round(budget.used * 100),
+            category: budget.category,
+            remaining: Math.round((1 - budget.elapsed) * 100),
+            window: budget.window.label,
+            daily: money(budget.safeDailySpend),
+          }),
           severity: 'info',
           // Critical and warning interrupt; info waits to be found.
           push: false,
@@ -125,13 +160,18 @@ export async function generateAlertsForUser(userId: string): Promise<string[]> {
   for (const [cat, total] of Object.entries(byCategory)) {
     const prevTotal = prevCatMap[cat] || 0
     if (prevTotal > 50 && total > prevTotal * 1.5) {
-      const title = `${cat} spending spike`
+      const title = say.alert('categorySpikeTitle', { category: cat })
       if (!existingTitles.has(title)) {
         await raiseAlert({
           userId,
           type: 'overspend',
           title,
-          message: `Your ${cat} spending jumped to $${total.toFixed(0)} (${(((total - prevTotal) / prevTotal) * 100).toFixed(0)}% increase from $${prevTotal.toFixed(0)}). Check if this is a one-time expense or a new pattern.`,
+          message: say.alert('categorySpikeMessage', {
+            category: cat,
+            current: money(total),
+            percent: (((total - prevTotal) / prevTotal) * 100).toFixed(0),
+            previous: money(prevTotal),
+          }),
           severity: total > prevTotal * 2 ? 'critical' : 'warning',
           // Critical and warning interrupt; info waits to be found.
           push: true,
@@ -155,13 +195,25 @@ export async function generateAlertsForUser(userId: string): Promise<string[]> {
   )
 
   for (const anomaly of anomalies.slice(0, 5)) {
-    const title = `${anomaly.title}: ${anomaly.merchant}`
+    const anomalyTitle = say.anomaly(anomaly.titleKey, anomaly.params)
+    const title = say.alert('anomalyHeading', {
+      title: anomalyTitle,
+      merchant: anomaly.merchant,
+    })
     if (existingTitles.has(title)) continue
     await raiseAlert({
       userId,
       type: anomaly.type === 'duplicate_charge' ? 'duplicate' : 'unusual',
       title,
-      message: anomaly.message,
+      message: say.anomaly(anomaly.messageKey, {
+        ...anomaly.params,
+        // Amounts arrive as plain numbers so they can be formatted for the
+        // reader's currency here rather than baked in during detection.
+        amount: money(Number(anomaly.params.amount ?? 0)),
+        ...(anomaly.params.typical !== undefined
+          ? { typical: money(Number(anomaly.params.typical)) }
+          : {}),
+      }),
       severity: anomaly.severity,
       // A duplicate charge is the one worth a buzz: it is disputable, and only
       // while the user still remembers the purchase.
