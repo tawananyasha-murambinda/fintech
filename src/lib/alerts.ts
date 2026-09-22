@@ -4,6 +4,7 @@ import { canonicalCategory } from '@/lib/categories'
 import { budgetStatuses } from '@/lib/budgets'
 import { detectAnomalies } from '@/lib/anomalies'
 import { sendPushNotification } from '@/lib/push-notifications'
+import { preferencesFor, shouldDeliver } from '@/lib/notification-preferences'
 import { logger } from '@/lib/logger'
 import { translate, formatMoney, isLocale, DEFAULT_LOCALE, type Locale, type Dictionary } from '@/lib/i18n'
 
@@ -253,6 +254,11 @@ async function raiseAlert(params: {
   // Only things worth interrupting someone for. An informational nudge does
   // not earn a buzz, and a stream of them trains people to disable the lot.
   if (!params.push) return
+
+  // And only if they have not asked us not to. Pushing through a mute is how
+  // an app gets deleted rather than merely ignored.
+  const prefs = await preferencesFor(params.userId)
+  if (!shouldDeliver(prefs, 'alerts', 'push')) return
 
   try {
     await sendPushNotification(params.userId, {

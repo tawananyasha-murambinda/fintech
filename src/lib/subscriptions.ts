@@ -61,6 +61,44 @@ export type DetectedSubscription = {
   /** True when the most recent charge differs from the established norm. */
   priceChanged: boolean
   previousAmount: number | null
+  /** How much more (or less) the latest charge is, per month. */
+  priceChangeMonthly: number | null
+  /**
+   * Days since the last charge, against the expected interval. A subscription
+   * that has not billed in twice its usual gap has probably lapsed — or is
+   * about to surprise someone.
+   */
+  daysSinceLastCharge: number
+  /** Nothing has been charged for well over a cycle. */
+  dormant: boolean
+  /** Where to go to stop it, when the provider is one we know. */
+  cancelUrl: string | null
+}
+
+// Cancellation pages for the providers people most often want to leave. Only
+// first-party URLs — pointing someone at a third-party "cancel anything" site
+// with their subscription list would be worse than saying nothing.
+const CANCEL_URLS: { match: RegExp; url: string }[] = [
+  { match: /netflix/i, url: 'https://www.netflix.com/cancelplan' },
+  { match: /spotify/i, url: 'https://www.spotify.com/account/subscription/' },
+  { match: /amazon prime|prime video/i, url: 'https://www.amazon.com/gp/primecentral' },
+  { match: /disney/i, url: 'https://www.disneyplus.com/account/subscription' },
+  { match: /youtube/i, url: 'https://www.youtube.com/paid_memberships' },
+  { match: /apple|icloud/i, url: 'https://support.apple.com/en-us/HT202039' },
+  { match: /adobe/i, url: 'https://account.adobe.com/plans' },
+  { match: /dropbox/i, url: 'https://www.dropbox.com/account/plan' },
+  { match: /audible/i, url: 'https://www.audible.com/account/membership' },
+  { match: /hulu/i, url: 'https://secure.hulu.com/account' },
+  { match: /nordvpn|expressvpn/i, url: 'https://my.nordaccount.com/billing/' },
+  { match: /notion/i, url: 'https://www.notion.so/my-settings' },
+  { match: /figma/i, url: 'https://www.figma.com/settings' },
+  { match: /github/i, url: 'https://github.com/settings/billing' },
+  { match: /openai|chatgpt/i, url: 'https://platform.openai.com/account/billing' },
+  { match: /anthropic|claude/i, url: 'https://claude.ai/settings/billing' },
+]
+
+function cancelUrlFor(name: string): string | null {
+  return CANCEL_URLS.find((entry) => entry.match.test(name))?.url ?? null
 }
 
 export type SubscriptionInput = {
@@ -129,6 +167,12 @@ export function detectSubscriptions(
         : new Date(lastCharge.date.getTime() + medianGap * DAY_MS)
 
     const priceChanged = amounts.length >= 3 && Math.abs(latestAmount - typicalAmount) > 0.01
+    const daysSinceLastCharge = Math.floor(
+      (now.getTime() - lastCharge.date.getTime()) / DAY_MS
+    )
+    // Twice the usual gap with nothing charged: either it lapsed, or a bill is
+    // overdue. Either way it is worth a look.
+    const dormant = medianGap > 0 && daysSinceLastCharge > medianGap * 2
 
     subscriptions.push({
       name,
@@ -146,6 +190,15 @@ export function detectSubscriptions(
       ),
       priceChanged,
       previousAmount: priceChanged ? typicalAmount : null,
+      priceChangeMonthly: priceChanged
+        ? round(
+            monthlyEquivalent(latestAmount, effectiveCadence) -
+              monthlyEquivalent(typicalAmount, effectiveCadence)
+          )
+        : null,
+      daysSinceLastCharge,
+      dormant,
+      cancelUrl: cancelUrlFor(name),
     })
   }
 

@@ -7,34 +7,49 @@ interface StatCardProps {
   icon?: React.ReactNode
 }
 
+// A single figure.
+//
+// Rebuilt on the design tokens rather than hard-coded slate classes, so it
+// changes with the rest of the app instead of drifting from it. The figure is
+// set in the display face at the size that made the mobile balance readable —
+// a dashboard of small bold numbers reads as a spreadsheet, not a summary.
 export function StatCard({ label, value, change, changeLabel, accent, icon }: StatCardProps) {
-  const valueClass =
+  const valueColor =
     accent === 'red'
-      ? 'text-rose-600 dark:text-rose-400'
+      ? 'var(--negative)'
       : accent === 'amber'
-      ? 'text-amber-600 dark:text-amber-400'
-      : 'text-slate-900 dark:text-slate-100'
+        ? 'var(--warning)'
+        : 'var(--ink)'
 
-  // For a bank, lower spend = good. Keep the semantics but drop arrow glyphs.
-  const positive = change !== undefined && change < 0
-  const changeClass = positive
-    ? 'text-emerald-600 dark:text-emerald-400'
-    : change && change > 0
-    ? 'text-rose-500 dark:text-rose-400'
-    : 'text-slate-400 dark:text-slate-500'
+  // For spending, down is good — so the colour follows the meaning rather than
+  // the sign. A 12% fall in outgoings is not a red number.
+  const improving = change !== undefined && change < 0
+  const changeColor =
+    change === undefined || Math.abs(change) < 0.05
+      ? 'var(--ink-faint)'
+      : improving
+        ? 'var(--positive)'
+        : 'var(--negative)'
 
   return (
-    <div className="rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-      <div className="flex items-center gap-2 mb-2">
-        {icon && (
-          <span className="text-slate-400 dark:text-slate-500">{icon}</span>
-        )}
-        <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400">{label}</p>
+    <div className="card card-hover p-5">
+      <div className="flex items-center gap-2 mb-3">
+        {icon && <span style={{ color: 'var(--ink-faint)' }}>{icon}</span>}
+        <p className="text-xs font-medium" style={{ color: 'var(--ink-muted)' }}>
+          {label}
+        </p>
       </div>
-      <p className={`text-2xl font-semibold stat-number ${valueClass}`}>{value}</p>
+
+      <p className="display-number text-[1.75rem]" style={{ color: valueColor }}>
+        {value}
+      </p>
+
       {change !== undefined && (
-        <p className={`text-[13px] font-medium mt-1 ${changeClass}`}>
-          {change > 0 ? '+' : ''}{change.toFixed(1)}%{changeLabel ? ` ${changeLabel}` : ''}
+        <p className="text-xs font-medium mt-1.5" style={{ color: changeColor }}>
+          {/* An arrow says the direction faster than a sign does, and avoids
+              "+12%" reading as good news when the figure is spending. */}
+          {Math.abs(change) < 0.05 ? '—' : improving ? '↓' : '↑'}{' '}
+          {Math.abs(change).toFixed(1)}%{changeLabel ? ` ${changeLabel}` : ''}
         </p>
       )}
     </div>

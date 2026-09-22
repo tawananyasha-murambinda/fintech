@@ -9,6 +9,11 @@ const updateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   currency: z.enum(['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY']).optional(),
   locale: z.enum(LOCALES).optional(),
+  notifyPush: z.boolean().optional(),
+  notifyEmail: z.boolean().optional(),
+  notifyBills: z.boolean().optional(),
+  notifyAlerts: z.boolean().optional(),
+  notifyGoals: z.boolean().optional(),
 })
 
 // GET /api/auth/profile — return current user profile
@@ -21,7 +26,7 @@ export async function GET() {
   try {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { id: true, name: true, email: true, image: true, createdAt: true, password: true, currency: true, locale: true },
+      select: { id: true, name: true, email: true, image: true, createdAt: true, password: true, currency: true, locale: true, notifyPush: true, notifyEmail: true, notifyBills: true, notifyAlerts: true, notifyGoals: true },
     })
 
     if (!user) {
@@ -38,6 +43,11 @@ export async function GET() {
         hasPassword: !!user.password,
         currency: user.currency,
         locale: user.locale,
+        notifyPush: user.notifyPush,
+        notifyEmail: user.notifyEmail,
+        notifyBills: user.notifyBills,
+        notifyAlerts: user.notifyAlerts,
+        notifyGoals: user.notifyGoals,
       },
     })
   } catch (err) {
@@ -60,10 +70,14 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
 
-    const data: { name?: string; currency?: string; locale?: string } = {}
+    const data: Record<string, unknown> = {}
     if (parsed.data.name !== undefined) data.name = parsed.data.name
     if (parsed.data.currency !== undefined) data.currency = parsed.data.currency
     if (parsed.data.locale !== undefined) data.locale = parsed.data.locale
+    // Preferences the nightly job reads, so a mute actually takes effect.
+    for (const key of ['notifyPush', 'notifyEmail', 'notifyBills', 'notifyAlerts', 'notifyGoals'] as const) {
+      if (parsed.data[key] !== undefined) data[key] = parsed.data[key]
+    }
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
     }

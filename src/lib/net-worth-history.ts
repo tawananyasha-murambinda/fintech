@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { sum, round, subtract } from '@/lib/money'
+import { ensureRates } from '@/lib/fx'
 
 // Net worth over time.
 //
@@ -18,6 +19,10 @@ export type NetWorthComponents = {
 }
 
 export async function computeNetWorth(userId: string): Promise<NetWorthComponents> {
+  // Assets and liabilities carry no currency of their own today, but the rate
+  // table is warmed here so any conversion added later is against live figures.
+  await ensureRates()
+
   const [assets, liabilities, investments, banks] = await Promise.all([
     prisma.asset.findMany({ where: { userId }, select: { value: true } }),
     prisma.liability.findMany({ where: { userId }, select: { balance: true } }),

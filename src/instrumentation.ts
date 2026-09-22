@@ -4,6 +4,12 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     await import('../sentry.server.config')
+
+    // Say once, at boot, which features are switched off by missing
+    // configuration. Silent degradation is how a dead cron went unnoticed.
+    const { describeGaps } = await import('@/lib/config-check')
+    const { logger } = await import('@/lib/logger')
+    for (const gap of describeGaps()) logger.warn(gap)
   }
   if (process.env.NEXT_RUNTIME === 'edge') {
     await import('../sentry.edge.config')

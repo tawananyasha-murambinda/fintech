@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     const form = await req.formData()
     const file = form.get('file')
     const manualId = form.get('manualTransactionId')
+    const transactionId = form.get('transactionId')
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'Attach a photo or PDF of the receipt.' }, { status: 400 })
@@ -87,10 +88,17 @@ export async function POST(req: NextRequest) {
     })
 
     // Attaching on upload, scoped to the caller so a guessed id cannot bind a
-    // receipt onto someone else's transaction.
+    // receipt onto someone else's transaction. Bank transactions can carry one
+    // now too — previously only manual entries could, so photographing a
+    // receipt for a card payment stored it unlinked.
     if (typeof manualId === 'string' && manualId) {
       await prisma.manualTransaction.updateMany({
         where: { id: manualId, userId: session.user.id },
+        data: { receiptId: receipt.id },
+      })
+    } else if (typeof transactionId === 'string' && transactionId) {
+      await prisma.transaction.updateMany({
+        where: { id: transactionId, userId: session.user.id },
         data: { receiptId: receipt.id },
       })
     }

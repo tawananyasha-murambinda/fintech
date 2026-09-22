@@ -30,8 +30,22 @@ function authorised(req: NextRequest): boolean {
 
 export async function GET(req: NextRequest) {
   if (!process.env.CRON_SECRET) {
-    logger.error('Daily cron invoked but CRON_SECRET is not configured')
-    return NextResponse.json({ error: 'Cron is not configured.' }, { status: 503 })
+    // This is the failure that hides itself: Vercel fires the schedule, the
+    // route refuses, and the only symptom is that reminders never arrive.
+    // Name the consequence so it is recognisable in a log.
+    logger.error(
+      'Daily cron refused: CRON_SECRET is not set. No bill reminders, alerts, round-ups, ' +
+        'net-worth snapshots or retention will run until it is.'
+    )
+    return NextResponse.json(
+      {
+        error: 'Cron is not configured.',
+        detail:
+          'CRON_SECRET is not set on this deployment, so scheduled jobs cannot run. ' +
+          'Set it in the environment and redeploy.',
+      },
+      { status: 503 }
+    )
   }
   if (!authorised(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

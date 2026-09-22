@@ -153,7 +153,9 @@ export function TransactionDetail({
     try {
       const body = new FormData()
       body.append('file', file)
+      // Either kind of transaction can hold a receipt now.
       if (transaction.isManual) body.append('manualTransactionId', transaction.id)
+      else body.append('transactionId', transaction.id)
 
       const res = await fetch('/api/receipts', { method: 'POST', body })
       const data = await res.json()
@@ -333,12 +335,7 @@ export function TransactionDetail({
               >
                 {uploading ? 'Uploading…' : 'Attach a photo'}
               </button>
-              {!transaction.isManual && (
-                <p className="text-2xs text-[var(--ink-faint)] mt-2 leading-relaxed">
-                  Stored against your account. Receipts attach directly to manual entries; for bank
-                  transactions this keeps the photo alongside your records.
-                </p>
-              )}
+
             </>
           )}
         </section>

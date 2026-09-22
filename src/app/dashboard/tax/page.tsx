@@ -9,6 +9,7 @@ const TAX_TYPES = ['deduction', 'income', 'donation', 'business_expense', 'medic
 const YEARS = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
 
 export default function TaxPage() {
+  const [deductibleTotal, setDeductibleTotal] = useState(0)
   const { format: fmt } = useCurrency()
   const [entries, setEntries] = useState<TaxEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,7 +19,10 @@ export default function TaxPage() {
   const fetchEntries = useCallback(async () => {
     const res = await fetch('/api/tax-entries')
     const data = await res.json()
-    setEntries(data)
+    // Manual entries and the deductible parts of real transactions, in one
+    // list. The splits used to be recorded and never shown here.
+    setEntries([...(data.entries ?? []), ...(data.fromSplits ?? [])])
+    setDeductibleTotal(data.deductibleTotal ?? 0)
     setLoading(false)
   }, [])
 

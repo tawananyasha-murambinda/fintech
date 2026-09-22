@@ -95,10 +95,10 @@ export function DashboardClient({
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">
+            <h1 className="page-title">
               Good {getGreeting()}, {firstName(userName)}
             </h1>
-            <p className="text-sm text-slate-500 mt-0.5 dark:text-slate-400">
+            <p className="page-subtitle">
               {hasData
                 ? "Here's your financial picture this month."
                 : "Connect a bank account to get started."}

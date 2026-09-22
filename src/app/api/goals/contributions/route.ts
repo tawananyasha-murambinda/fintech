@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { round, sum } from '@/lib/money'
 import { notifyGoalAchieved } from '@/lib/notifications'
 import { sendPushNotification } from '@/lib/push-notifications'
+import { preferencesFor, shouldDeliver } from '@/lib/notification-preferences'
 import { errorResponse } from '@/lib/errors'
 import { logger } from '@/lib/logger'
 
@@ -91,13 +92,18 @@ export async function POST(req: NextRequest) {
       goal.currentAmount < goal.targetAmount && updated.currentAmount >= updated.targetAmount
 
     if (justCompleted) {
-      await notifyGoalAchieved(session.user.id, updated.name).catch(() => undefined)
-      await sendPushNotification(session.user.id, {
-        title: 'Goal reached',
-        body: `You hit your ${updated.name} goal.`,
-        tag: `goal-${goalId}`,
-        url: '/dashboard/goals',
-      }).catch(() => undefined)
+      const prefs = await preferencesFor(session.user.id)
+      if (prefs.goals) {
+        await notifyGoalAchieved(session.user.id, updated.name).catch(() => undefined)
+      }
+      if (shouldDeliver(prefs, 'goals', 'push')) {
+        await sendPushNotification(session.user.id, {
+          title: 'Goal reached',
+          body: `You hit your ${updated.name} goal.`,
+          tag: `goal-${goalId}`,
+          url: '/dashboard/goals',
+        }).catch(() => undefined)
+      }
     }
 
     return NextResponse.json({

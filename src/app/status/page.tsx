@@ -9,7 +9,12 @@ interface Health {
   version: string
   uptime: number
   time: string
-  checks: { database: 'ok' | 'error' }
+  checks: { database: 'ok' | 'error'; configuration?: 'ok' | 'incomplete' }
+  configuration?: {
+    missingCritical: { key: string; impact: string }[]
+    missingDegraded: { key: string; impact: string }[]
+    missingOptional: string[]
+  }
 }
 
 export default function StatusPage() {
@@ -21,6 +26,8 @@ export default function StatusPage() {
 
     async function poll() {
       try {
+        // A degraded deployment answers 503 with a body worth reading, so the
+        // response is parsed either way rather than treated as a failure.
         const res = await fetch('/api/health', { cache: 'no-store' })
         const data = await res.json()
         if (active) {
@@ -70,6 +77,25 @@ export default function StatusPage() {
                 : 'The API is up but the database is unreachable.'}
           </p>
         </div>
+
+        {health?.configuration &&
+          (health.configuration.missingCritical.length > 0 ||
+            health.configuration.missingDegraded.length > 0) && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 mb-4 dark:border-amber-900/40 dark:bg-amber-950/30">
+              <p className="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-2">
+                Some features are switched off
+              </p>
+              <ul className="space-y-2">
+                {[...health.configuration.missingCritical, ...health.configuration.missingDegraded].map(
+                  (gap) => (
+                    <li key={gap.key} className="text-xs text-amber-800 dark:text-amber-300/90 leading-relaxed">
+                      <code className="font-mono font-semibold">{gap.key}</code> is not set — {gap.impact}
+                    </li>
+                  )
+                )}
+              </ul>
+            </div>
+          )}
 
         {health && (
           <div className="mt-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-4">

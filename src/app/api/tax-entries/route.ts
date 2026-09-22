@@ -8,12 +8,52 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const entries = await prisma.taxEntry.findMany({
-    where: { userId: session.user.id },
-    orderBy: [{ year: 'desc' }, { createdAt: 'desc' }],
+  const [entries, deductibleSplits] = await Promise.all([
+    prisma.taxEntry.findMany({
+      where: { userId: session.user.id },
+      orderBy: [{ year: 'desc' }, { createdAt: 'desc' }],
+    }),
+    // Transaction splits marked as business spend. These were recorded and
+    // then went nowhere — the tax organiser only ever showed entries typed in
+    // by hand, so the deductible flag was decoration.
+    prisma.transactionSplit.findMany({
+      where: { userId: session.user.id, deductible: true },
+      include: {
+        transaction: { select: { date: true, merchantName: true, description: true } },
+        manual: { select: { date: true, merchantName: true, description: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    }),
+  ])
+
+  // Presented alongside manual entries in the same shape, flagged by source so
+  // the UI can show where each came from and link back to the transaction.
+  const fromSplits = deductibleSplits.map((split) => {
+    const parent = split.transaction ?? split.manual
+    const date = parent?.date ?? split.createdAt
+    return {
+      id: `split-${split.id}`,
+      year: date.getFullYear(),
+      type: 'expense' as const,
+      description:
+        split.note || parent?.merchantName || parent?.description || 'Business expense',
+      amount: split.amount,
+      category: split.category,
+      date,
+      source: 'split' as const,
+      transactionId: split.transactionId,
+      manualId: split.manualId,
+    }
   })
 
-  return NextResponse.json(entries)
+  return NextResponse.json({
+    entries: entries.map((e) => ({ ...e, source: 'manual' as const })),
+    fromSplits,
+    // One figure the page can show without re-deriving it.
+    deductibleTotal:
+      Math.round(fromSplits.reduce((sum, s) => sum + s.amount, 0) * 100) / 100,
+  })
 }
 
 export async function POST(req: NextRequest) {

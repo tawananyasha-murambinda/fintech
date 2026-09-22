@@ -1,112 +1,273 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { LinkBankButton } from "@/components/bank/LinkBankButton";
-import { detectAndSaveLocation, saveUserLocation } from "@/lib/location";
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { LinkBankButton } from '@/components/bank/LinkBankButton'
+import { BUDGETABLE_CATEGORIES } from '@/lib/categories'
+import { useCurrency } from '@/hooks/useCurrency'
+
+// Onboarding.
+//
+// A new account previously landed on an empty dashboard — every number zero,
+// every list empty, nothing to react to. That is the moment most people decide
+// whether to come back.
+//
+// Three steps, each producing something the dashboard can actually show, and
+// every one skippable: a setup flow that cannot be escaped is worse than no
+// setup flow at all.
+
+type Step = 'bank' | 'budget' | 'goal' | 'location'
+
+const STEPS: Step[] = ['bank', 'budget', 'goal', 'location']
+
+// The categories people actually overspend on, offered first so the common
+// case is one tap rather than a scroll through twenty.
+const SUGGESTED = ['Food & Dining', 'Groceries', 'Shopping', 'Transportation', 'Entertainment']
 
 export default function OnboardingPage() {
-  const router = useRouter();
-  const [step, setStep] = useState<"bank" | "location">("bank");
-  const [locating, setLocating] = useState(false);
-  const [locationDone, setLocationDone] = useState(false);
+  const router = useRouter()
+  const { format: fmt } = useCurrency()
+  const [step, setStep] = useState<Step>('bank')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
-  async function handleSetLocation() {
-    setLocating(true);
-    // Already persisted server-side; only a named city counts as done, since
-    // coordinates alone leave local suggestions generic.
-    const loc = await detectAndSaveLocation();
-    if (loc.ok && loc.city) {
-      setLocationDone(true);
+  const [budgetCategory, setBudgetCategory] = useState('Food & Dining')
+  const [budgetAmount, setBudgetAmount] = useState('')
+  const [goalName, setGoalName] = useState('')
+  const [goalTarget, setGoalTarget] = useState('')
+
+  const index = STEPS.indexOf(step)
+
+  function next() {
+    setError('')
+    const following = STEPS[index + 1]
+    if (following) setStep(following)
+    else finish()
+  }
+
+  function finish() {
+    router.push('/dashboard')
+  }
+
+  async function saveBudget() {
+    const amount = parseFloat(budgetAmount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Enter an amount to budget.')
+      return
     }
-    setLocating(false);
-    router.push("/dashboard");
+
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch('/api/budgets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: budgetCategory, amount, period: 'monthly' }),
+      })
+      if (!res.ok) throw new Error('Could not save that budget.')
+      next()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save that budget.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveGoal() {
+    const target = parseFloat(goalTarget)
+    if (!goalName.trim() || !Number.isFinite(target) || target <= 0) {
+      setError('Give the goal a name and an amount.')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch('/api/goals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: goalName.trim(), targetAmount: target }),
+      })
+      if (!res.ok) throw new Error('Could not save that goal.')
+      next()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save that goal.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full text-center animate-fade-up">
-        {/* Logo */}
-        <img src="/icon-192.png" alt="" width={48} height={48} className="rounded-xl mx-auto mb-6" />
+    <div className="min-h-screen flex items-center justify-center px-5 py-10" style={{ background: 'var(--wash-base)' }}>
+      <div className="w-full max-w-md">
+        {/* Progress. Four dots rather than a percentage: it is short, and a
+            percentage on a four-step flow reads as longer than it is. */}
+        <div className="flex items-center gap-1.5 mb-8" role="progressbar" aria-valuenow={index + 1} aria-valuemin={1} aria-valuemax={STEPS.length}>
+          {STEPS.map((s, i) => (
+            <span
+              key={s}
+              className="h-1 flex-1 rounded-full transition-colors"
+              style={{ background: i <= index ? 'var(--accent)' : 'var(--line)' }}
+            />
+          ))}
+        </div>
 
-        {step === "bank" ? (
-          <>
-            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight mb-2">
-              Welcome to FinTrack
+        {error && (
+          <p role="alert" className="text-xs text-[var(--negative)] mb-4">
+            {error}
+          </p>
+        )}
+
+        {step === 'bank' && (
+          <section>
+            <h1 className="font-display text-3xl font-semibold tracking-[-0.035em] text-[var(--ink)] mb-3">
+              Connect an account
             </h1>
-            <p className="text-sm text-slate-500 mb-10 leading-relaxed">
-              Connect your bank account to get started. We&apos;ll pull your transactions
-              and analyse your spending with AI.
+            <p className="text-sm text-[var(--ink-muted)] leading-relaxed mb-6">
+              FinTrack reads your transactions through Plaid — read-only, and your bank credentials
+              never reach us. Everything else works better once it can see real spending.
+            </p>
+            <LinkBankButton variant="onboarding" />
+            <button onClick={next} className="btn-ghost w-full mt-3 text-sm">
+              I&apos;ll connect later
+            </button>
+          </section>
+        )}
+
+        {step === 'budget' && (
+          <section>
+            <h1 className="font-display text-3xl font-semibold tracking-[-0.035em] text-[var(--ink)] mb-3">
+              Set one budget
+            </h1>
+            <p className="text-sm text-[var(--ink-muted)] leading-relaxed mb-6">
+              Just one, on whatever you most want to keep an eye on. You can add more later.
             </p>
 
-            <div className="text-left space-y-3 mb-8">
-              {[
-                { label: "Connect your bank via Plaid", note: "Read-only access — we never see your password" },
-                { label: "We sync your transactions", note: "Up to 90 days of history imported automatically" },
-                { label: "See your spending clearly", note: "Category breakdowns, budgets, and trends over time" },
-              ].map((step, i) => (
-                <div key={i} className="flex items-start gap-3 p-3.5 bg-white rounded-xl border border-slate-100">
-                  <div className="w-6 h-6 rounded-full bg-teal-50 text-teal-700 text-xs font-semibold flex items-center justify-center shrink-0 mt-0.5">
-                    {i + 1}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">{step.label}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{step.note}</p>
-                  </div>
-                </div>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {SUGGESTED.map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => setBudgetCategory(category)}
+                  aria-pressed={budgetCategory === category}
+                  className="rounded-xl px-3 py-2 text-sm font-medium border transition-colors"
+                  style={{
+                    borderColor: budgetCategory === category ? 'var(--accent)' : 'var(--line)',
+                    background: budgetCategory === category ? 'var(--accent-wash)' : 'transparent',
+                    color: budgetCategory === category ? 'var(--accent-ink)' : 'var(--ink-muted)',
+                  }}
+                >
+                  {category}
+                </button>
               ))}
             </div>
 
-            <div className="flex flex-col gap-3">
-              <LinkBankButton variant="onboarding" />
-              <button
-                onClick={() => setStep("location")}
-                className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                Skip for now — I&apos;ll connect later
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="w-16 h-16 rounded-2xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center mx-auto mb-6">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-white dark:text-slate-900">
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="1.5"/>
-                <circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
-              </svg>
-            </div>
+            <select
+              value={budgetCategory}
+              onChange={(e) => setBudgetCategory(e.target.value)}
+              aria-label="Budget category"
+              className="input mb-3"
+            >
+              {BUDGETABLE_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
 
-            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight mb-2">
-              Enable location insights
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              value={budgetAmount}
+              onChange={(e) => setBudgetAmount(e.target.value)}
+              placeholder={`Monthly limit, e.g. ${fmt(300)}`}
+              aria-label="Monthly budget amount"
+              className="input stat-number"
+            />
+
+            <button onClick={saveBudget} disabled={saving} className="btn-primary w-full mt-4 disabled:opacity-50">
+              {saving ? 'Saving…' : 'Set budget'}
+            </button>
+            <button onClick={next} className="btn-ghost w-full mt-2 text-sm">
+              Skip
+            </button>
+          </section>
+        )}
+
+        {step === 'goal' && (
+          <section>
+            <h1 className="font-display text-3xl font-semibold tracking-[-0.035em] text-[var(--ink)] mb-3">
+              What are you saving for?
             </h1>
-            <p className="text-sm text-slate-500 mb-8 leading-relaxed max-w-xs mx-auto">
-              Allow your location to get personalised merchant alternatives, local savings tips, and area-specific spending insights.
+            <p className="text-sm text-[var(--ink-muted)] leading-relaxed mb-6">
+              A goal gives the numbers somewhere to go. Round-ups and spare cash can feed it later.
             </p>
 
-            <div className="space-y-3">
-              <button
-                onClick={handleSetLocation}
-                disabled={locating}
-                className="w-full py-3 text-sm font-medium text-white bg-teal-700 rounded-xl hover:bg-teal-800 active:scale-[0.98] transition-all disabled:opacity-50"
-              >
-                {locating ? "Detecting location…" : "Use my location"}
-              </button>
+            <input
+              type="text"
+              value={goalName}
+              onChange={(e) => setGoalName(e.target.value)}
+              placeholder="Holiday, emergency fund, a new laptop…"
+              aria-label="Goal name"
+              className="input mb-3"
+            />
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              value={goalTarget}
+              onChange={(e) => setGoalTarget(e.target.value)}
+              placeholder="Target amount"
+              aria-label="Target amount"
+              className="input stat-number"
+            />
 
-              <button
-                onClick={() => router.push("/dashboard")}
-                className="w-full py-2.5 text-sm font-medium text-slate-600 rounded-xl hover:bg-slate-100 active:scale-[0.98] transition-all"
-              >
-                Skip — I&apos;ll set it later in Settings
-              </button>
-            </div>
+            <button onClick={saveGoal} disabled={saving} className="btn-primary w-full mt-4 disabled:opacity-50">
+              {saving ? 'Saving…' : 'Create goal'}
+            </button>
+            <button onClick={next} className="btn-ghost w-full mt-2 text-sm">
+              Skip
+            </button>
+          </section>
+        )}
 
-            <p className="text-xs text-slate-400 mt-6 leading-relaxed">
-              Location data is used only to find nearby merchants and alternatives.
-              You can change this anytime in Settings.
+        {step === 'location' && (
+          <section>
+            <h1 className="font-display text-3xl font-semibold tracking-[-0.035em] text-[var(--ink)] mb-3">
+              Where are you?
+            </h1>
+            <p className="text-sm text-[var(--ink-muted)] leading-relaxed mb-6">
+              Used to find real shops and fares near you when suggesting cheaper alternatives.
+              Without it those suggestions are generic. You can set it later in Settings.
             </p>
-          </>
+
+            <button
+              onClick={async () => {
+                setSaving(true)
+                try {
+                  const { detectAndSaveLocation } = await import('@/lib/location')
+                  await detectAndSaveLocation()
+                } catch {
+                  // Denied or unavailable — not worth blocking the flow over.
+                } finally {
+                  setSaving(false)
+                  finish()
+                }
+              }}
+              disabled={saving}
+              className="btn-primary w-full disabled:opacity-50"
+            >
+              {saving ? 'Detecting…' : 'Use my location'}
+            </button>
+            <button onClick={finish} className="btn-ghost w-full mt-2 text-sm">
+              Not now
+            </button>
+          </section>
         )}
       </div>
     </div>
-  );
+  )
 }

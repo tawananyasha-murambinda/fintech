@@ -28,6 +28,23 @@ export async function GET() {
     return NextResponse.json({
       ...result,
       count: result.subscriptions.length,
+      // Surfaced separately so the page can lead with what needs a decision
+      // rather than making the user scan the whole list for it.
+      needsAttention: {
+        priceIncreases: result.subscriptions.filter(
+          (s) => s.priceChanged && (s.priceChangeMonthly ?? 0) > 0
+        ).length,
+        dormant: result.subscriptions.filter((s) => s.dormant).length,
+        // What the increases add up to over a year, which is the number that
+        // actually changes behaviour.
+        yearlyCostOfIncreases:
+          Math.round(
+            result.subscriptions.reduce(
+              (sum, s) => sum + Math.max(0, s.priceChangeMonthly ?? 0) * 12,
+              0
+            ) * 100
+          ) / 100,
+      },
     })
   } catch (err) {
     logger.error('Subscription detection failed', { userId: session.user.id, error: err })

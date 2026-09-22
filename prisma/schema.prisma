@@ -22,8 +22,17 @@ model User {
   // Interface language. Held on the account so the choice follows the user to
   // another device; localStorage mirrors it for instant switching.
   locale        String    @default("en")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+
+  // Notification preferences. These lived in localStorage, which the nightly
+  // job cannot read — so muting bill reminders did nothing and the phone still
+  // buzzed. They have to be on the account for the server to honour them.
+  notifyPush   Boolean  @default(true)
+  notifyEmail  Boolean  @default(true)
+  notifyBills  Boolean  @default(true)
+  notifyAlerts Boolean  @default(true)
+  notifyGoals  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Billing. `plan` is the entitlement the app reads on every request;
   // the Stripe columns are the bookkeeping that keeps it in sync.
@@ -164,12 +173,16 @@ model Transaction {
   merchantState      String?
   merchantCountry    String?
   status             String // "posted" | "pending"
+  // Receipts previously attached only to manual entries, so photographing one
+  // for a real card payment stored it unlinked.
+  receiptId          String?
   type               String? // "card_payment" | "transfer" | etc.
   runningBalance     Decimal? @db.Decimal(14, 2)
   createdAt          DateTime @default(now())
 
   user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   linkedBank       LinkedBank          @relation(fields: [linkedBankId], references: [id], onDelete: Cascade)
+  receipt          Receipt?            @relation("TransactionReceipt", fields: [receiptId], references: [id], onDelete: SetNull)
   contributions    VaultContribution[]
   TransactionSplit TransactionSplit[]
 
@@ -193,15 +206,18 @@ model AiInsight {
 }
 
 model Budget {
-  id        String   @id @default(cuid())
-  userId    String
-  category  String
-  amount    Decimal  @db.Decimal(14, 2)
-  period    String   @default("monthly") // "weekly" | "monthly" | "quarterly"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  userId      String
+  // Shared with every member of the household when set.
+  householdId String?
+  category    String
+  amount      Decimal  @db.Decimal(14, 2)
+  period      String   @default("monthly") // "weekly" | "monthly" | "quarterly"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household Household? @relation("HouseholdBudgets", fields: [householdId], references: [id], onDelete: SetNull)
 
   @@unique([userId, category, period])
   @@index([userId])
@@ -210,6 +226,8 @@ model Budget {
 model Goal {
   id            String    @id @default(cuid())
   userId        String
+  // Shared with every member of the household when set.
+  householdId   String?
   name          String
   targetAmount  Decimal   @db.Decimal(14, 2)
   currentAmount Decimal   @default(0) @db.Decimal(14, 2)
@@ -219,9 +237,11 @@ model Goal {
   updatedAt     DateTime  @updatedAt
 
   user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household        Household?         @relation("HouseholdGoals", fields: [householdId], references: [id], onDelete: SetNull)
   GoalContribution GoalContribution[]
 
   @@index([userId])
+  @@index([householdId])
 }
 
 model Bill {
@@ -245,7 +265,7 @@ model Bill {
   updatedAt    DateTime  @updatedAt
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  household Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  household Household? @relation("HouseholdBills", fields: [householdId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([householdId])
@@ -293,6 +313,7 @@ model Receipt {
 
   user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   manualTransactions ManualTransaction[]
+  transactions       Transaction[]       @relation("TransactionReceipt")
 
   @@index([userId])
 }
@@ -436,7 +457,9 @@ model Household {
   updatedAt DateTime @updatedAt
 
   members HouseholdMember[]
-  Bill    Bill[]
+  bills   Bill[]            @relation("HouseholdBills")
+  budgets Budget[]          @relation("HouseholdBudgets")
+  goals   Goal[]            @relation("HouseholdGoals")
 }
 
 model HouseholdMember {

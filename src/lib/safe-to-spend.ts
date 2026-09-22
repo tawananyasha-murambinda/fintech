@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { round, sum, subtract } from '@/lib/money'
 import { nextDueDate, daysUntilDue } from '@/lib/bills'
 import { detectIncomeStreams, nextPayday, type IncomeStream } from '@/lib/recurring-income'
+import { sumInCurrency } from '@/lib/fx'
 
 // Safe to spend.
 //
@@ -65,8 +66,16 @@ export async function computeSafeToSpend(
   const caveats: string[] = []
 
   const priced = banks.filter((b) => b.currentBalance !== null)
-  const balance = sum(priced.map((b) => b.currentBalance ?? 0))
   const accountsWithoutBalance = banks.length - priced.length
+
+  // Converted rather than added raw. A €500 account plus a £500 account is not
+  // 1000 of anything, which is what this produced before.
+  const displayCurrency = priced[0]?.currency || 'USD'
+  const converted = await sumInCurrency(
+    priced.map((b) => ({ amount: b.currentBalance ?? 0, currency: b.currency })),
+    displayCurrency
+  )
+  const balance = converted.total
 
   if (accountsWithoutBalance > 0) {
     caveats.push(
@@ -74,11 +83,12 @@ export async function computeSafeToSpend(
     )
   }
 
-  // Mixed currencies are summed as-is. Converting would need a rate and would
-  // make the headline figure depend on one; saying so is more honest.
-  const currencies = new Set(priced.map((b) => b.currency))
-  if (currencies.size > 1) {
-    caveats.push('Accounts are in different currencies and have been added without conversion.')
+  if (converted.converted) {
+    caveats.push(
+      converted.live
+        ? `Accounts in other currencies were converted to ${displayCurrency} at today's rate.`
+        : `Accounts in other currencies were converted to ${displayCurrency} using stored rates, which may be out of date.`
+    )
   }
 
   const { streams } = detectIncomeStreams(transactions, now)

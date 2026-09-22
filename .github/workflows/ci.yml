@@ -44,3 +44,64 @@ jobs:
           # Next will not build without at least a dummy NEXTAUTH secret
           # present when the session strategy reads env at build time.
           NEXTAUTH_SECRET: ci-placeholder-secret
+
+  e2e:
+    name: End-to-end smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # A real Postgres, because the bugs worth catching here live in the seam
+    # between the app and its schema — which no mock can reproduce.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fintrack_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fintrack_test
+      NEXTAUTH_SECRET: ci-e2e-secret-not-a-real-one
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      # 32 bytes of hex — the format the encryption module validates.
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      CRON_SECRET: ci-cron-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Create the schema
+        run: npx prisma db push --skip-generate
+
+      - name: Build
+        run: npx prisma generate && npm run build
+
+      - name: Run smoke tests
+        run: npx playwright test
+
+      - name: Upload the trace when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

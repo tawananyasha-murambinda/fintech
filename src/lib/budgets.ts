@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { sharedScope } from '@/lib/households'
 import { canonicalCategory, totalsByCategory } from '@/lib/categories'
 import { currentPeriodWindow, periodProgress, type PeriodWindow } from '@/lib/budget-period'
 import { sum, subtract, gt, multiply } from '@/lib/money'
@@ -73,8 +74,9 @@ function statusFor(
  * window rather than a blanket calendar month.
  */
 export async function budgetStatuses(userId: string, now: Date = new Date()): Promise<BudgetStatus[]> {
+  // Includes budgets other household members have shared, not only your own.
   const budgets = await prisma.budget.findMany({
-    where: { userId },
+    where: await sharedScope(userId),
     orderBy: { category: 'asc' },
   })
   if (budgets.length === 0) return []

@@ -81,14 +81,19 @@ describe('computeSafeToSpend', () => {
     expect(result.caveats.join(' ')).toMatch(/end of the month/)
   })
 
-  it('warns when accounts are in different currencies', async () => {
+  it('converts across currencies instead of adding them raw', async () => {
+    // A £500 account plus a €500 account is not 1000 of anything. This used to
+    // sum them untouched and merely warn about it.
     mockPrisma.linkedBank.findMany.mockResolvedValue([
       { currentBalance: 500, currency: 'GBP', accountName: 'UK' },
       { currentBalance: 500, currency: 'EUR', accountName: 'EU' },
     ])
 
     const result = await computeSafeToSpend('u1', NOW)
-    expect(result.caveats.join(' ')).toMatch(/different currencies/)
+
+    expect(result.balance).not.toBe(1000)
+    expect(result.balance).toBeGreaterThan(500)
+    expect(result.caveats.join(' ')).toMatch(/converted to GBP/)
   })
 
   it('reports hasBalance false rather than a zero balance', async () => {

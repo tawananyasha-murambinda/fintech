@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { notifyBillReminder } from '@/lib/notifications'
 import { sendPushNotification } from '@/lib/push-notifications'
 import { logger } from '@/lib/logger'
+import { preferencesFor, shouldDeliver } from '@/lib/notification-preferences'
 import { nextDueDate, daysUntilDue } from '@/lib/bills'
 
 export const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -65,13 +66,22 @@ export async function runBillReminders(now: Date = new Date()): Promise<Reminder
       // notifyBillReminder composes the text in the account's language and
       // currency; the push reuses it rather than repeating a second English
       // copy with a hard-coded dollar sign.
+      const prefs = await preferencesFor(bill.userId)
+
+      // A muted reminder is skipped entirely rather than written and hidden —
+      // the user asked not to be reminded, not to be reminded quietly.
+      if (!prefs.bills) continue
+
       const notification = await notifyBillReminder(bill.userId, bill.name, bill.amount, days)
-      await sendPushNotification(bill.userId, {
-        title: notification.title,
-        body: notification.body,
-        tag: `bill-${bill.id}`,
-        url: '/dashboard/bills',
-      })
+
+      if (shouldDeliver(prefs, 'bills', 'push')) {
+        await sendPushNotification(bill.userId, {
+          title: notification.title,
+          body: notification.body,
+          tag: `bill-${bill.id}`,
+          url: '/dashboard/bills',
+        })
+      }
       // Stamped only after a successful notification so a failure retries
       // on the next run instead of being silently swallowed for the cycle.
       await prisma.bill.update({ where: { id: bill.id }, data: { lastReminded: now } })

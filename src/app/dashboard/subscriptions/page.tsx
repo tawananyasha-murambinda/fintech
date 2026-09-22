@@ -14,6 +14,9 @@ interface Subscription {
   nextExpected: string | null
   confidence: number
   priceChanged: boolean
+  priceChangeMonthly: number | null
+  dormant: boolean
+  cancelUrl: string | null
   lastCharge: string
   transactionCount: number
 }
@@ -186,8 +189,14 @@ export default function SubscriptionsPage() {
                         <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{sub.name}</p>
                         <p className="text-2xs text-slate-400">
                           {sub.category} · {describeCadence(sub)} · {sub.transactionCount} charge{sub.transactionCount !== 1 ? 's' : ''}
-                          {sub.priceChanged && (
-                            <span className="ml-1 text-amber-600 dark:text-amber-400">· price changed</span>
+                          {sub.priceChanged && sub.priceChangeMonthly !== null && (
+                            <span className="ml-1 text-amber-600 dark:text-amber-400">
+                              · {sub.priceChangeMonthly > 0 ? 'up' : 'down'}{' '}
+                              {fmt(Math.abs(sub.priceChangeMonthly))}/mo
+                            </span>
+                          )}
+                          {sub.dormant && (
+                            <span className="ml-1 text-slate-400">· nothing charged recently</span>
                           )}
                         </p>
                       </div>
@@ -200,6 +209,16 @@ export default function SubscriptionsPage() {
                             <span className="text-2xs font-normal text-slate-400">/{CADENCE_UNIT[sub.cadence] || 'charge'}</span>
                           )}
                         </p>
+                        {sub.cancelUrl && (
+                          <a
+                            href={sub.cancelUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-2xs font-medium text-[var(--accent)] hover:underline block"
+                          >
+                            Cancel
+                          </a>
+                        )}
                         <p className="text-2xs text-slate-400">
                           {sub.cadence === 'monthly'
                             ? `${fmt(sub.monthlyAmount * 12)}/yr`

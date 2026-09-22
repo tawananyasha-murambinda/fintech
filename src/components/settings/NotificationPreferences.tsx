@@ -12,19 +12,41 @@ export function NotificationPreferencesSection() {
   const [mounted, setMounted] = useState(false)
   const [saved, setSaved] = useState(false)
 
+  const [error, setError] = useState('')
+
+  // Read from the account, not localStorage. The nightly job that sends these
+  // notifications runs on the server and cannot see a browser — so a mute kept
+  // only in localStorage silenced nothing at all.
   useEffect(() => {
-    setMounted(true)
-    setPushEnabled(localStorage.getItem('notif_push') === 'true')
-    setEmailEnabled(localStorage.getItem('notif_email') !== 'false')
-    setNotifyBills(localStorage.getItem('notif_bills') !== 'false')
-    setNotifyGoals(localStorage.getItem('notif_goals') !== 'false')
-    setNotifyAlerts(localStorage.getItem('notif_alerts') !== 'false')
+    fetch('/api/auth/profile')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return
+        setPushEnabled(data.notifyPush ?? true)
+        setEmailEnabled(data.notifyEmail ?? true)
+        setNotifyBills(data.notifyBills ?? true)
+        setNotifyGoals(data.notifyGoals ?? true)
+        setNotifyAlerts(data.notifyAlerts ?? true)
+      })
+      .catch(() => undefined)
+      .finally(() => setMounted(true))
   }, [])
 
-  function save(key: string, value: boolean) {
-    localStorage.setItem(key, String(value))
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  async function save(key: string, value: boolean) {
+    setError('')
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: value }),
+      })
+      if (!res.ok) throw new Error('Could not save that preference.')
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err) {
+      // Say so rather than showing "saved" for something that was not.
+      setError(err instanceof Error ? err.message : 'Could not save that preference.')
+    }
   }
 
   if (!mounted) {
@@ -39,7 +61,12 @@ export function NotificationPreferencesSection() {
 
   return (
     <SettingsCard title="Notifications" description="Control what notifications you receive.">
-      {saved && (
+      {error && (
+        <div role="alert" className="text-sm px-4 py-3 rounded-lg bg-red-50 text-red-700 border border-red-100 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/40">
+          {error}
+        </div>
+      )}
+      {saved && !error && (
         <div className="text-sm px-4 py-3 rounded-lg bg-teal-50 text-teal-700 border border-teal-100 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-900/40">
           Preferences saved
         </div>
@@ -50,7 +77,7 @@ export function NotificationPreferencesSection() {
           <input
             type="checkbox"
             checked={emailEnabled}
-            onChange={e => { setEmailEnabled(e.target.checked); save('notif_email', e.target.checked) }}
+            onChange={e => { setEmailEnabled(e.target.checked); save('notifyEmail', e.target.checked) }}
             className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
           />
           <span className="text-sm text-slate-700 dark:text-slate-300">{emailEnabled ? 'On' : 'Off'}</span>
@@ -62,7 +89,7 @@ export function NotificationPreferencesSection() {
           <input
             type="checkbox"
             checked={pushEnabled}
-            onChange={e => { setPushEnabled(e.target.checked); save('notif_push', e.target.checked) }}
+            onChange={e => { setPushEnabled(e.target.checked); save('notifyPush', e.target.checked) }}
             className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
           />
           <span className="text-sm text-slate-700 dark:text-slate-300">{pushEnabled ? 'On' : 'Off'}</span>
@@ -80,7 +107,7 @@ export function NotificationPreferencesSection() {
             <input
               type="checkbox"
               checked={notifyBills}
-              onChange={e => { setNotifyBills(e.target.checked); save('notif_bills', e.target.checked) }}
+              onChange={e => { setNotifyBills(e.target.checked); save('notifyBills', e.target.checked) }}
               className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
             />
           </label>
@@ -93,7 +120,7 @@ export function NotificationPreferencesSection() {
             <input
               type="checkbox"
               checked={notifyGoals}
-              onChange={e => { setNotifyGoals(e.target.checked); save('notif_goals', e.target.checked) }}
+              onChange={e => { setNotifyGoals(e.target.checked); save('notifyGoals', e.target.checked) }}
               className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
             />
           </label>
@@ -106,7 +133,7 @@ export function NotificationPreferencesSection() {
             <input
               type="checkbox"
               checked={notifyAlerts}
-              onChange={e => { setNotifyAlerts(e.target.checked); save('notif_alerts', e.target.checked) }}
+              onChange={e => { setNotifyAlerts(e.target.checked); save('notifyAlerts', e.target.checked) }}
               className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
             />
           </label>
