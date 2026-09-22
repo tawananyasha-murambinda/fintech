@@ -17,9 +17,6 @@ ALTER TABLE "Goal" ADD COLUMN     "householdId" TEXT;
 -- CreateIndex
 CREATE INDEX "Goal_householdId_idx" ON "Goal"("householdId");
 
--- CreateIndex
-CREATE INDEX "Bill_householdId_idx" ON "Bill"("householdId");
-
 -- AddForeignKey
 ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_receiptId_fkey" FOREIGN KEY ("receiptId") REFERENCES "Receipt"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
