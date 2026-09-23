@@ -645,15 +645,17 @@ function report(extras = '') {
 
 }
 
-async function main() {
-  const prisma = await db()
-  const user = await prisma.user.findUnique({ where: { email: EMAIL } })
-  if (!user) {
-    throw new Error(
-      `No account for ${EMAIL}. Register it in the app first, then run this again.`
-    )
-  }
-
+/**
+ * Writes the generated year into an existing account.
+ *
+ * Shared by the CLI and the developer-only seed endpoint, so what runs on a
+ * deployment is the same code that runs locally — a seeder that only works in
+ * one of the two places is a seeder nobody trusts.
+ *
+ * Only rows tagged with DEMO_ITEM_ID are removed on a re-run; a real linked
+ * bank on the same user is never touched.
+ */
+export async function seedInto(prisma, user, { wipe = false } = {}) {
   // The alternatives and location insights need somewhere to be.
   await prisma.user.update({
     where: { id: user.id },
@@ -714,7 +716,7 @@ async function main() {
     await prisma.transaction.createMany({ data: data.slice(i, i + 500), skipDuplicates: true })
   }
 
-  if (WIPE) {
+  if (wipe) {
     await prisma.budget.deleteMany({ where: { userId: user.id } })
     await prisma.goal.deleteMany({ where: { userId: user.id } })
     await prisma.bill.deleteMany({ where: { userId: user.id } })
@@ -823,10 +825,33 @@ async function main() {
     })
   }
 
-  report(
-    `\n  also: ${budgets.length} budgets, ${goals.length} goals, ${bills.length} bills, 1 liability, ${snapshots.length} net-worth points`
-  )
+  return {
+    transactions: data.length,
+    budgets: budgets.length,
+    goals: goals.length,
+    bills: bills.length,
+    liabilities: 1,
+    netWorthPoints: snapshots.length,
+    openingBalance: opening,
+    closingBalance: closing,
+    lowestBalance: trough,
+    from: ymd(start),
+    to: ymd(today),
+  }
+}
 
+async function main() {
+  const prisma = await db()
+  const user = await prisma.user.findUnique({ where: { email: EMAIL } })
+  if (!user) {
+    throw new Error(`No account for ${EMAIL}. Register it in the app first, then run this again.`)
+  }
+
+  const result = await seedInto(prisma, user, { wipe: WIPE })
+  report(
+    `\n  also: ${result.budgets} budgets, ${result.goals} goals, ${result.bills} bills, ` +
+      `${result.liabilities} liability, ${result.netWorthPoints} net-worth points`
+  )
   await prisma.$disconnect()
 }
 
