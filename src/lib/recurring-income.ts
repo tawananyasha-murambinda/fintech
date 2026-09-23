@@ -29,6 +29,9 @@ export type IncomeStream = {
   paymentCount: number
   /** 0–1. Regular intervals and steady amounts raise it. */
   confidence: number
+  /** Nothing has arrived in well over a cycle: the stream has stopped. */
+  ended: boolean
+  daysSinceLastPaid: number
   /** True when the most recent payment differs materially from the norm. */
   amountVaries: boolean
 }
@@ -106,13 +109,30 @@ export function detectIncomeStreams(
         ? null
         : new Date(last.date.getTime() + medianGap * DAY_MS)
 
+    // Income that stopped. A student grant that ended in March, a contract
+    // that finished — the payments are real history, but the stream is over.
+    //
+    // Two things went wrong without this. `nextExpected` kept projecting a
+    // payday that had already passed, which any screen showing "next expected"
+    // renders as a date six months ago. And `monthlyTotal` went on counting
+    // the money, so someone whose grant and stipend both ended was told they
+    // earn nearly EUR 1,000 a month more than they do — a figure the budget
+    // advice and the assistant then reason from.
+    //
+    // The sibling detector for subscriptions already draws this line; income
+    // was simply never given the same treatment.
+    const daysSinceLastPaid = Math.floor((now.getTime() - last.date.getTime()) / DAY_MS)
+    const ended = medianGap > 0 && daysSinceLastPaid > medianGap * 2
+
     streams.push({
       source,
       amount: typical,
       cadence: effectiveCadence,
       medianGapDays: Math.round(medianGap),
       lastPaid: last.date.toISOString(),
-      nextExpected: projected ? projected.toISOString() : null,
+      nextExpected: projected && projected > now ? projected.toISOString() : null,
+      ended,
+      daysSinceLastPaid,
       paymentCount: payments.length,
       confidence: Math.min(
         1,
@@ -128,7 +148,9 @@ export function detectIncomeStreams(
 
   return {
     streams,
-    monthlyTotal: sum(streams.map(monthlyValue)),
+    // Only what is still arriving. Ended streams stay in the list — the
+    // history is worth seeing — but they are not counted as income.
+    monthlyTotal: sum(streams.filter((s) => !s.ended).map(monthlyValue)),
   }
 }
 

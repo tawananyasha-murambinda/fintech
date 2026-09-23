@@ -14,7 +14,14 @@ type LinkedBankWithToken = {
 
 // Imports/updates transactions for a single linked bank using the Plaid
 // cursor. Shared by the manual sync endpoint and the Plaid webhook handler.
+// Seeded test accounts hold a fabricated access token, so asking Plaid about
+// them fails every night and the error buries real sync failures in the log.
+// They are already complete by construction; there is nothing to fetch.
+export const DEMO_ITEM_ID = 'demo_seed_v1'
+
 export async function syncLinkedBank(bank: LinkedBankWithToken): Promise<{ imported: number; error?: string }> {
+  if (bank.plaidItemId === DEMO_ITEM_ID) return { imported: 0 }
+
   const today = new Date().toISOString().split('T')[0]
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 

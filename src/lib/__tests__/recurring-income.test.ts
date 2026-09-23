@@ -13,6 +13,15 @@ function payments(source: string, amount: number, gapDays: number, count: number
   }))
 }
 
+
+/** The same payments, but ending `agoDays` before NOW instead of at it. */
+function endedPayments(source: string, amount: number, gapDays: number, count: number, agoDays: number) {
+  return payments(source, amount, gapDays, count).map((p) => ({
+    ...p,
+    date: new Date(p.date.getTime() - agoDays * 86_400_000),
+  }))
+}
+
 describe('detectIncomeStreams', () => {
   it('finds a monthly salary', () => {
     const { streams } = detectIncomeStreams(payments('Acme Corp Payroll', 2400, 30, 6), NOW)
@@ -71,7 +80,7 @@ describe('detectIncomeStreams', () => {
 
 describe('monthlyValue', () => {
   it('converts each cadence onto a month', () => {
-    const base = { source: 'x', medianGapDays: 30, lastPaid: '', nextExpected: null, paymentCount: 3, confidence: 1, amountVaries: false }
+    const base = { source: 'x', medianGapDays: 30, lastPaid: '', nextExpected: null, paymentCount: 3, confidence: 1, amountVaries: false, ended: false, daysSinceLastPaid: 0 }
     expect(monthlyValue({ ...base, amount: 1200, cadence: 'yearly' })).toBe(100)
     expect(monthlyValue({ ...base, amount: 300, cadence: 'quarterly' })).toBe(100)
     expect(monthlyValue({ ...base, amount: 100, cadence: 'monthly' })).toBe(100)
@@ -93,5 +102,54 @@ describe('nextPayday', () => {
   it('returns null rather than inventing a payday', () => {
     // Everything built on safe-to-spend depends on this not guessing.
     expect(nextPayday([], NOW)).toBeNull()
+  })
+})
+
+describe('detectIncomeStreams, continued', () => {
+  // Found by the seeded test year: a student grant and an internship stipend
+  // that both stopped in March were still being counted as income in
+  // September, and still projecting a "next payment" six months in the past.
+  describe('income that has stopped', () => {
+    it('marks a stream that has not paid in well over a cycle as ended', () => {
+      const { streams } = detectIncomeStreams(
+        endedPayments('DUO Studiefinanciering', 314.53, 30, 6, 150),
+        NOW
+      )
+
+      expect(streams).toHaveLength(1)
+      expect(streams[0].ended).toBe(true)
+      expect(streams[0].daysSinceLastPaid).toBeGreaterThan(60)
+    })
+
+    it('does not project a payday that has already passed', () => {
+      const { streams } = detectIncomeStreams(
+        endedPayments('Acme Corp Payroll', 2400, 30, 6, 150),
+        NOW
+      )
+
+      expect(streams[0].nextExpected).toBeNull()
+    })
+
+    it('leaves ended income out of the monthly total', () => {
+      const live = payments('Acme Corp Payroll', 2400, 30, 6)
+      const dead = endedPayments('Old Job Salary', 1800, 30, 6, 150)
+
+      const { streams, monthlyTotal } = detectIncomeStreams([...live, ...dead], NOW)
+
+      // Both remain visible — the history is worth showing — but only the
+      // money still arriving is counted.
+      expect(streams).toHaveLength(2)
+      expect(monthlyTotal).toBeCloseTo(2400, 0)
+    })
+
+    it('still counts a stream that is merely a few days late', () => {
+      const { streams, monthlyTotal } = detectIncomeStreams(
+        endedPayments('Acme Corp Payroll', 2400, 30, 6, 12),
+        NOW
+      )
+
+      expect(streams[0].ended).toBe(false)
+      expect(monthlyTotal).toBeCloseTo(2400, 0)
+    })
   })
 })
